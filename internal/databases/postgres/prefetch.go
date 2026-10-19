@@ -218,15 +218,22 @@ func prefetchFile(ctx context.Context, location string,
 	err := os.MkdirAll(runningLocation, 0755)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("WAL-prefetch %s, make dirs: %v", walFileName, err)
+		return
 	}
 
 	tracelog.DebugLogger.Printf("File prefetched to %s", oldPath)
 	err = internal.DownloadFileTo(ctx, reader, walFileName, oldPath)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("WAL-prefetch %s, download: %v", walFileName, err)
-	} else {
-		tracelog.DebugLogger.Printf("WAL-prefetch %s, download OK", walFileName)
+		// DownloadFileTo can leave output behind after a read/decompression
+		// error, including a full-size file with a failed frame checksum.
+		// EEXIST means another prefetcher owns the running file: leave it alone.
+		if !os.IsExist(err) {
+			_ = os.Remove(oldPath)
+		}
+		return
 	}
+	tracelog.DebugLogger.Printf("WAL-prefetch %s, download OK", walFileName)
 
 	_, errO = os.Stat(oldPath)
 	_, errN = os.Stat(newPath)

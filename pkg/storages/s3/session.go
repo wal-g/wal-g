@@ -24,6 +24,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+//nolint:gocyclo
 func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Options), error) {
 	// Connect to a node from endpoint source, but keep configured endpoint as request host
 	// Use configured endpoint protocol for connection
@@ -46,6 +47,22 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 	loadOpts := []func(*config.LoadOptions) error{
 		config.WithHTTPClient(httpClient),
 		config.WithRetryer(newRetryerFunc(cfg)),
+	}
+
+	requestChecksumCalculation, err := parseRequestChecksumCalculation(cfg.RequestChecksumCalculation)
+	if err != nil {
+		return aws.Config{}, nil, err
+	}
+	if requestChecksumCalculation != aws.RequestChecksumCalculationUnset {
+		loadOpts = append(loadOpts, config.WithRequestChecksumCalculation(requestChecksumCalculation))
+	}
+
+	responseChecksumValidation, err := parseResponseChecksumValidation(cfg.ResponseChecksumValidation)
+	if err != nil {
+		return aws.Config{}, nil, err
+	}
+	if responseChecksumValidation != aws.ResponseChecksumValidationUnset {
+		loadOpts = append(loadOpts, config.WithResponseChecksumValidation(responseChecksumValidation))
 	}
 
 	if cfg.DualStack {
@@ -82,6 +99,34 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 	}
 
 	return awsCfg, append(s3Opts, ycOpts...), nil
+}
+
+func parseRequestChecksumCalculation(value string) (aws.RequestChecksumCalculation, error) {
+	switch strings.ToUpper(value) {
+	case "":
+		return aws.RequestChecksumCalculationUnset, nil
+	case "WHEN_SUPPORTED":
+		return aws.RequestChecksumCalculationWhenSupported, nil
+	case "WHEN_REQUIRED":
+		return aws.RequestChecksumCalculationWhenRequired, nil
+	default:
+		return aws.RequestChecksumCalculationUnset, fmt.Errorf("%s=%q must be WHEN_SUPPORTED or WHEN_REQUIRED",
+			requestChecksumCalculationSetting, value)
+	}
+}
+
+func parseResponseChecksumValidation(value string) (aws.ResponseChecksumValidation, error) {
+	switch strings.ToUpper(value) {
+	case "":
+		return aws.ResponseChecksumValidationUnset, nil
+	case "WHEN_SUPPORTED":
+		return aws.ResponseChecksumValidationWhenSupported, nil
+	case "WHEN_REQUIRED":
+		return aws.ResponseChecksumValidationWhenRequired, nil
+	default:
+		return aws.ResponseChecksumValidationUnset, fmt.Errorf("%s=%q must be WHEN_SUPPORTED or WHEN_REQUIRED",
+			responseChecksumValidationSetting, value)
+	}
 }
 
 func buildS3Options(cfg *Config, scheme, host string) ([]func(*s3.Options), error) {

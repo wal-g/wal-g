@@ -12,6 +12,13 @@ import (
 //go:generate mockgen -destination=../../../test/mocks/mock_folder.go -package mocks -build_flags -mod=readonly github.com/wal-g/wal-g/pkg/storages/storage Folder
 //go:generate mockgen -destination=../../../test/mocks/mock_folder_ext.go -package mocks -build_flags -mod=readonly github.com/wal-g/wal-g/pkg/storages/storage FolderExt
 
+// SizedReader reports the number of bytes that remain to be read. It allows
+// storage implementations to tune uploads without buffering the content.
+type SizedReader interface {
+	io.Reader
+	RemainingSize() int64
+}
+
 type Folder interface {
 	// GetPath provides a relative path from the root of the storage. It must always end with '/'.
 	GetPath() string
