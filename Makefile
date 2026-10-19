@@ -44,7 +44,7 @@ GIT_REVISION ?= `git rev-parse --short HEAD`
 
 # disable_grpc_modules drops gRPC DirectPath (xDS/envoy) from cloud.google.com/go/storage,
 # wal-g uses the HTTP GCS client only
-BUILD_TAGS:=disable_grpc_modules
+BUILD_TAGS:=disable_grpc_modules $(EXTRA_BUILD_TAGS)
 
 ifdef USE_BROTLI
 	BUILD_TAGS:=$(BUILD_TAGS) brotli
