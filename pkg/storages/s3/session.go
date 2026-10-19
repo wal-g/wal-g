@@ -24,6 +24,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+//nolint:gocyclo
 func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Options), error) {
 	// Connect to a node from endpoint source, but keep configured endpoint as request host
 	// Use configured endpoint protocol for connection
@@ -45,6 +46,23 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 
 	loadOpts := []func(*config.LoadOptions) error{
 		config.WithHTTPClient(httpClient),
+		config.WithRetryer(newRetryerFunc(cfg)),
+	}
+
+	requestChecksumCalculation, err := parseRequestChecksumCalculation(cfg.RequestChecksumCalculation)
+	if err != nil {
+		return aws.Config{}, nil, err
+	}
+	if requestChecksumCalculation != aws.RequestChecksumCalculationUnset {
+		loadOpts = append(loadOpts, config.WithRequestChecksumCalculation(requestChecksumCalculation))
+	}
+
+	responseChecksumValidation, err := parseResponseChecksumValidation(cfg.ResponseChecksumValidation)
+	if err != nil {
+		return aws.Config{}, nil, err
+	}
+	if responseChecksumValidation != aws.ResponseChecksumValidationUnset {
+		loadOpts = append(loadOpts, config.WithResponseChecksumValidation(responseChecksumValidation))
 	}
 
 	if cfg.DualStack {
@@ -70,8 +88,6 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 	}
 	awsCfg.Region = region
 
-	awsCfg.Retryer = newRetryerFunc(cfg)
-
 	s3Opts, err := buildS3Options(cfg, scheme, host)
 	if err != nil {
 		return aws.Config{}, nil, err
@@ -85,10 +101,39 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 	return awsCfg, append(s3Opts, ycOpts...), nil
 }
 
+func parseRequestChecksumCalculation(value string) (aws.RequestChecksumCalculation, error) {
+	switch strings.ToUpper(value) {
+	case "":
+		return aws.RequestChecksumCalculationUnset, nil
+	case "WHEN_SUPPORTED":
+		return aws.RequestChecksumCalculationWhenSupported, nil
+	case "WHEN_REQUIRED":
+		return aws.RequestChecksumCalculationWhenRequired, nil
+	default:
+		return aws.RequestChecksumCalculationUnset, fmt.Errorf("%s=%q must be WHEN_SUPPORTED or WHEN_REQUIRED",
+			requestChecksumCalculationSetting, value)
+	}
+}
+
+func parseResponseChecksumValidation(value string) (aws.ResponseChecksumValidation, error) {
+	switch strings.ToUpper(value) {
+	case "":
+		return aws.ResponseChecksumValidationUnset, nil
+	case "WHEN_SUPPORTED":
+		return aws.ResponseChecksumValidationWhenSupported, nil
+	case "WHEN_REQUIRED":
+		return aws.ResponseChecksumValidationWhenRequired, nil
+	default:
+		return aws.ResponseChecksumValidationUnset, fmt.Errorf("%s=%q must be WHEN_SUPPORTED or WHEN_REQUIRED",
+			responseChecksumValidationSetting, value)
+	}
+}
+
 func buildS3Options(cfg *Config, scheme, host string) ([]func(*s3.Options), error) {
 	s3Opts := []func(*s3.Options){
 		func(o *s3.Options) {
 			o.UsePathStyle = cfg.ForcePathStyle
+			o.DisableLogOutputChecksumValidationSkipped = true
 		},
 	}
 	if cfg.Endpoint != "" {
@@ -137,6 +182,7 @@ func applyYCSessionToken(awsCfg *aws.Config, cfg *Config) ([]func(*s3.Options), 
 
 func buildHTTPClient(cfg *Config, tlsServerName string) (aws.HTTPClient, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = cfg.RequestTimeout
 
 	if tlsServerName != "" {
 		if transport.TLSClientConfig == nil {
@@ -161,11 +207,6 @@ func buildHTTPClient(cfg *Config, tlsServerName string) (aws.HTTPClient, error) 
 			transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 		}
 		transport.TLSClientConfig.RootCAs = pool
-	}
-
-	// Zero leaves the clone's timeout disabled. See Config.ResponseHeaderTimeout.
-	if cfg.ResponseHeaderTimeout > 0 {
-		transport.ResponseHeaderTimeout = cfg.ResponseHeaderTimeout
 	}
 
 	return &http.Client{Transport: NewRoundTripperWithLogging(transport)}, nil
@@ -225,6 +266,7 @@ func detectAWSRegionByBucket(ctx context.Context, awsCfg *aws.Config, bucket, en
 		if endpoint != "" {
 			o.BaseEndpoint = aws.String(endpoint)
 		}
+		o.DisableLogOutputChecksumValidationSkipped = true
 	})
 	out, err := client.GetBucketLocation(ctx, &s3.GetBucketLocationInput{
 		Bucket: aws.String(bucket),

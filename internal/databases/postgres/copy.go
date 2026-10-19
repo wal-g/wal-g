@@ -22,7 +22,11 @@ func HandleCopy(ctx context.Context, fromConfigFile string, toConfigFile string,
 	tracelog.ErrorLogger.FatalOnError(err)
 	plan, err := BuildCopyPlan(ctx, from.RootFolder(), to.RootFolder(), backupName, withAllHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, copy.OptionsFromConfigs(fromConfig, toConfig)))
+	options, err := copy.OptionsFromConfigs(fromConfig, toConfig)
+	tracelog.ErrorLogger.FatalOnError(err)
+	options.SkipErrorsFor, err = copy.DisasterCopyPattern(fromConfig, toConfig)
+	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, options))
 	tracelog.InfoLogger.Println("Success copy.")
 }
 
@@ -152,6 +156,10 @@ func addPostgresHistoryObjects(
 	last string,
 	withAllHistory bool,
 ) (postgresHistoryScan, error) {
+	firstTimeline, _, err := ParseWALFilename(first)
+	if err != nil {
+		return postgresHistoryScan{}, err
+	}
 	history := postgresHistoryScan{segments: make(map[uint32]map[uint64]bool)}
 	for _, object := range plan.SourceObjects() {
 		name := object.GetName()
@@ -164,7 +172,11 @@ func addPostgresHistoryObjects(
 		isTimelineHistory := strings.HasSuffix(archiveName, ".history")
 		// Timeline files are small, opaque restore dependencies. They bypass
 		// range filtering to avoid opening or decrypting them to infer ancestry.
-		if !isTimelineHistory && (logicalName < first || (!withAllHistory && logicalName > last)) {
+		if isTimelineHistory {
+			if isOlderTimelineHistory(archiveName, firstTimeline) {
+				continue
+			}
+		} else if logicalName < first || (!withAllHistory && logicalName > last) {
 			continue
 		}
 		if err := plan.AddObject(name, name, copy.PayloadPhase, false); err != nil {
@@ -188,6 +200,15 @@ func addPostgresHistoryObjects(
 		}
 	}
 	return history, nil
+}
+
+func isOlderTimelineHistory(name string, firstTimeline uint32) bool {
+	timelineName := strings.TrimSuffix(name, ".history")
+	if len(timelineName) != 8 {
+		return false
+	}
+	timeline, err := ParseTimelineFromString(timelineName)
+	return err == nil && timeline > 0 && timeline < firstTimeline
 }
 
 func validatePostgresHistory(history postgresHistoryScan, first, last string, withAllHistory bool) error {

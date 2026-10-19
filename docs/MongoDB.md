@@ -20,6 +20,12 @@ to STDIN and push it to MongoDB instance. Required for restore procedure.
 
 URI used to connect to a MongoDB instance. Required for backup and oplog archiving procedure.
 
+* `MONGODB_BACKUP_CURSOR_FAST_RETRY`
+
+Use the fast backup cursor retry strategy for checkpoint conflicts during `binary-backup-push`.
+When enabled, WAL-G makes five retries with delays of 0, 100ms, 250ms, 500ms, and 1s.
+Default: `false`.
+
 * `MONGODB_RESTORE_DISABLE_HOST_RESETUP`
 
 Do not perform any MongoDB reconfiguration steps during `binary-backup-fetch`. Usefull when one might want just to restore original host state.
@@ -86,7 +92,9 @@ Copies one backup or all backups between storage configurations without transfor
 wal-g copy --from=config_from.json --to=config_to.json --backup-name=LATEST
 ```
 
-Add `--with-history` to synchronize a continuous oplog sequence from the selected backup through the latest archived entry. Repeating the command adds newly archived oplog objects and skips immutable objects already present at the destination.
+Add `--with-history` to synchronize a continuous oplog sequence from the selected backup through the latest archived entry. Repeating the command adds newly archived oplog objects and skips immutable objects already present at the destination with the same path and size.
+
+Size conflicts fail the command before any transfers by default. Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to overwrite all size conflicts with source bytes, including zero-byte destinations. Each planned replacement is logged with both sizes; equal-sized immutable objects are still skipped. Transfer failures remain fatal after applicable retries; cancellation remains fatal.
 
 ### ``backup-push``
 

@@ -162,6 +162,8 @@ wal-g copy --from=config_from.json --to=config_to.json --backup-name=LATEST
 
 Add `--with-history` to synchronize binlogs from the selected backup recovery point through the latest continuous archived binlog. Repeating the command later copies only missing immutable objects and refreshes the binlog sentinel when one is present. The older `backup-copy` command remains available as a compatibility alias, including `--add-prefix`.
 
+Immutable destination objects with the same path and size are skipped; size conflicts fail the command before any transfers by default. Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to overwrite all size conflicts with source bytes, including zero-byte destinations. Each planned replacement is logged with both sizes. This also applies to `backup-copy`. Transfer failures remain fatal after applicable retries; cancellation remains fatal.
+
 ### ``get-stream``
 Download the specified backup as single stream (when backup is stream-based backup). This command will:
 * decrypt backup

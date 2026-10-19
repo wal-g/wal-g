@@ -24,6 +24,7 @@ For information about pattern syntax view: https://golang.org/pkg/path/filepath/
 var fileMask string
 var restoreSpec string
 var targetUserData string
+var segBackupFetchTurbo bool
 
 // segBackupFetchCmd is a subcommand to fetch a backup of a single segment.
 // It is called remotely by a backup-fetch command from the master host
@@ -32,6 +33,7 @@ var segBackupFetchCmd = &cobra.Command{
 	Short: segBackupFetchShortDescription, // TODO : improve description
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
+		conf.Turbo = segBackupFetchTurbo
 		internal.ConfigureLimiters()
 
 		if targetUserData == "" {
@@ -91,6 +93,8 @@ func init() {
 	segBackupFetchCmd.PersistentFlags().IntVar(&contentID, "content-id", 0, "segment content ID")
 	_ = segBackupFetchCmd.MarkFlagRequired("content-id")
 	segBackupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only", nil, restoreOnlyDescription)
+	segBackupFetchCmd.Flags().BoolVar(&segBackupFetchTurbo, "turbo", false,
+		"Ignore all kinds of throttling defined in config")
 	// Since this is a utility command called by backup-fetch, it should not be exposed to the end user.
 	segBackupFetchCmd.Hidden = true
 	cmd.AddCommand(segBackupFetchCmd)

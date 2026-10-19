@@ -282,12 +282,20 @@ type recordingCrossCopyFolder struct {
 func (f *recordingCrossCopyFolder) CanCopyFrom(storage.Folder) bool { return true }
 
 func (f *recordingCrossCopyFolder) CopyObjectFrom(
-	context.Context, storage.Folder, string, string, int64,
+	ctx context.Context, from storage.Folder, source, target string, _ int64,
 ) error {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.copyCalls++
-	return f.copyErr
+	f.mu.Unlock()
+	if f.copyErr != nil {
+		return f.copyErr
+	}
+	reader, err := from.ReadObject(ctx, source)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+	return f.Folder.PutObject(ctx, target, reader)
 }
 
 func (f *recordingCrossCopyFolder) PutObject(ctx context.Context, name string, content io.Reader) error {

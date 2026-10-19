@@ -2,15 +2,16 @@ package copy
 
 import (
 	"context"
+	"fmt"
 	"io"
-	"sync"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/statistics"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"golang.org/x/sync/errgroup"
 )
 
-type SourceTransformerFunc func(r io.Reader) (io.Reader, error)
+type SourceTransformerFunc func(context.Context, io.Reader) (io.ReadCloser, error)
 
 type InfoProvider struct {
 	From storage.Folder
@@ -24,76 +25,37 @@ type InfoProvider struct {
 }
 
 func Infos(ctx context.Context, chs []InfoProvider) error {
-	maxParallelJobsCount := 8
-
-	tickets := make(chan interface{}, maxParallelJobsCount)
-
-	for t := 0; t < maxParallelJobsCount; t++ {
-		tickets <- nil
-	}
-
-	errors := make(chan error, maxParallelJobsCount*2)
-	var wg sync.WaitGroup
-
-	for _, ch := range chs {
-		// do we have any errs yet?
-		for len(errors) > 0 {
-			if err := <-errors; err != nil {
-				return err
-			}
-		}
-
-		// block here
-		<-tickets
-		wg.Add(1)
-
-		go func(handler InfoProvider) {
-			defer wg.Done()
-			err := handler.copyObject(ctx)
-			tracelog.DebugLogger.PrintOnError(err)
-			tickets <- nil
-			errors <- err
-		}(ch)
-	}
-
-	wg.Wait()
-
-	for len(errors) > 0 {
-		if err := <-errors; err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return InfosWithOptions(ctx, chs, ExecuteOptions{})
 }
 
-func (ch *InfoProvider) copyObject(ctx context.Context) error {
-	objReadCloser, err := ch.From.ReadObject(ctx, ch.SrcObj.GetName())
+func InfosWithOptions(ctx context.Context, chs []InfoProvider, options ExecuteOptions) error {
+	retries, err := options.copyRetries()
 	if err != nil {
 		return err
 	}
-
-	var r io.Reader
-
-	if ch.SourceTransformer != nil {
-		r, err = ch.SourceTransformer(objReadCloser)
-		if err != nil {
-			return err
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(defaultRawCopyConcurrency)
+	for _, ch := range chs {
+		if groupCtx.Err() != nil {
+			break
 		}
-	} else {
-		r = objReadCloser
+		group.Go(func() error { return ch.copyObject(groupCtx, retries) })
 	}
-	defer objReadCloser.Close()
+	if err := group.Wait(); err != nil {
+		return err
+	}
+	return ctx.Err()
+}
 
-	tracelog.DebugLogger.Printf("fetched object %s reader\n", ch.SrcObj.GetName())
-
-	uploader, err := internal.ConfigureUploaderToFolder(ch.To)
+func (ch *InfoProvider) copyObject(ctx context.Context, retries int) error {
+	statistics.WalgMetrics.UploadedFilesTotal.Inc()
+	err := retryCopy(ctx, retries, copyRetryDelay, func(ctx context.Context) error {
+		return streamObject(ctx, ch.From, ch.To, ch.SrcObj.GetName(), ch.targetName,
+			ch.SrcObj.GetSize(), ch.SourceTransformer)
+	})
 	if err != nil {
-		return err
-	}
-
-	if err := uploader.Upload(ctx, ch.targetName, r); err != nil {
-		return err
+		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
+		return fmt.Errorf("copy %q to %q: %w", ch.SrcObj.GetName(), ch.targetName, err)
 	}
 
 	tracelog.InfoLogger.Printf(
@@ -109,8 +71,8 @@ var NoopRenameFunc = func(o storage.Object) string {
 	return o.GetName()
 }
 
-var NoopSourceTransformer = func(r io.Reader) (io.Reader, error) {
-	return r, nil
+var NoopSourceTransformer = func(_ context.Context, r io.Reader) (io.ReadCloser, error) {
+	return io.NopCloser(r), nil
 }
 
 func BuildCopyingInfos(

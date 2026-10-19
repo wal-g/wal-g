@@ -14,6 +14,26 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
+func TestS3PartSizeModeConfiguration(t *testing.T) {
+	baseSettings := map[string]string{
+		endpointSetting:          "HTTP://s3.example.test/",
+		skipValidationSetting:    "true",
+		uploadConcurrencySetting: "1",
+	}
+
+	automaticStorage, err := ConfigureStorage(t.Context(), "s3://bucket/prefix", baseSettings)
+	assert.NoError(t, err)
+	automaticFolder := automaticStorage.RootFolder().(*Folder)
+	assert.True(t, automaticFolder.uploader.autoPartSize)
+
+	baseSettings[maxPartSizeSetting] = "33554432"
+	explicitStorage, err := ConfigureStorage(t.Context(), "s3://bucket/prefix", baseSettings)
+	assert.NoError(t, err)
+	explicitFolder := explicitStorage.RootFolder().(*Folder)
+	assert.False(t, explicitFolder.uploader.autoPartSize)
+	assert.Equal(t, int64(33554432), explicitFolder.uploader.partSize)
+}
+
 func TestS3FolderCreatesWithoutAdditionalHeaders(t *testing.T) {
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
 	_, err := ConfigureStorage(t.Context(), waleS3Prefix,
@@ -70,10 +90,10 @@ func TestS3FolderResponseHeaderTimeoutAcceptsValue(t *testing.T) {
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
 	_, err := ConfigureStorage(t.Context(), waleS3Prefix,
 		map[string]string{
-			endpointSetting:              "HTTP://s3.kek.lol.net/",
-			skipValidationSetting:        "true",
-			uploadConcurrencySetting:     "1",
-			responseHeaderTimeoutSetting: "45",
+			endpointSetting:          "HTTP://s3.kek.lol.net/",
+			skipValidationSetting:    "true",
+			uploadConcurrencySetting: "1",
+			requestTimeoutSetting:    "45",
 		})
 
 	assert.NoError(t, err)
@@ -83,10 +103,10 @@ func TestS3FolderResponseHeaderTimeoutRejectsNonInteger(t *testing.T) {
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
 	_, err := ConfigureStorage(t.Context(), waleS3Prefix,
 		map[string]string{
-			endpointSetting:              "HTTP://s3.kek.lol.net/",
-			skipValidationSetting:        "true",
-			uploadConcurrencySetting:     "1",
-			responseHeaderTimeoutSetting: "not-a-number",
+			endpointSetting:          "HTTP://s3.kek.lol.net/",
+			skipValidationSetting:    "true",
+			uploadConcurrencySetting: "1",
+			requestTimeoutSetting:    "not-a-number",
 		})
 
 	assert.Error(t, err)
@@ -126,7 +146,7 @@ func TestResponseHeaderTimeoutBoundsHeadersOnly(t *testing.T) {
 	}))
 	t.Cleanup(slowBody.Close)
 
-	client, err := buildHTTPClient(&Config{ResponseHeaderTimeout: headerTimeout}, "")
+	client, err := buildHTTPClient(&Config{RequestTimeout: headerTimeout}, "")
 	require.NoError(t, err)
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPut, delayedHeaders.URL, strings.NewReader("payload"))
