@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -119,10 +120,21 @@ func TestUploadFileS3FailureCleanupAndRecovery(t *testing.T) {
 			for range 3 {
 				closed := make(chan struct{})
 				u.Compressor = observedCompressor{none.Compressor{}, closed}
-				ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
+				// Retry exhaustion must not race a short deadline on loaded CI
+				// runners. Only the limiter case intentionally expires early.
+				timeout := 30 * time.Second
+				if tc.limited {
+					timeout = 300 * time.Millisecond
+				}
+				ctx, cancel := context.WithTimeout(t.Context(), timeout)
 				err := u.UploadFile(ctx, ioextensions.NewNamedReaderImpl(bytes.NewReader(payload), "test"))
 				cancel()
 				require.Error(t, err)
+				if !tc.limited {
+					var apiErr smithy.APIError
+					require.ErrorAs(t, err, &apiErr)
+					require.Equal(t, "SlowDown", apiErr.ErrorCode())
+				}
 				waitCompressionClosed(t, closed)
 			}
 			if tc.limited {
