@@ -68,6 +68,7 @@ type BackupInfo struct {
 	UncompressedSize int64       `json:"uncompressed_size"`
 	CompressedSize   int64       `json:"compressed_size"`
 	UserData         interface{} `json:"user_data,omitempty"`
+	IncrementFrom    *string     `json:"delta_from,omitempty"`
 	// Note: Real WAL-G doesn't include is_full field, we determine it from backup name
 }
 
@@ -129,6 +130,14 @@ func (b *BackupInfo) GetDeltaOriginName(backups []BackupInfo) string {
 	if b.IsFullBackup() {
 		return "" // Full backups don't have a base backup
 	}
+	// New backups carry the exact DeltaFrom identity from the sentinel. WAL
+	// positions alone cannot distinguish different attempts at one restartpoint.
+	if b.IncrementFrom != nil {
+		return *b.IncrementFrom
+	}
+	if strings.Contains(b.BackupName, "_U_") {
+		return "" // Do not guess if metadata for a new-format backup is missing.
+	}
 
 	// Find the "_D_" pattern in the backup name
 	deltaIndex := strings.Index(b.BackupName, "_D_")
@@ -138,14 +147,19 @@ func (b *BackupInfo) GetDeltaOriginName(backups []BackupInfo) string {
 
 	// Extract the part after "_D_" which contains the base backup identifier
 	expectedParent := "base_" + b.BackupName[deltaIndex+3:] // +3 to skip "_D_"
+	var parent string
 	for i := range backups {
 		candidate := &backups[i]
-		if b.BackupName != candidate.BackupName && strings.HasPrefix(candidate.BackupName, expectedParent) {
-			return candidate.BackupName
+		if b.BackupName != candidate.BackupName && !strings.Contains(candidate.BackupName, "_U_") &&
+			strings.HasPrefix(candidate.BackupName, expectedParent) {
+			if parent != "" {
+				return "" // Legacy names can also be ambiguous; do not pick arbitrarily.
+			}
+			parent = candidate.BackupName
 		}
 	}
 
-	return ""
+	return parent
 }
 
 // NewWalgExporter creates a new WAL-G exporter

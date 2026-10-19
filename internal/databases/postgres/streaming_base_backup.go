@@ -44,6 +44,7 @@ type StreamingBaseBackup struct {
 	uploader         internal.Uploader
 	fileNo           int
 	pgVersion        int
+	backupName       string
 }
 
 // NewStreamingBaseBackup will define a new StreamingBaseBackup object
@@ -74,6 +75,7 @@ func (bb *StreamingBaseBackup) Start(ctx context.Context, verifyChecksum bool, d
 	bb.StartLSN = result.LSN
 	bb.TimeLine = uint32(result.TimelineID)
 	bb.Files = make(internal.BackupFileList)
+	bb.backupName, err = newBackupAttemptName("base_" + formatWALFileName(bb.TimeLine, uint64(bb.StartLSN)/WalSegmentSize))
 	return
 }
 
@@ -184,7 +186,7 @@ func (bb *StreamingBaseBackup) Upload(ctx context.Context, uploader internal.Upl
 
 // BackupName returns the name of the folder where the backup should be stored.
 func (bb *StreamingBaseBackup) BackupName() string {
-	return "base_" + formatWALFileName(bb.TimeLine, uint64(bb.StartLSN)/WalSegmentSize)
+	return bb.backupName
 }
 
 // FileName returns the filename of a tablespace backup file.

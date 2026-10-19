@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -29,7 +30,7 @@ var UtilityFilePaths = map[string]bool{
 	TablespaceMapFilename: true,
 }
 
-var patternPgBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?(_%[2]s)?", PatternTimelineAndLogSegNo, PatternLSN)
+var patternPgBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?(_%[2]s)?(_U_[0-9a-f]{32})?", PatternTimelineAndLogSegNo, PatternLSN)
 var regexpPgBackupName = regexp.MustCompile(patternPgBackupName)
 
 // Backup contains information about a valid Postgres backup
@@ -302,7 +303,9 @@ func (backup *Backup) unwrapOld(
 func IsPgControlRequired(backup Backup) bool {
 	walleRe := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
 	walgBasebackupName := walleRe.FindString(backup.Name) == ""
-	needPgControl := walgBasebackupName || backup.SentinelDto.IsIncremental()
+	// An attempt suffix must not make a WAL-G backup look like a legacy WAL-E
+	// name (which also has an extra underscore-delimited component).
+	needPgControl := walgBasebackupName || strings.Contains(backup.Name, "_U_") || backup.SentinelDto.IsIncremental()
 	return needPgControl
 }
 

@@ -206,6 +206,9 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	}
 	err = bh.handleDeltaBackup(ctx, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
+	bh.CurBackupInfo.Name, err = newBackupAttemptName(bh.CurBackupInfo.Name)
+	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.InfoLogger.Printf("Uploading backup attempt %s", bh.CurBackupInfo.Name)
 	tarFileSets := bh.uploadBackup(ctx)
 	sentinelDto, filesMetaDto, err := bh.setupDTO(ctx, tarFileSets)
 	tracelog.ErrorLogger.FatalOnError(err)

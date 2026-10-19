@@ -203,6 +203,33 @@ Because of unrestored databases' or tables remains are still in system tables, i
 
 ### ``backup-push``
 
+Each local or streaming backup attempt has a collision-resistant physical name:
+`base_<WAL segment>[_D_<parent WAL segment>]_U_<32 lowercase hex digits>`.
+The random 128-bit suffix is generated once before uploading any backup objects;
+it is not derived from a timestamp. Concurrent backups and retries therefore use
+separate object prefixes even when standbys share the same restartpoint. Recovery
+positions are unchanged. Incremental backups record the exact parent identity in
+the sentinel's `DeltaFrom` field (also exposed as `delta_from` in detailed JSON metadata).
+Existing backups without the suffix remain readable. A failed attempt may leave
+an incomplete prefix, but cannot overwrite a completed or another in-progress attempt.
+This does not change incremental-backup eligibility checks or WAL object names.
+
+**Upgrade:** pause backup scheduling and upgrade backup readers, copy/delete tools,
+and the exporter before resuming backup creation with this version. Older tools
+may truncate the new names or misinterpret them; new-format archives must not be
+managed by older binaries. Automation must treat the returned backup name as an
+opaque identity rather than reconstructing it from the starting WAL position.
+The change does not repair backups already overwritten by an older version.
+
+The standby collision/restore regression can be run with disposable local PostgreSQL
+15+ servers and filesystem storage:
+
+```sh
+go build -o /tmp/wal-g-attempt-test ./main/pg
+TMPDIR=/tmp WALG_TEST_PG_BIN=/path/to/postgresql/bin WALG_TEST_BINARY=/tmp/wal-g-attempt-test \
+  go test ./internal/databases/postgres -run '^TestBackupAttemptsStandbyIntegration$' -count=1 -v
+```
+
 When uploading backups to storage, the user should pass the Postgres data directory as an argument.
 
 ```bash
