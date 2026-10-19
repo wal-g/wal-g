@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -478,7 +479,11 @@ func TestDaemonArchiverServeAndClient(t *testing.T) {
 	require.NoError(t, err)
 	defer multi.Close()
 	// Keep the socket path short enough for sockaddr_un on macOS.
-	socketDir, err := os.MkdirTemp("/tmp", "walg-socket-")
+	socketRoot := ""
+	if runtime.GOOS == "darwin" {
+		socketRoot = "/tmp"
+	}
+	socketDir, err := os.MkdirTemp(socketRoot, "walg-socket-")
 	require.NoError(t, err)
 	defer os.Remove(socketDir)
 	socket := filepath.Join(socketDir, "s")

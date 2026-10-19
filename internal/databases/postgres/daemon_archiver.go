@@ -65,7 +65,7 @@ func configureDaemonArchiver(ctx context.Context, st *multistorage.Storage) (*da
 		return nil, err
 	}
 	window := int(viper.GetInt32(conf.TotalBgUploadedLimit)) - 1
-	var manager asm.ArchiveStatusManager = asm.NewNopASM()
+	manager := asm.NewNopASM()
 	folder, err := internal.ConfigureArchiveStatusManager()
 	if err != nil {
 		// Foreground archiving is still useful without the optional success cache.
@@ -107,7 +107,7 @@ func (a *daemonArchiver) Close() {
 	<-a.stopped
 	// Synchronize with the last Add; startJob checks cancellation under this lock.
 	a.mu.Lock()
-	a.mu.Unlock()
+	a.mu.Unlock() //nolint:staticcheck // SA2001: barrier with startJob's final cancellation check and wg.Add
 	a.wg.Wait()
 }
 
@@ -272,14 +272,7 @@ func (a *daemonArchiver) scan() {
 		case <-ticker.C:
 		case <-a.wake:
 		}
-		a.mu.Lock()
-		anchor := a.anchor
-		for filename := range a.retryAfter {
-			if filename <= anchor || filepath.Dir(filename) != filepath.Dir(anchor) {
-				delete(a.retryAfter, filename)
-			}
-		}
-		a.mu.Unlock()
+		anchor := a.scanAnchor()
 		if anchor == "" {
 			continue
 		}
@@ -303,6 +296,18 @@ func (a *daemonArchiver) scan() {
 			}
 		}
 	}
+}
+
+// Forget retry delays for files outside the current lookahead directory/window.
+func (a *daemonArchiver) scanAnchor() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for filename := range a.retryAfter {
+		if filename <= a.anchor || filepath.Dir(filename) != filepath.Dir(a.anchor) {
+			delete(a.retryAfter, filename)
+		}
+	}
+	return a.anchor
 }
 
 // Prefer arithmetic lookahead and stat to a complete sorted directory listing.
@@ -337,14 +342,7 @@ func (a *daemonArchiver) candidates(anchor string, scan *daemonArchiveScan) []st
 	if time.Since(scan.lastFullScan) < 5*time.Second {
 		// Reuse the bounded listing on every worker completion. Throttling the
 		// listing must not also throttle uploads of files we already found.
-		for _, filename := range scan.fallback {
-			if filename > anchor {
-				if _, err := os.Stat(filepath.Join(dir, archiveStatusDir, filepath.Base(filename)+readySuffix)); err == nil {
-					files = append(files, filename)
-				}
-			}
-		}
-		return files
+		return scan.readyFallback(anchor)
 	}
 	scan.lastFullScan = time.Now()
 	scan.fallback = nil
@@ -364,5 +362,18 @@ func (a *daemonArchiver) candidates(anchor string, scan *daemonArchiveScan) []st
 		}
 	}
 	scan.fallback = files
+	return files
+}
+
+func (scan *daemonArchiveScan) readyFallback(anchor string) []string {
+	var files []string
+	for _, filename := range scan.fallback {
+		if filename <= anchor {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(scan.dir, archiveStatusDir, filepath.Base(filename)+readySuffix)); err == nil {
+			files = append(files, filename)
+		}
+	}
 	return files
 }
