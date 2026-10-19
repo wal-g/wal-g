@@ -2,6 +2,7 @@ package binary
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -10,6 +11,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/utility"
 )
 
 var (
@@ -69,7 +71,16 @@ func (restoreService *RestoreService) DoRestore(
 	}
 
 	if !args.SkipBackupDownload {
-		if err = restoreService.downloadBackup(ctx, args.BackupName, tarFilesFilter); err != nil {
+		expectedParts := make(map[string]models.FilePartsInfo)
+		for name, parts := range sentinel.FileParts {
+			if args.IsPartial() {
+				if _, selected := onHostFilesFilter[name]; !selected {
+					continue
+				}
+			}
+			expectedParts[name] = parts
+		}
+		if err = restoreService.downloadBackup(ctx, args.BackupName, tarFilesFilter, expectedParts); err != nil {
 			return err
 		}
 	} else {
@@ -96,14 +107,14 @@ func (restoreService *RestoreService) DoRestore(
 }
 
 func (restoreService *RestoreService) downloadBackup(ctx context.Context,
-	backupName string, tarFilter map[string]struct{}) error {
+	backupName string, tarFilter map[string]struct{}, expectedParts map[string]models.FilePartsInfo) error {
 	err := restoreService.LocalStorage.CleanupMongodDBPath()
 	if err != nil {
 		return err
 	}
 
 	tracelog.InfoLogger.Println("Download backup files to dbPath")
-	return restoreService.downloadFromTarArchives(ctx, backupName, tarFilter)
+	return restoreService.downloadFromTarArchives(ctx, backupName, tarFilter, expectedParts)
 }
 
 func (restoreService *RestoreService) doChecks(mongoVersion, restoreVersion string) error {
@@ -137,9 +148,36 @@ func (restoreService *RestoreService) reconfigMongo(
 }
 
 func (restoreService *RestoreService) downloadFromTarArchives(ctx context.Context,
-	backupName string, filter map[string]struct{}) error {
-	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader, restoreService.LocalStorage.whitelist)
-	return downloader.Download(ctx, backupName, restoreService.LocalStorage.MongodDBPath, filter)
+	backupName string, filter map[string]struct{}, expectedParts map[string]models.FilePartsInfo) error {
+	folder := restoreService.Uploader.Folder().GetSubFolder(strings.Trim(backupName+internal.TarPartitionFolderName, "/"))
+	objects, subfolders, err := folder.ListFolder(ctx)
+	if err != nil {
+		return errors.Wrap(err, "list MongoDB backup archives")
+	}
+	if len(subfolders) != 0 {
+		return errors.Errorf("unexpected subfolders in MongoDB backup %s", folder.GetPath())
+	}
+	isEmpty, err := utility.IsDirectoryEmpty(restoreService.LocalStorage.MongodDBPath, restoreService.LocalStorage.whitelist)
+	if err != nil {
+		return err
+	}
+	if !isEmpty {
+		return errors.Errorf("directory %s should be empty", restoreService.LocalStorage.MongodDBPath)
+	}
+	archives := make([]internal.ReaderMaker, 0, len(objects))
+	for _, object := range objects {
+		if filter != nil {
+			if _, selected := filter[object.GetName()]; !selected {
+				continue
+			}
+		}
+		archives = append(archives, internal.NewStorageReaderMaker(folder, object.GetName()))
+	}
+	interpreter := NewFilePartsTarInterpreter(restoreService.LocalStorage.MongodDBPath, expectedParts)
+	if err := internal.ExtractAll(ctx, interpreter, archives); err != nil {
+		return err
+	}
+	return interpreter.Validate()
 }
 
 func (restoreService *RestoreService) fixSystemData(

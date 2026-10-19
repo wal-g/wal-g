@@ -26,6 +26,30 @@ Use the fast backup cursor retry strategy for checkpoint conflicts during `binar
 When enabled, WAL-G makes five retries with delays of 0, 100ms, 250ms, 500ms, and 1s.
 Default: `false`.
 
+* `WALG_MONGO_BACKUP_FILE_PART_SIZE`
+
+Maximum uncompressed payload size, in bytes, of a part of a binary-backup
+`collection-*.wt` or `index-*.wt` file. Default: `0` (disabled). For example,
+`WALG_MONGO_BACKUP_FILE_PART_SIZE=67108864` splits files larger than 64 MiB.
+The value must be a non-negative integer. Smaller files and other MongoDB files
+keep the existing archive format.
+
+Each part is stored in its own compressed and optionally encrypted tar object.
+Tar headers and compression/encryption add overhead to the configured payload
+size. A failed download retries its archive without downloading successful parts
+again. `WALG_DOWNLOAD_CONCURRENCY` controls parallel downloads.
+Completed parts are preserved during retries within the running
+`binary-backup-fetch` process. Starting a new fetch performs the usual dbPath
+cleanup and downloads the backup again.
+
+The backup sentinel records the split files and their sizes; each part carries
+its byte offset and complete file size in PAX records. Restore writes parts to
+their original offsets and checks that every expected part is present before
+starting MongoDB. Full and partial restores support split files. Restore detects
+the format automatically; this setting is only needed when creating the backup.
+Use a WAL-G version supporting file parts to restore these backups. This version
+continues to restore existing backups created without file splitting.
+
 * `MONGODB_RESTORE_DISABLE_HOST_RESETUP`
 
 Do not perform any MongoDB reconfiguration steps during `binary-backup-fetch`. Usefull when one might want just to restore original host state.
