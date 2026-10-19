@@ -41,7 +41,9 @@ func TestUploadWALFileClosesSource(t *testing.T) {
 				require.ErrorIs(t, err, tc.err)
 			}
 			require.NotNil(t, u.file)
-			_, err = u.file.Stat()
+			// Stat may return a native invalid-handle error on Windows. Read
+			// consistently reports os.ErrClosed for a closed file on all platforms.
+			_, err = u.file.Read(make([]byte, 1))
 			require.ErrorIs(t, err, os.ErrClosed)
 		})
 	}
