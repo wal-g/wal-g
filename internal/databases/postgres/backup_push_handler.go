@@ -85,7 +85,6 @@ type BackupArguments struct {
 	withoutFilesMetadata     bool
 	composerInitFunc         func(ctx context.Context, handler *BackupHandler) error
 	preventConcurrentBackups bool
-	reserveBackupName        bool
 	countJournals            bool
 	json                     bool
 	pretty                   bool
@@ -207,7 +206,7 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	}
 	err = bh.handleDeltaBackup(ctx, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = bh.reserveBackupName(ctx, folder, bh.Arguments.backupsFolder, bh.CurBackupInfo.Name)
+	err = reserveBackupName(ctx, folder, bh.Arguments.backupsFolder, bh.CurBackupInfo.Name)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tarFileSets := bh.uploadBackup(ctx)
 	sentinelDto, filesMetaDto, err := bh.setupDTO(ctx, tarFileSets)
@@ -651,7 +650,7 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context, rootFolder storage
 	tracelog.InfoLogger.Println("Starting remote backup")
 	err = baseBackup.Start(ctx, bh.Arguments.verifyPageChecksums, diskLimit)
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = bh.reserveBackupName(ctx, rootFolder, utility.BaseBackupPath, baseBackup.BackupName())
+	err = reserveBackupName(ctx, rootFolder, utility.BaseBackupPath, baseBackup.BackupName())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Streaming remote backup")

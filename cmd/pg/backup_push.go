@@ -109,7 +109,6 @@ var (
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(conf.StoreAllCorruptBlocksSetting),
 				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
 				userData, withoutFilesMetadata, countJournals, json, pretty)
-			arguments.EnableBackupNameReservation()
 
 			backupHandler, err := postgres.NewBackupHandler(cmd.Context(), arguments)
 			tracelog.ErrorLogger.FatalOnError(err)

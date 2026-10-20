@@ -162,16 +162,16 @@ func TestBackupNameReservationUnsupportedDoesNotAccessStorage(t *testing.T) {
 	require.NoError(t, reserveBackupName(t.Context(), folder, utility.BaseBackupPath, reservationTestName))
 }
 
-func TestBackupNameReservationSharedHandler(t *testing.T) {
-	// Greenplum also uses the handler; only PostgreSQL's command unconditionally
-	// enables its reservation protocol. There is no CLI opt-out.
-	handler := BackupHandler{}
-	require.NoError(t, handler.reserveBackupName(t.Context(), nil, "", ""))
-	handler.Arguments.EnableBackupNameReservation()
-	folder := fs.NewFolder(t.TempDir(), "")
-	require.NoError(t, handler.reserveBackupName(t.Context(), folder, utility.BaseBackupPath, reservationTestName))
-	require.ErrorIs(t, handler.reserveBackupName(t.Context(), folder, utility.BaseBackupPath, reservationTestName),
-		storage.ErrObjectAlreadyExists)
+func TestBackupNameReservationIndependentSegmentPrefixes(t *testing.T) {
+	root := fs.NewFolder(t.TempDir(), "")
+	// Segment backups may share an LSN/name; only writers within the same
+	// segment prefix should conflict, including the coordinator's segment -1.
+	for _, id := range []int{-1, 0, 1} {
+		folder := root.GetSubFolder(fmt.Sprintf("segments_%s/seg%d", utility.VersionStr, id))
+		require.NoError(t, reserveBackupName(t.Context(), folder, utility.BaseBackupPath, reservationTestName))
+		require.ErrorIs(t, reserveBackupName(t.Context(), folder, utility.BaseBackupPath, reservationTestName),
+			storage.ErrObjectAlreadyExists)
+	}
 }
 
 func TestBackupNameReservationSurvivesGarbageCollection(t *testing.T) {
@@ -186,4 +186,11 @@ func TestBackupNameReservationSurvivesGarbageCollection(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, exists)
 	require.ErrorIs(t, reserveBackupName(t.Context(), folder, utility.BaseBackupPath, reservationTestName), storage.ErrObjectAlreadyExists)
+}
+
+func TestBackupNameReservationPermanentPaths(t *testing.T) {
+	marker := path.Join(backupReservationsPath, utility.BaseBackupPath, reservationTestName+".json")
+	require.True(t, IsPermanent(marker, "default", nil, nil))
+	require.True(t, IsPermanent("/"+marker, "default", nil, nil))
+	require.False(t, IsPermanent(backupReservationsPath+"_other/"+reservationTestName, "default", nil, nil))
 }
