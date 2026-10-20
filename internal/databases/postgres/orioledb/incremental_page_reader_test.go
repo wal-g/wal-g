@@ -21,7 +21,6 @@ func newMockReadSeekCloser(data []byte) *mockReadSeekCloser {
 	return &mockReadSeekCloser{Reader: bytes.NewReader(data)}
 }
 
-// TODO : unit tests
 func TestIncrementalPageReader_Initialize(t *testing.T) {
 	t.Run("FullScanUncompressed", func(t *testing.T) {
 		pageSize := DatabasePageSize
