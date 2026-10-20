@@ -70,6 +70,9 @@ func GetPermanentBackupsAndWals(ctx context.Context, folder storage.Folder) (map
 }
 
 func IsPermanent(objectName, storageName string, permanentBackups, permanentWals map[PermanentObject]bool) bool {
+	if strings.HasPrefix(objectName, backupReservationsPath+"/") {
+		return true
+	}
 	if strings.HasPrefix(objectName, utility.WalPath) && len(objectName) >= len(utility.WalPath)+24 {
 		wal := PermanentObject{
 			Name:        objectName[len(utility.WalPath) : len(utility.WalPath)+24],

@@ -203,6 +203,39 @@ Because of unrestored databases' or tables remains are still in system tables, i
 
 ### ``backup-push``
 
+#### Backup name reservation
+
+Use `--reserve-backup-name` to reject a backup whose name has already been used,
+without changing backup names or the archive format. This works for local and
+streaming backups, including concurrent backups from different replicas sharing
+the same storage prefix. It also checks for completed and partial older backups.
+
+Currently supported: S3 endpoints implementing atomic `PutObject` with
+`If-None-Match: *`, and filesystem storage with atomic exclusive file creation.
+Other backends fail explicitly when this flag is enabled; they do not fall back
+to a racy check-then-upload. Without the flag, existing behavior is unchanged.
+
+Reservations live at `backup_reservations/basebackups_005/<backup-name>.json`.
+They are **permanent**, including after a failed/interrupted upload or deletion
+of the backup. There is no TTL or automatic takeover: a stalled uploader might
+still resume. A network error while reserving also aborts the backup. Use a new
+backup name (on a standby, advance the restartpoint) before retrying.
+
+Exclude the reservation prefix from lifecycle expiry and routine cleanup.
+Use the updated WAL-G for cleanup too: older `delete garbage --without-backup-check`
+can remove these markers. `delete everything` and low-level storage tools remain
+destructive and must not run alongside active backup writers.
+Manual removal is only safe after stopping all writers that could use that name
+and removing any corresponding backup data and sentinel. The marker contains
+host, PID and creation time for diagnosis, not proof that its owner has stopped.
+
+Enable this flag on **all** writers to the prefix; older or unconfigured writers
+ignore reservations. With failover storage, a reservation protects only the
+selected destination, not a global namespace spanning different storages.
+The checks add one conditional PUT, one sentinel HEAD and a listing scoped to
+the candidate backup directory, not a recursive listing of the archive.
+This prevents overwrites; it does not make two same-name backups both succeed.
+
 When uploading backups to storage, the user should pass the Postgres data directory as an argument.
 
 ```bash

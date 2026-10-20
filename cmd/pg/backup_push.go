@@ -109,6 +109,9 @@ var (
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(conf.StoreAllCorruptBlocksSetting),
 				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
 				userData, withoutFilesMetadata, countJournals, json, pretty)
+			if reserveBackupName {
+				arguments.EnableBackupNameReservation()
+			}
 
 			backupHandler, err := postgres.NewBackupHandler(cmd.Context(), arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -127,6 +130,7 @@ var (
 	userDataRaw           = ""
 	withoutFilesMetadata  = false
 	countJournals         = false
+	reserveBackupName     = false
 )
 
 func chooseTarBallComposer() postgres.TarBallComposerType {
@@ -153,6 +157,8 @@ func chooseTarBallComposer() postgres.TarBallComposerType {
 
 func init() {
 	Cmd.AddCommand(backupPushCmd)
+	backupPushCmd.Flags().BoolVar(&reserveBackupName, "reserve-backup-name", false,
+		"Permanently reserve the backup name before uploading (S3 and filesystem storage)")
 
 	backupPushCmd.Flags().BoolVar(&pretty, PrettyFlag, false,
 		"Prints more readable output in table format")
