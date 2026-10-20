@@ -28,6 +28,8 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v7
         with:
+          # pull_or_build.sh needs full file history to compare image timestamps.
+          fetch-depth: 0
           submodules: true
 
       - name: Set up Go 1.x
