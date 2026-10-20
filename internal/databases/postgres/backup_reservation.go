@@ -21,6 +21,9 @@ func reserveBackupName(ctx context.Context, root storage.Folder, backupsPath, na
 	if err := multistorage.EnsureSingleStorageIsUsed(root); err != nil {
 		return err
 	}
+	if !storage.SupportsCreateObject(root) {
+		return nil
+	}
 	hostname, err := os.Hostname()
 	if err != nil {
 		return err
@@ -57,6 +60,9 @@ func reserveBackupName(ctx context.Context, root storage.Folder, backupsPath, na
 	return nil
 }
 
+// EnableBackupNameReservation is called unconditionally by PostgreSQL's
+// backup-push command. The shared handler also serves Greenplum segment backups,
+// whose storage layout and cleanup protocol are outside this change.
 func (ba *BackupArguments) EnableBackupNameReservation() {
 	ba.reserveBackupName = true
 }

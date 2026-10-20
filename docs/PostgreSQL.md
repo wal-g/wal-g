@@ -205,15 +205,20 @@ Because of unrestored databases' or tables remains are still in system tables, i
 
 #### Backup name reservation
 
-Use `--reserve-backup-name` to reject a backup whose name has already been used,
-without changing backup names or the archive format. This works for local and
+On supported storage backends, WAL-G always reserves the backup name and rejects
+a name that has already been used. There is no flag or setting to disable this.
+Backup names and the archive format are unchanged. This works for local and
 streaming backups, including concurrent backups from different replicas sharing
 the same storage prefix. It also checks for completed and partial older backups.
 
 Currently supported: S3 endpoints implementing atomic `PutObject` with
 `If-None-Match: *`, and filesystem storage with atomic exclusive file creation.
-Other backends fail explicitly when this flag is enabled; they do not fall back
-to a racy check-then-upload. Without the flag, existing behavior is unchanged.
+Other backends retain their previous behavior, without reservation protection.
+Support is determined by the backend, including through storage wrappers and
+failover selection, not by probing the endpoint. An error from a supported
+backend aborts the backup; it never disables reservations. In particular, an
+S3-compatible endpoint that rejects conditional PUT cannot be used for backups
+with this version. There is no racy check-then-upload fallback.
 
 Reservations live at `backup_reservations/basebackups_005/<backup-name>.json`.
 They are **permanent**, including after a failed/interrupted upload or deletion
@@ -229,8 +234,8 @@ Manual removal is only safe after stopping all writers that could use that name
 and removing any corresponding backup data and sentinel. The marker contains
 host, PID and creation time for diagnosis, not proof that its owner has stopped.
 
-Enable this flag on **all** writers to the prefix; older or unconfigured writers
-ignore reservations. With failover storage, a reservation protects only the
+Upgrade **all** writers to the prefix; older writers ignore reservations.
+With failover storage, a reservation protects only the
 selected destination, not a global namespace spanning different storages.
 The checks add one conditional PUT, one sentinel HEAD and a listing scoped to
 the candidate backup directory, not a recursive listing of the archive.

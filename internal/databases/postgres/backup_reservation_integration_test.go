@@ -38,14 +38,14 @@ func TestBackupReservationStandbyIntegration(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(config, configJSON, 0600))
 
-	port := func() string {
+	port := func(t *testing.T) string {
 		listener, err := net.Listen("tcp", "127.0.0.1:0")
 		require.NoError(t, err)
 		p := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
 		require.NoError(t, listener.Close())
 		return p
 	}
-	primaryPort, firstPort, secondPort := port(), port(), port()
+	primaryPort, firstPort, secondPort := port(t), port(t), port(t)
 	// Package test initialization exports WAL-G defaults to the environment.
 	// Do not let those (or the operator's PG settings) override this test config.
 	var cleanEnv []string
@@ -57,7 +57,7 @@ func TestBackupReservationStandbyIntegration(t *testing.T) {
 	env := func(p string) []string {
 		return append(append([]string(nil), cleanEnv...), "PGHOST="+root, "PGPORT="+p, "PGUSER=postgres", "PGDATABASE=postgres")
 	}
-	run := func(p, program string, args ...string) string {
+	run := func(t *testing.T, p, program string, args ...string) string {
 		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, program, args...)
@@ -65,52 +65,60 @@ func TestBackupReservationStandbyIntegration(t *testing.T) {
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
 		out, err := cmd.Output()
+		if err != nil && program == filepath.Join(pgBin, "pg_ctl") {
+			for i := 0; i+1 < len(args); i++ {
+				if args[i] == "-l" {
+					log, readErr := os.ReadFile(args[i+1])
+					t.Logf("PostgreSQL log (read error: %v):\n%s", readErr, log)
+				}
+			}
+		}
 		if program == walg && len(args) > 1 && args[1] == "backup-push" {
 			t.Log(stderr.String())
 		}
 		require.NoError(t, err, "%s %v: %s\n%s", program, args, out, stderr.String())
 		return strings.TrimSpace(string(out))
 	}
-	sql := func(p, query string) string {
-		return run(p, filepath.Join(pgBin, "psql"), "-XAt", "-v", "ON_ERROR_STOP=1", "-c", query)
+	sql := func(t *testing.T, p, query string) string {
+		return run(t, p, filepath.Join(pgBin, "psql"), "-XAt", "-v", "ON_ERROR_STOP=1", "-c", query)
 	}
-	appendConfig := func(data, extra string) {
+	appendConfig := func(t *testing.T, data, extra string) {
 		f, err := os.OpenFile(filepath.Join(data, "postgresql.conf"), os.O_APPEND|os.O_WRONLY, 0600)
 		require.NoError(t, err)
 		_, err = f.WriteString("\n" + extra + "\n")
 		require.NoError(t, err)
 		require.NoError(t, f.Close())
 	}
-	start := func(data, p string) {
-		appendConfig(data, fmt.Sprintf("port=%s\nlisten_addresses=''\nunix_socket_directories='%s'", p, root))
+	start := func(t *testing.T, data, p string) {
+		appendConfig(t, data, fmt.Sprintf("port=%s\nlisten_addresses=''\nunix_socket_directories='%s'", p, root))
 		// Cleanup is installed before starting, so failed starts cannot strand a server.
 		t.Cleanup(func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
 			_ = exec.CommandContext(ctx, filepath.Join(pgBin, "pg_ctl"), "-D", data, "-m", "immediate", "-w", "stop").Run()
 		})
-		run(p, filepath.Join(pgBin, "pg_ctl"), "-D", data, "-l", data+".log", "-w", "start")
+		run(t, p, filepath.Join(pgBin, "pg_ctl"), "-D", data, "-l", data+".log", "-w", "start")
 	}
 	primary := filepath.Join(root, "primary")
 	first, second := filepath.Join(root, "first"), filepath.Join(root, "second")
-	run(primaryPort, filepath.Join(pgBin, "initdb"), "-D", primary, "-U", "postgres", "-A", "trust", "--no-locale")
-	appendConfig(primary, fmt.Sprintf("wal_level=replica\nmax_wal_senders=10\ncheckpoint_timeout='1h'\nmax_wal_size='2GB'\narchive_mode=on\narchive_command='%s --config=%s wal-push %%p'", walg, config))
-	start(primary, primaryPort)
-	sql(primaryPort, "CREATE TABLE attempt_data AS SELECT generate_series(1,3) AS id")
-	run(primaryPort, filepath.Join(pgBin, "pg_basebackup"), "-D", first, "-X", "stream", "-R")
+	run(t, primaryPort, filepath.Join(pgBin, "initdb"), "-D", primary, "-U", "postgres", "-A", "trust", "--no-locale")
+	appendConfig(t, primary, fmt.Sprintf("wal_level=replica\nmax_wal_senders=10\ncheckpoint_timeout='1h'\nmax_wal_size='2GB'\narchive_mode=on\narchive_command='%s --config=%s wal-push %%p'", walg, config))
+	start(t, primary, primaryPort)
+	sql(t, primaryPort, "CREATE TABLE attempt_data AS SELECT generate_series(1,3) AS id")
+	run(t, primaryPort, filepath.Join(pgBin, "pg_basebackup"), "-D", first, "-X", "stream", "-R")
 	// Identical initial copies ensure that both replicas have the same restartpoint.
 	require.NoError(t, os.CopyFS(second, os.DirFS(first)))
 	require.NoError(t, os.Chmod(second, 0700))
 	for _, data := range []string{first, second} {
-		appendConfig(data, "archive_mode=off")
+		appendConfig(t, data, "archive_mode=off")
 	}
-	start(first, firstPort)
-	start(second, secondPort)
+	start(t, first, firstPort)
+	start(t, second, secondPort)
 	for _, p := range []string{firstPort, secondPort} {
-		require.Equal(t, "3", sql(p, "SELECT count(*) FROM attempt_data"))
+		require.Equal(t, "3", sql(t, p, "SELECT count(*) FROM attempt_data"))
 	}
-	require.Equal(t, sql(firstPort, "SELECT redo_lsn FROM pg_control_checkpoint()"),
-		sql(secondPort, "SELECT redo_lsn FROM pg_control_checkpoint()"))
+	require.Equal(t, sql(t, firstPort, "SELECT redo_lsn FROM pg_control_checkpoint()"),
+		sql(t, secondPort, "SELECT redo_lsn FROM pg_control_checkpoint()"))
 
 	for _, modes := range [][2]bool{{false, false}, {false, true}, {true, true}} {
 		label := fmt.Sprintf("streaming-%t-%t", modes[0], modes[1])
@@ -127,7 +135,7 @@ func TestBackupReservationStandbyIntegration(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 			defer cancel()
 			push := func(p, data string, streaming bool) *exec.Cmd {
-				args := []string{"--config=" + caseConfig, "backup-push", "--full", "--reserve-backup-name"}
+				args := []string{"--config=" + caseConfig, "backup-push", "--full"}
 				if !streaming {
 					args = append(args, data)
 				}
@@ -153,7 +161,7 @@ func TestBackupReservationStandbyIntegration(t *testing.T) {
 			var backups []struct {
 				Name string `json:"backup_name"`
 			}
-			list := run(primaryPort, walg, "--config="+caseConfig, "backup-list", "--detail", "--json")
+			list := run(t, primaryPort, walg, "--config="+caseConfig, "backup-list", "--detail", "--json")
 			require.NoError(t, json.Unmarshal([]byte(list), &backups))
 			require.Len(t, backups, 1)
 			name := backups[0].Name
@@ -186,19 +194,23 @@ func TestBackupReservationStandbyIntegration(t *testing.T) {
 
 			// WAL is archived by the primary into the shared archive config;
 			// backup data lives in a fresh per-case prefix.
-			sql(primaryPort, "SELECT pg_switch_wal()")
+			// Emit a record beyond the standby's consistency point. An idle
+			// primary may otherwise have no record in the next segment, so
+			// switching WAL alone is insufficient for recovery_target=immediate.
+			sql(t, primaryPort, "UPDATE attempt_data SET id = id WHERE id = 1")
+			sql(t, primaryPort, "SELECT pg_switch_wal()")
 			require.Eventually(t, func() bool {
 				files, err := filepath.Glob(filepath.Join(primary, "pg_wal", "archive_status", "*.ready"))
 				return err == nil && len(files) == 0
 			}, 30*time.Second, 100*time.Millisecond)
-			data, p := filepath.Join(root, "restore-"+label), port()
-			run(primaryPort, walg, "--config="+caseConfig, "backup-fetch", data, name)
+			data, p := filepath.Join(root, "restore-"+label), port(t)
+			run(t, primaryPort, walg, "--config="+caseConfig, "backup-fetch", data, name)
 			_ = os.Remove(filepath.Join(data, "standby.signal"))
 			require.NoError(t, os.WriteFile(filepath.Join(data, "postgresql.auto.conf"), nil, 0600))
 			require.NoError(t, os.WriteFile(filepath.Join(data, "recovery.signal"), nil, 0600))
-			appendConfig(data, fmt.Sprintf("archive_mode=off\nrestore_command='%s --config=%s wal-fetch %%f %%p'\nrecovery_target='immediate'\nrecovery_target_action='promote'", walg, config))
-			start(data, p)
-			require.Equal(t, "3", sql(p, "SELECT count(*) FROM attempt_data"))
+			appendConfig(t, data, fmt.Sprintf("archive_mode=off\nrestore_command='%s --config=%s wal-fetch %%f %%p'\nrecovery_target='immediate'\nrecovery_target_action='promote'", walg, config))
+			start(t, data, p)
+			require.Equal(t, "3", sql(t, p, "SELECT count(*) FROM attempt_data"))
 		})
 	}
 }

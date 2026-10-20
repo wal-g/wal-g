@@ -18,6 +18,7 @@ func TestCreateObjectSelectedStorageOnly(t *testing.T) {
 	// No statistics collector is needed: a name conflict must not mark a storage
 	// unhealthy and must not retry on the other configured destination.
 	subfolder := folder.GetSubFolder("cluster/")
+	require.True(t, storage.SupportsCreateObject(subfolder))
 	require.NoError(t, storage.CreateObject(t.Context(), subfolder, "reservation", nil))
 	require.ErrorIs(t, storage.CreateObject(t.Context(), subfolder, "reservation", nil), storage.ErrObjectAlreadyExists)
 	exists, err := primary.Exists(t.Context(), "cluster/reservation")
@@ -27,13 +28,16 @@ func TestCreateObjectSelectedStorageOnly(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, exists)
 	folder.usedFolders = append(folder.usedFolders, NamedFolder{Folder: primary, StorageName: "primary"})
+	require.False(t, storage.SupportsCreateObject(folder))
 	require.Error(t, folder.CreateObject(t.Context(), "other", nil))
 	folder.usedFolders = nil
+	require.False(t, storage.SupportsCreateObject(folder))
 	require.Error(t, folder.CreateObject(t.Context(), "other", nil))
 }
 
 func TestCreateObjectUnsupportedStorage(t *testing.T) {
 	folder := memory.NewFolder("", memory.NewKVS())
+	require.False(t, storage.SupportsCreateObject(folder))
 	require.ErrorContains(t, storage.CreateObject(t.Context(), folder, "reservation", nil), "does not support atomic")
 	exists, err := folder.Exists(t.Context(), "reservation")
 	require.NoError(t, err)

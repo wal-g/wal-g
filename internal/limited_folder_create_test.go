@@ -13,6 +13,7 @@ import (
 
 func TestLimitedFolderCreateObject(t *testing.T) {
 	folder := internal.NewLimitedFolder(fs.NewFolder(t.TempDir(), ""), rate.NewLimiter(rate.Inf, 1)).GetSubFolder("cluster")
+	require.True(t, storage.SupportsCreateObject(folder))
 	require.NoError(t, storage.CreateObject(t.Context(), folder, "reservation", []byte("owner")))
 	require.ErrorIs(t, storage.CreateObject(t.Context(), folder, "reservation", []byte("other")), storage.ErrObjectAlreadyExists)
 	ctx, cancel := context.WithCancel(t.Context())
