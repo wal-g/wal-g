@@ -94,7 +94,7 @@ func archiveTestPush(t *testing.T, a *daemonArchiver, filename string) {
 }
 
 // A slow speculative upload must neither delay foreground acknowledgement nor
-// prevent the other background worker from refilling. ASM hits move the window.
+// prevent the other background worker from draining beyond the discovery batch.
 func TestDaemonArchiverForegroundAndMarkerRefill(t *testing.T) {
 	archiveTestConfig(t)
 	files := archiveTestFiles(t, 7)
@@ -127,11 +127,8 @@ func TestDaemonArchiverForegroundAndMarkerRefill(t *testing.T) {
 	defer a.Close()
 	archiveTestPush(t, a, files[0]) // returns with files[1] still blocked
 	require.Eventually(t, func() bool { return manager.IsWalAlreadyUploaded(files[4]) }, 3*time.Second, time.Millisecond)
-	mu.Lock()
-	require.Equal(t, 0, counts[files[5]], "must respect the lookahead window")
-	mu.Unlock()
-	archiveTestPush(t, a, files[2]) // hit ASM; opens more of the window
 	archiveTestWait(t, sixthStarted)
+	archiveTestPush(t, a, files[2]) // hit ASM; no new request was needed to reach files[6]
 	mu.Lock()
 	defer mu.Unlock()
 	require.Equal(t, 1, counts[files[2]], "acknowledgement should not re-upload the WAL")

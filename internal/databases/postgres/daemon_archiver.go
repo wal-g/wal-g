@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +30,7 @@ type daemonArchiveJob struct {
 // daemonArchiver owns uploads across archive_command calls. At most C-1 jobs
 // are speculative, reserving capacity for the WAL PostgreSQL actually needs.
 // The existing ASM remains the persistent success record; only in-flight jobs
-// and a bounded lookahead window live in memory.
+// and bounded candidate batches live in memory.
 type daemonArchiver struct {
 	ctx                           context.Context //nolint:containedctx // daemon lifetime, not a client connection
 	cancel                        context.CancelFunc
@@ -132,7 +133,7 @@ func (a *daemonArchiver) Push(ctx context.Context, filename string) error {
 		a.mu.Lock()
 		a.anchor = filename
 		a.mu.Unlock()
-		a.notify() // Also refill while acknowledging an already uploaded WAL.
+		a.notify() // Establish the directory/lower bound, even on an ASM hit.
 	}
 	started := time.Now()
 	job, err := a.startJob(ctx, filename, false)
@@ -265,6 +266,7 @@ func (a *daemonArchiver) scan() {
 	ticker := time.NewTicker(pollPauseDuration)
 	defer ticker.Stop()
 	var scan daemonArchiveScan
+	defer scan.closeListing()
 	for {
 		select {
 		case <-a.ctx.Done():
@@ -276,53 +278,122 @@ func (a *daemonArchiver) scan() {
 		if anchor == "" {
 			continue
 		}
-		candidates := a.candidates(anchor, &scan)
-		for _, filename := range candidates {
-			if a.ctx.Err() != nil {
-				return
-			}
-			if a.manager.IsWalAlreadyUploaded(filename) {
-				continue
-			}
-			a.mu.Lock()
-			wait := time.Now().Before(a.retryAfter[filename])
-			a.mu.Unlock()
-			if wait {
-				continue
-			}
-			job, err := a.startJob(a.ctx, filename, true)
-			if err != nil || job == nil {
-				break
-			}
-		}
+		a.refill(anchor, &scan)
 	}
 }
 
-// Forget retry delays for files outside the current lookahead directory/window.
+func (a *daemonArchiver) refill(anchor string, scan *daemonArchiveScan) {
+	scan.follow(anchor)
+	if len(scan.pending) == 0 {
+		scan.pending = a.candidates(anchor, scan)
+	}
+	hadCandidates := len(scan.pending) > 0
+	for len(scan.pending) > 0 {
+		if a.ctx.Err() != nil {
+			return
+		}
+		filename := scan.pending[0]
+		if filename > anchor && a.needsUpload(filename) {
+			job, err := a.startJob(a.ctx, filename, true)
+			if err != nil || job == nil {
+				break // Keep this candidate until a worker becomes available.
+			}
+		}
+		scan.pending = scan.pending[1:]
+		if filename > scan.cursor {
+			scan.cursor = filename
+		}
+	}
+	if len(scan.pending) == 0 && (hadCandidates || scan.listing != nil) {
+		a.notify() // A batch is a memory bound, not an archival progress limit.
+	}
+}
+
+// Expire retry delays even when PostgreSQL is stuck on the same WAL.
 func (a *daemonArchiver) scanAnchor() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	for filename := range a.retryAfter {
-		if filename <= a.anchor || filepath.Dir(filename) != filepath.Dir(a.anchor) {
+	for filename, retryAt := range a.retryAfter {
+		if !time.Now().Before(retryAt) || filename <= a.anchor || filepath.Dir(filename) != filepath.Dir(a.anchor) {
 			delete(a.retryAfter, filename)
 		}
 	}
 	return a.anchor
 }
 
-// Prefer arithmetic lookahead and stat to a complete sorted directory listing.
-// A throttled fallback handles gaps without repeatedly listing a large backlog.
+func (a *daemonArchiver) needsUpload(filename string) bool {
+	if a.manager.IsWalAlreadyUploaded(filename) {
+		return false
+	}
+	a.mu.Lock()
+	busy := a.jobs[filename] != nil || time.Now().Before(a.retryAfter[filename])
+	a.mu.Unlock()
+	if busy {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(filepath.Dir(filename), archiveStatusDir, filepath.Base(filename)+readySuffix))
+	return err == nil
+}
+
+const daemonArchiveRescanInterval = 5 * time.Second
+
+// The cursor advances independently of client requests. Periodic streaming
+// directory passes rediscover failures and late .ready files behind the cursor.
+// Both predicted and listed candidates are retained in bounded batches while
+// workers are busy; a large or sparse backlog does not need to fit in memory.
 type daemonArchiveScan struct {
 	dir          string
+	cursor       string
 	lastFullScan time.Time
-	fallback     []string
+	nextRescan   time.Time
+	pending      []string
+	listing      *os.File
+}
+
+func (scan *daemonArchiveScan) closeListing() {
+	if scan.listing != nil {
+		_ = scan.listing.Close()
+		scan.listing = nil
+	}
+}
+
+func (scan *daemonArchiveScan) follow(anchor string) {
+	dir := filepath.Dir(anchor)
+	if scan.dir != dir {
+		scan.closeListing()
+		*scan = daemonArchiveScan{dir: dir, cursor: anchor, nextRescan: time.Now().Add(daemonArchiveRescanInterval)}
+	}
+	if anchor > scan.cursor {
+		scan.cursor = anchor
+	}
 }
 
 func (a *daemonArchiver) candidates(anchor string, scan *daemonArchiveScan) []string {
-	dir, name := filepath.Dir(anchor), filepath.Base(anchor)
-	if scan.dir != dir {
-		*scan = daemonArchiveScan{dir: dir}
+	scan.follow(anchor)
+	if scan.listing != nil {
+		return a.listCandidates(anchor, scan)
 	}
+	if time.Now().Before(scan.nextRescan) {
+		if files := a.predictCandidates(scan.cursor); len(files) > 0 {
+			return files
+		}
+		if !scan.lastFullScan.IsZero() {
+			return nil
+		}
+	}
+	scan.lastFullScan = time.Now()
+	scan.nextRescan = scan.lastFullScan.Add(daemonArchiveRescanInterval)
+	var err error
+	scan.listing, err = os.Open(filepath.Join(scan.dir, archiveStatusDir))
+	if err != nil {
+		tracelog.ErrorLogger.Print(fmt.Errorf("scan archive_status: %w", err))
+		return nil
+	}
+	return a.listCandidates(anchor, scan)
+}
+
+func (a *daemonArchiver) predictCandidates(cursor string) []string {
+	dir, name := filepath.Dir(cursor), filepath.Base(cursor)
 	files := make([]string, 0, a.window)
 	for len(files) < a.window {
 		next, err := GetNextWalFilename(name)
@@ -336,42 +407,27 @@ func (a *daemonArchiver) candidates(anchor string, scan *daemonArchiveScan) []st
 		files = append(files, filepath.Join(dir, next))
 		name = next
 	}
-	if len(files) > 0 {
-		return files
-	}
-	if time.Since(scan.lastFullScan) < 5*time.Second {
-		// Reuse the bounded listing on every worker completion. Throttling the
-		// listing must not also throttle uploads of files we already found.
-		return scan.readyFallback(anchor)
-	}
-	scan.lastFullScan = time.Now()
-	scan.fallback = nil
-	entries, err := os.ReadDir(filepath.Join(dir, archiveStatusDir))
-	if err != nil {
-		tracelog.ErrorLogger.Print(fmt.Errorf("scan archive_status: %w", err))
-		return files
-	}
-	for _, entry := range entries {
-		name := strings.TrimSuffix(entry.Name(), readySuffix)
-		if !strings.HasSuffix(entry.Name(), readySuffix) || !isWalFilename(name) || name <= filepath.Base(anchor) {
-			continue
-		}
-		files = append(files, filepath.Join(dir, name))
-		if len(files) == a.window {
-			break
-		}
-	}
-	scan.fallback = files
 	return files
 }
 
-func (scan *daemonArchiveScan) readyFallback(anchor string) []string {
+func (a *daemonArchiver) listCandidates(anchor string, scan *daemonArchiveScan) []string {
+	names, err := scan.listing.Readdirnames(a.window)
+	if err != nil {
+		scan.closeListing()
+		if err != io.EOF {
+			tracelog.ErrorLogger.Print(fmt.Errorf("scan archive_status: %w", err))
+		}
+		// Back off after completing the pass, even if draining it took a while.
+		scan.nextRescan = time.Now().Add(daemonArchiveRescanInterval)
+	}
 	var files []string
-	for _, filename := range scan.fallback {
-		if filename <= anchor {
+	for _, entry := range names {
+		name := strings.TrimSuffix(entry, readySuffix)
+		filename := filepath.Join(scan.dir, name)
+		if !strings.HasSuffix(entry, readySuffix) || !isWalFilename(name) || filename <= anchor {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(scan.dir, archiveStatusDir, filepath.Base(filename)+readySuffix)); err == nil {
+		if a.needsUpload(filename) {
 			files = append(files, filename)
 		}
 	}
