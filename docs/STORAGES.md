@@ -98,6 +98,10 @@ Overrides the default minimum time between retries when throttled in millisecond
 
 Overrides the default minimum time between retries when throttled in milliseconds. Default is 300000ms.
 
+* `S3_ADDITIONAL_RETRYABLE_ERROR_CODES`
+
+Comma-separated list of S3 error codes to retry in addition to the default ones, for example `InvalidRequest`. A response is retried if its error code is in the list, for any HTTP status. Codes are case-sensitive. The number of retries is limited by `WALG_S3_MAX_RETRIES`; request cancellation and deadlines still apply. Empty by default.
+
 * `S3_RETENTION_PERIOD`
 
 Sets retention period in seconds to files, uploaded to s3. Default is disabled with value -1.

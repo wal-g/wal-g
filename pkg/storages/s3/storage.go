@@ -38,6 +38,7 @@ type Config struct {
 	RequestAdditionalHeaders string
 	UseListObjectsV1         bool
 	MaxRetries               int
+	RetryableErrorCodes      map[string]struct{} `json:",omitempty"`
 	LogLevel                 string
 	Uploader                 *UploaderConfig
 	RangeBatchEnabled        bool
