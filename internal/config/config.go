@@ -213,6 +213,8 @@ const (
 	HTTPExposePprof  = "HTTP_EXPOSE_PPROF"
 	HTTPExposeExpVar = "HTTP_EXPOSE_EXPVAR"
 
+	ConsoleAddress = "WALG_CONSOLE_ADDRESS"
+
 	SQLServerBlobHostname     = "SQLSERVER_BLOB_HOSTNAME"
 	SQLServerBlobCertFile     = "SQLSERVER_BLOB_CERT_FILE"
 	SQLServerBlobKeyFile      = "SQLSERVER_BLOB_KEY_FILE"
