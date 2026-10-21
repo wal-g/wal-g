@@ -3,6 +3,7 @@ set -e -x
 
 . /tmp/tests/test_functions/pg_compat.sh
 
+. /tmp/tests/test_functions/check_deleted.sh
 . /tmp/tests/test_functions/prepare_config.sh
 prepare_config "/tmp/configs/delete_garbage_test_config.json"
 
@@ -111,6 +112,9 @@ wal-g --config=${TMP_CONFIG} delete target "${FIRST_NON_PERMANENT_BACKUP}" --con
 wal-g --config=${TMP_CONFIG} delete garbage --confirm
 
 wal-g --config=${TMP_CONFIG} backup-list
+
+# the deleted backup must be gone from backup-list and from the storage(s), including its leftover objects
+assert_backups_deleted "${FIRST_NON_PERMANENT_BACKUP}"
 
 # the desired first backup is on line 2 (1st line is the header)
 FIRST_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==2{print $1}')

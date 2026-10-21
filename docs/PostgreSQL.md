@@ -581,6 +581,20 @@ This command copies restorable backup closures between storages without decrypti
 
 `--with-history` synchronizes continuous WAL from the selected backup recovery point through the latest archived WAL visible when the command starts. The command is resumable: run it again later to add newly archived WAL without retransferring existing immutable objects.
 
+In both modes, timeline history files with IDs below the first required WAL's timeline are omitted: the starting timeline's history already contains its ancestry. That timeline's history and all later history files are retained so recovery can discover later timelines with `recovery_target_timeline=latest`. Unrecognized history filenames are retained conservatively. Selection uses filenames without opening or decrypting the files.
+
+Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to overwrite destination objects whose sizes differ from the source, including zero-byte objects. Each planned replacement is logged with both sizes. Equal-sized immutable objects are still skipped. The default is `false`, which rejects size conflicts before transferring any objects.
+
+Disaster mode also allows matching transfer errors to be logged as warnings while copying continues. `WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES` controls which source object paths may have their transfer errors skipped; it does not restrict which size conflicts are overwritten. Its database-specific default matches timeline history files, including compressed files:
+
+```yaml
+WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES: '^wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$'
+```
+
+An explicit pattern in `--to` takes precedence over `--from`, then the main config/environment and the database default. An empty pattern disables transfer-error skipping but still allows conflicting objects to be overwritten; an invalid pattern fails the command when disaster mode is enabled. Retryable transfer failures are skipped only after exhausting the configured retries; permanent matching transfer failures are skipped immediately. Transfer errors for unmatched objects and cancellation remain fatal, including during replacement of conflicting objects.
+
+Disaster-mode completion does not guarantee recovery. Same-timeline recovery may succeed without a history file, but a missing target history file can prevent startup, and a gap in history files can prevent `latest` from discovering later timelines. Normal mode continues to fail on transfer errors after applicable retries.
+
 Flags:
 
 - `-b, --backup-name string` Copy specific backup

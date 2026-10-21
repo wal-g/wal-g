@@ -6,10 +6,10 @@ MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
 MAIN_GP_PATH := main/gp
 MAIN_ETCD_PATH := main/etcd
-DOCKER_COMMON := golang s3
 # Keep the golang docker image's toolchain in sync with go.mod instead of hardcoding it.
 GO_VERSION := $(shell awk '/^go /{print $$2; exit}' go.mod)
 export GO_VERSION
+PULL_OR_BUILD := .github/scripts/pull_or_build.sh
 export GOEXPERIMENT=simd
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go internal/**/**/**/*.go)
@@ -45,7 +45,7 @@ GIT_REVISION ?= `git rev-parse --short HEAD`
 
 # disable_grpc_modules drops gRPC DirectPath (xDS/envoy) from cloud.google.com/go/storage,
 # wal-g uses the HTTP GCS client only
-BUILD_TAGS:=disable_grpc_modules
+BUILD_TAGS:=disable_grpc_modules grpcnotrace
 
 ifdef USE_BROTLI
 	BUILD_TAGS:=$(BUILD_TAGS) brotli
@@ -90,18 +90,13 @@ pg_build: $(CMD_FILES) $(PKG_FILES)
 
 install_and_build_pg: deps pg_build
 
-pg10_build_image: go_deps load_ubuntu_18_04
-ifeq ($(COMPOSE_BAKE),true)
-	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
-	docker compose build $(DOCKER_COMMON) pg10 pg10_tests_template
-else
+pg10_build_image: go_deps load_ubuntu_18_04 load_golang_image
 	# There are dependencies between container images.
 	# Running in one command leads to using outdated images and fails on clean system.
 	# It can not be fixed with depends_on in compose file. https://github.com/docker/compose/issues/6332
-	docker compose build $(DOCKER_COMMON)
+	docker compose build s3
 	docker compose build pg10
 	docker compose build pg10_tests_template
-endif
 
 # Builds the image for any PostgreSQL 14-18, chosen by PG_MAJOR (ubuntu 22.04 and
 # PGDG). PG 10 still uses pg10_build_image above, because wal-e needs python3.7
@@ -110,17 +105,12 @@ pg_build_image: go_deps load_docker_common
 ifeq ($(PG_MAJOR),10)
 	$(error PG_MAJOR=10 must be built with pg10_build_image - the PG 10 image is bionic + wal-e)
 endif
-ifeq ($(COMPOSE_BAKE),true)
-	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
-	docker compose build $(DOCKER_COMMON) pg pg_tests_template
-else
 	# pg_tests_template is built FROM wal-g/pg$(PG_MAJOR). In a single command
 	# compose would look for that image on docker.io instead of using the one it
 	# is about to build. https://github.com/docker/compose/issues/6332
-	docker compose build $(DOCKER_COMMON)
+	docker compose build s3
 	docker compose build pg
 	docker compose build pg_tests_template
-endif
 
 # PG 10 is built by pg10_build_image (bionic + wal-e), the rest by pg_build_image.
 # This list is also what CI tests: dockertests-par.yml reads it from here.
@@ -141,8 +131,11 @@ pg_matrix_test:
 	done
 
 # Reuse the prebuilt image from build-golang-image.yml; build locally if it is unavailable.
+.PHONY: load_golang_image
 load_golang_image:
-	(docker pull ghcr.io/wal-g/golang:$(GO_VERSION) && docker tag ghcr.io/wal-g/golang:$(GO_VERSION) wal-g/golang) || docker compose build golang
+	@if ! docker image inspect wal-g/golang:latest >/dev/null 2>&1; then \
+		sh $(PULL_OR_BUILD) ghcr.io/wal-g/golang:$(GO_VERSION) wal-g/golang docker/golang/Dockerfile golang; \
+	fi
 
 pg_integration_test: clean_compose
 	if [ "$(PG_MAJOR)" = "10" ]; then\
@@ -204,10 +197,10 @@ sqlserver_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_SQLSERVER_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g$(BINARY_EXT) -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
 
 load_ubuntu_18_04:
-	(docker pull ghcr.io/wal-g/ubuntu:18.04 && docker tag ghcr.io/wal-g/ubuntu:18.04 wal-g/ubuntu:18.04) || docker compose build ubuntu
+	@sh $(PULL_OR_BUILD) ghcr.io/wal-g/ubuntu:18.04 wal-g/ubuntu:18.04 docker/ubuntu/Dockerfile ubuntu
 
 load_ubuntu_22_04:
-	(docker pull ghcr.io/wal-g/ubuntu:22.04 && docker tag ghcr.io/wal-g/ubuntu:22.04 wal-g/ubuntu:22.04) || docker compose build ubuntu_22_04
+	@sh $(PULL_OR_BUILD) ghcr.io/wal-g/ubuntu:22.04 wal-g/ubuntu:22.04 docker/ubuntu/Dockerfile_22_04 ubuntu_22_04
 
 load_docker_common: load_ubuntu_18_04 load_ubuntu_22_04 load_golang_image
 	docker compose build s3
@@ -328,11 +321,7 @@ gp_install: gp_build
 gp_test: deps gp_build unlink_brotli gp_integration_test
 
 gp_integration_test: load_docker_common
-	@if docker pull ghcr.io/wal-g/gp:latest; then \
-		docker tag ghcr.io/wal-g/gp:latest wal-g/gp:latest; \
-	else \
-		docker compose build gp; \
-	fi
+	@sh $(PULL_OR_BUILD) ghcr.io/wal-g/gp:latest wal-g/gp:latest docker/gp/Dockerfile gp
 	docker compose build gp_tests
 	docker compose up --exit-code-from gp_tests gp_tests
 
@@ -345,11 +334,7 @@ cloudberry_install: gp_install
 cloudberry_test: deps cloudberry_build unlink_brotli cloudberry_integration_test
 
 cloudberry_integration_test: load_docker_common
-	@if docker pull ghcr.io/wal-g/cloudberry:latest; then \
-		docker tag ghcr.io/wal-g/cloudberry:latest wal-g/cloudberry:latest; \
-	else \
-		docker compose build cloudberry; \
-	fi
+	@sh $(PULL_OR_BUILD) ghcr.io/wal-g/cloudberry:latest wal-g/cloudberry:latest docker/cloudberry/Dockerfile cloudberry
 	docker compose build cloudberry_tests
 	docker compose up s3 cloudberry_tests --force-recreate --exit-code-from cloudberry_tests
 

@@ -260,6 +260,8 @@ const (
 
 	ForceWalDetal          = "WALG_FORCE_WAL_DELTA"
 	ServerSideCopyFallback = "WALG_SERVER_SIDE_COPY_FALLBACK"
+	DisasterCopy           = "WALG_DISASTER_COPY"
+	DisasterCopySkipFiles  = "WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES"
 )
 
 var (
@@ -298,6 +300,7 @@ var (
 		DirectIOBlockCountSetting:    "32",
 		LogLevelSetting:              "NORMAL",
 		ServerSideCopyFallback:       "true",
+		DisasterCopy:                 "false",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -335,6 +338,7 @@ var (
 	}
 
 	PGDefaultSettings = map[string]string{
+		DisasterCopySkipFiles:     `^wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$`,
 		PgWalSize:                 "16",
 		PgWalPageSize:             "8192",
 		PgBlockSize:               "8192",
@@ -347,6 +351,7 @@ var (
 	}
 
 	GPDefaultSettings = map[string]string{
+		DisasterCopySkipFiles:        `^segments_005/seg-?[0-9]+/wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$`,
 		GPLogsDirectory:              "/var/log",
 		PgWalSize:                    "64",
 		PgWalPageSize:                "32768",
@@ -426,6 +431,8 @@ var (
 		StatsdAddressSetting:          true,
 		StatsdExtraTagsSetting:        true,
 		ServerSideCopyFallback:        true,
+		DisasterCopy:                  true,
+		DisasterCopySkipFiles:         true,
 
 		ProfileSamplingRatio: true,
 		ProfileMode:          true,

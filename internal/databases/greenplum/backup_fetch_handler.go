@@ -58,14 +58,17 @@ type ClusterRestoreConfig struct {
 }
 
 type FetchHandler struct {
-	cluster             *cluster.Cluster
-	backupIDByContentID map[int]string
-	backup              internal.Backup
-	contentIDsToFetch   map[int]bool
-	fetchMode           BackupFetchMode
-	restorePoint        string
-	partialRestoreArgs  []string
-	sentinel            BackupSentinelDto
+	cluster               *cluster.Cluster
+	backupIDByContentID   map[int]string
+	backupNameByContentID map[int]string
+	backup                internal.Backup
+	contentIDsToFetch     map[int]bool
+	fetchMode             BackupFetchMode
+	restorePoint          string
+	partialRestoreArgs    []string
+	turbo                 bool
+	allowDataLoss         bool
+	sentinel              BackupSentinelDto
 }
 
 //nolint:gocritic
@@ -73,9 +76,10 @@ func NewFetchHandler(
 	backup internal.Backup, sentinel BackupSentinelDto,
 	segCfgMaker SegConfigMaker, logsDir string,
 	fetchContentIDs []int, mode BackupFetchMode,
-	restorePoint string, partialRestoreArgs []string,
+	restorePoint string, partialRestoreArgs []string, turbo, allowDataLoss bool,
 ) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
+	backupNameByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
 	initGpLog(logsDir)
 
@@ -85,6 +89,7 @@ func NewFetchHandler(
 			// update the segment config from the metadata with the
 			// Hostname, Port and DataDir specified in the restore config
 			backupIDByContentID[segMeta.ContentID] = segMeta.BackupID
+			backupNameByContentID[segMeta.ContentID] = segMeta.BackupName
 			segmentCfg, err := segCfgMaker.Make(segMeta)
 			tracelog.ErrorLogger.FatalOnError(err)
 
@@ -99,14 +104,17 @@ func NewFetchHandler(
 	tracelog.DebugLogger.Printf("cluster %v\n", globalCluster)
 
 	return &FetchHandler{
-		cluster:             globalCluster,
-		backupIDByContentID: backupIDByContentID,
-		backup:              backup,
-		contentIDsToFetch:   prepareContentIDsToFetch(fetchContentIDs, segmentConfigs),
-		fetchMode:           mode,
-		restorePoint:        restorePoint,
-		partialRestoreArgs:  partialRestoreArgs,
-		sentinel:            sentinel,
+		cluster:               globalCluster,
+		backupIDByContentID:   backupIDByContentID,
+		backupNameByContentID: backupNameByContentID,
+		backup:                backup,
+		contentIDsToFetch:     prepareContentIDsToFetch(fetchContentIDs, segmentConfigs),
+		fetchMode:             mode,
+		restorePoint:          restorePoint,
+		partialRestoreArgs:    partialRestoreArgs,
+		turbo:                 turbo,
+		allowDataLoss:         allowDataLoss,
+		sentinel:              sentinel,
 	}
 }
 
@@ -277,14 +285,27 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 		tracelog.ErrorLogger.Fatalf("Failed to load backup id by content id %d", contentID)
 	}
 
-	segUserData := NewSegmentUserDataFromID(backupID)
 	cmd := []string{
 		fmt.Sprintf("PGPORT=%d", segment.Port),
 		"wal-g seg-backup-fetch",
 		fmt.Sprint(segment.DataDir),
-		fmt.Sprintf("--content-id=%d", segment.ContentID),
-		fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()),
-		fmt.Sprintf("--config=%s", conf.CfgFile),
+	}
+	backupName := fh.backupNameByContentID[contentID]
+	if backupName != "" {
+		cmd = append(cmd, backupName)
+	}
+	cmd = append(cmd, fmt.Sprintf("--content-id=%d", segment.ContentID))
+	if backupName == "" {
+		// Older cluster sentinels may not include segment backup names.
+		segUserData := NewSegmentUserDataFromID(backupID)
+		cmd = append(cmd, fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()))
+	}
+	cmd = append(cmd, fmt.Sprintf("--config=%s", conf.CfgFile))
+	if fh.turbo {
+		cmd = append(cmd, "--turbo")
+	}
+	if contentID != -1 && fh.allowDataLoss {
+		cmd = append(cmd, "--allow-dataloss")
 	}
 	if fh.partialRestoreArgs != nil {
 		cmd = append(cmd, fmt.Sprintf("--restore-only=%s", strings.Join(fh.partialRestoreArgs[:], ",")))
@@ -298,7 +319,7 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 }
 
 func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsDir string,
-	fetchContentIDs []int, mode BackupFetchMode, restorePoint string, partialRestoreArgs []string,
+	fetchContentIDs []int, mode BackupFetchMode, restorePoint string, partialRestoreArgs []string, turbo, allowDataLoss bool,
 ) func(ctx context.Context, folder storage.Folder, backup internal.Backup) {
 	return func(ctx context.Context, folder storage.Folder, backup internal.Backup) {
 		tracelog.InfoLogger.Printf("Starting backup-fetch for %s", backup.Name)
@@ -312,7 +333,8 @@ func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsD
 		segCfgMaker, err := NewSegConfigMaker(restoreCfgPath, inPlaceRestore)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		handler := NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint, partialRestoreArgs)
+		handler := NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint,
+			partialRestoreArgs, turbo, allowDataLoss)
 		err = handler.Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}

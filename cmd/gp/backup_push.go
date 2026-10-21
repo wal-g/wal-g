@@ -21,6 +21,7 @@ const (
 	deltaFromUserDataFlag = "delta-from-user-data"
 	deltaFromNameFlag     = "delta-from-name"
 	countJournalsFlag     = "count-journals"
+	turboFlag             = "turbo"
 
 	permanentShorthand  = "p"
 	fullBackupShorthand = "f"
@@ -73,6 +74,7 @@ var (
 	}
 	permanent   = false
 	userDataRaw = ""
+	turbo       = false
 
 	deltaFromName     = ""
 	deltaFromUserData = ""
@@ -82,10 +84,14 @@ var (
 
 // prepare arguments that are going to be forwarded to segments
 func prepareSegmentFwdArgs() []greenplum.SegmentFwdArg {
-	return []greenplum.SegmentFwdArg{
+	args := []greenplum.SegmentFwdArg{
 		{Name: permanentFlag, Value: strconv.FormatBool(permanent)},
 		{Name: countJournalsFlag, Value: strconv.FormatBool(countJournals)},
 	}
+	if turbo {
+		args = append(args, greenplum.SegmentFwdArg{Name: turboFlag, Value: "true"})
+	}
+	return args
 }
 
 func init() {
@@ -99,6 +105,8 @@ func init() {
 		false, "Pushes permanent backup")
 	backupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand,
 		false, "Make full backup-push")
+	backupPushCmd.Flags().BoolVar(&turbo, turboFlag, false,
+		"Ignore IO and network rate limits from config on Greenplum segments")
 	backupPushCmd.Flags().StringVar(&userDataRaw, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
 	backupPushCmd.Flags().StringVar(&deltaFromName, deltaFromNameFlag,

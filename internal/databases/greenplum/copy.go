@@ -47,7 +47,11 @@ func HandleCopyWithHistory(
 	plan, err := buildCopyPlanWaiting(
 		ctx, from.RootFolder(), to.RootFolder(), backupName, withHistory, walWaitTimeout, sleepContext)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, copy.OptionsFromConfigs(fromConfig, toConfig)))
+	options, err := copy.OptionsFromConfigs(fromConfig, toConfig)
+	tracelog.ErrorLogger.FatalOnError(err)
+	options.SkipErrorsFor, err = copy.DisasterCopyPattern(fromConfig, toConfig)
+	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, options))
 	tracelog.InfoLogger.Println("Success copy.")
 }
 

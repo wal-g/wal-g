@@ -24,6 +24,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+//nolint:gocyclo
 func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Options), error) {
 	// Connect to a node from endpoint source, but keep configured endpoint as request host
 	// Use configured endpoint protocol for connection
@@ -45,6 +46,23 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 
 	loadOpts := []func(*config.LoadOptions) error{
 		config.WithHTTPClient(httpClient),
+		config.WithRetryer(newRetryerFunc(cfg)),
+	}
+
+	requestChecksumCalculation, err := parseRequestChecksumCalculation(cfg.RequestChecksumCalculation)
+	if err != nil {
+		return aws.Config{}, nil, err
+	}
+	if requestChecksumCalculation != aws.RequestChecksumCalculationUnset {
+		loadOpts = append(loadOpts, config.WithRequestChecksumCalculation(requestChecksumCalculation))
+	}
+
+	responseChecksumValidation, err := parseResponseChecksumValidation(cfg.ResponseChecksumValidation)
+	if err != nil {
+		return aws.Config{}, nil, err
+	}
+	if responseChecksumValidation != aws.ResponseChecksumValidationUnset {
+		loadOpts = append(loadOpts, config.WithResponseChecksumValidation(responseChecksumValidation))
 	}
 
 	if cfg.DualStack {
@@ -70,8 +88,6 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 	}
 	awsCfg.Region = region
 
-	awsCfg.Retryer = newRetryerFunc(cfg)
-
 	s3Opts, err := buildS3Options(cfg, scheme, host)
 	if err != nil {
 		return aws.Config{}, nil, err
@@ -83,6 +99,34 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 	}
 
 	return awsCfg, append(s3Opts, ycOpts...), nil
+}
+
+func parseRequestChecksumCalculation(value string) (aws.RequestChecksumCalculation, error) {
+	switch strings.ToUpper(value) {
+	case "":
+		return aws.RequestChecksumCalculationUnset, nil
+	case "WHEN_SUPPORTED":
+		return aws.RequestChecksumCalculationWhenSupported, nil
+	case "WHEN_REQUIRED":
+		return aws.RequestChecksumCalculationWhenRequired, nil
+	default:
+		return aws.RequestChecksumCalculationUnset, fmt.Errorf("%s=%q must be WHEN_SUPPORTED or WHEN_REQUIRED",
+			requestChecksumCalculationSetting, value)
+	}
+}
+
+func parseResponseChecksumValidation(value string) (aws.ResponseChecksumValidation, error) {
+	switch strings.ToUpper(value) {
+	case "":
+		return aws.ResponseChecksumValidationUnset, nil
+	case "WHEN_SUPPORTED":
+		return aws.ResponseChecksumValidationWhenSupported, nil
+	case "WHEN_REQUIRED":
+		return aws.ResponseChecksumValidationWhenRequired, nil
+	default:
+		return aws.ResponseChecksumValidationUnset, fmt.Errorf("%s=%q must be WHEN_SUPPORTED or WHEN_REQUIRED",
+			responseChecksumValidationSetting, value)
+	}
 }
 
 func buildS3Options(cfg *Config, scheme, host string) ([]func(*s3.Options), error) {
@@ -100,7 +144,8 @@ func buildS3Options(cfg *Config, scheme, host string) ([]func(*s3.Options), erro
 	}
 
 	if cfg.EndpointSource != "" {
-		s3Opts = append(s3Opts, withDynamicEndpoint(cfg.EndpointSource, cfg.EndpointPort, cfg.Endpoint, scheme, host))
+		s3Opts = append(s3Opts, withDynamicEndpoint(cfg.EndpointSource, cfg.EndpointPort, cfg.Endpoint, scheme, host,
+			cfg.IsolateEndpointSource))
 	}
 
 	if cfg.RequestAdditionalHeaders != "" {
@@ -240,13 +285,16 @@ func detectAWSRegionByBucket(ctx context.Context, awsCfg *aws.Config, bucket, en
 // withDynamicEndpoint rewrites the request URL host using a value fetched from
 // EndpointSource on each request. It runs as a Build middleware so the rewrite
 // happens before signing, matching v1's Validate handler timing.
-func withDynamicEndpoint(endpointSource, port, staticEndpoint, scheme, host string) func(*s3.Options) {
+func withDynamicEndpoint(endpointSource, port, staticEndpoint, scheme, host string, isolateTransport bool) func(*s3.Options) {
 	mw := &dynamicEndpointMiddleware{
 		source:         endpointSource,
 		port:           port,
 		staticEndpoint: staticEndpoint,
 		scheme:         scheme,
 		host:           host,
+	}
+	if isolateTransport {
+		mw.client = newEndpointSourceClient()
 	}
 	return func(o *s3.Options) {
 		o.APIOptions = append(o.APIOptions, func(s *middleware.Stack) error {
@@ -256,6 +304,7 @@ func withDynamicEndpoint(endpointSource, port, staticEndpoint, scheme, host stri
 }
 
 type dynamicEndpointMiddleware struct {
+	client         *http.Client
 	source         string
 	port           string
 	staticEndpoint string
@@ -272,7 +321,7 @@ func (m *dynamicEndpointMiddleware) HandleBuild(
 	if !ok {
 		return next.HandleBuild(ctx, in)
 	}
-	endpoint := requestEndpointFromSource(ctx, m.source, m.port)
+	endpoint := requestEndpointFromSource(ctx, m.source, m.port, m.client)
 	if endpoint != nil {
 		tracelog.DebugLogger.Printf("using S3 endpoint %s", *endpoint)
 		req.Host = m.host
@@ -398,12 +447,22 @@ func tlsServerName(host string) string {
 	return host
 }
 
-func requestEndpointFromSource(ctx context.Context, endpointSource, port string) *string {
-	t := http.DefaultTransport
-	c := http.DefaultClient
-	if tr, ok := t.(*http.Transport); ok {
-		tr.DisableKeepAlives = true
-		c = &http.Client{Transport: tr}
+// Clone once at construction, without reading the shared transport during secondary requests.
+func newEndpointSourceClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DisableKeepAlives = true
+	return &http.Client{Transport: transport}
+}
+
+func requestEndpointFromSource(ctx context.Context, endpointSource, port string, c *http.Client) *string {
+	if c == nil {
+		// Preserve the primary's existing behavior, regardless of failover configuration or selection.
+		t := http.DefaultTransport
+		c = http.DefaultClient
+		if tr, ok := t.(*http.Transport); ok {
+			tr.DisableKeepAlives = true
+			c = &http.Client{Transport: tr}
+		}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpointSource, nil)
 	if err != nil {

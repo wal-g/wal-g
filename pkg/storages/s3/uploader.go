@@ -17,6 +17,7 @@ import (
 type UploaderConfig struct {
 	UploadConcurrency            int
 	MaxPartSize                  int
+	AutoPartSize                 bool
 	StorageClass                 string
 	ServerSideEncryption         string
 	ServerSideEncryptionCustomer string
@@ -37,7 +38,7 @@ func createUploader(s3Client *s3.Client, config *UploaderConfig) (*Uploader, err
 	if (config.ServerSideEncryption == "aws:kms") == (config.ServerSideEncryptionKMSID == "") {
 		return nil, fmt.Errorf("server-side encryption KMS key ID must be set if 'aws:kms' encryption is used")
 	}
-	return NewUploader(
+	uploader := NewUploader(
 		uploaderAPI,
 		config.ServerSideEncryption,
 		config.ServerSideEncryptionCustomer,
@@ -45,11 +46,16 @@ func createUploader(s3Client *s3.Client, config *UploaderConfig) (*Uploader, err
 		config.StorageClass,
 		config.RetentionMode,
 		config.RetentionPeriod,
-	), nil
+	)
+	uploader.partSize = int64(config.MaxPartSize)
+	uploader.autoPartSize = config.AutoPartSize
+	return uploader, nil
 }
 
 type Uploader struct {
 	uploaderAPI          UploaderAPI
+	partSize             int64
+	autoPartSize         bool
 	serverSideEncryption string
 	SSECustomerKey       string
 	SSEKMSKeyID          string
@@ -63,13 +69,15 @@ func NewUploader(uploaderAPI UploaderAPI, serverSideEncryption, sseCustomerKey, 
 	if retentionMode == "" {
 		retentionMode = "GOVERNANCE"
 	}
-	return &Uploader{uploaderAPI,
-		serverSideEncryption,
-		sseCustomerKey,
-		sseKmsKeyID,
-		storageClass,
-		retentionMode,
-		time.Duration(retentionPeriod)}
+	return &Uploader{
+		uploaderAPI:          uploaderAPI,
+		serverSideEncryption: serverSideEncryption,
+		SSECustomerKey:       sseCustomerKey,
+		SSEKMSKeyID:          sseKmsKeyID,
+		StorageClass:         storageClass,
+		RetentionMode:        retentionMode,
+		RetentionPeriod:      time.Duration(retentionPeriod),
+	}
 }
 
 func (uploader *Uploader) createUploadInput(bucket, path string, content io.Reader) *s3.PutObjectInput {
@@ -106,8 +114,32 @@ func (uploader *Uploader) createUploadInput(bucket, path string, content io.Read
 
 func (uploader *Uploader) upload(ctx context.Context, bucket, path string, content io.Reader) error {
 	input := uploader.createUploadInput(bucket, path, content)
-	_, err := uploader.uploaderAPI.Upload(ctx, input)
+	if !uploader.autoPartSize {
+		_, err := uploader.uploaderAPI.Upload(ctx, input)
+		return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
+	}
+
+	size, known := uploadSize(content)
+	if !known {
+		_, err := uploader.uploaderAPI.Upload(ctx, input)
+		return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
+	}
+
+	partSize := max((size+int64(manager.MaxUploadParts)-1)/int64(manager.MaxUploadParts), uploader.partSize)
+	_, err := uploader.uploaderAPI.Upload(ctx, input, func(options *manager.Uploader) {
+		options.PartSize = partSize
+	})
 	return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
+}
+
+// uploadSize obtains the remaining content size without reading or buffering
+// it. Storage-to-storage copies provide SizedReader;
+func uploadSize(content io.Reader) (int64, bool) {
+	if sized, ok := content.(storage.SizedReader); ok {
+		size := sized.RemainingSize()
+		return size, size >= 0
+	}
+	return 0, false
 }
 
 // CreateUploaderAPI returns an uploader with customizable concurrency
@@ -117,23 +149,8 @@ func CreateUploaderAPI(svc *s3.Client, partsize, concurrency int) UploaderAPI {
 	return manager.NewUploader(svc, func(u *manager.Uploader) {
 		u.PartSize = int64(partsize)
 		u.Concurrency = concurrency
+		u.RequestChecksumCalculation = svc.Options().RequestChecksumCalculation
 	})
-}
-
-func partitionStrings(strings []string, blockSize int) [][]string {
-	// I've unsuccessfully tried this with interface{} but there was too much of casting
-	if blockSize <= 0 {
-		return [][]string{strings}
-	}
-	partition := make([][]string, 0)
-	for i := 0; i < len(strings); i += blockSize {
-		if i+blockSize > len(strings) {
-			partition = append(partition, strings[i:])
-		} else {
-			partition = append(partition, strings[i:i+blockSize])
-		}
-	}
-	return partition
 }
 
 func partitionObjects(objects []storage.Object, blockSize int) [][]storage.Object {
