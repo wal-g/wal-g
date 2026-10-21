@@ -196,7 +196,10 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 	backupCursor.StartKeepAlive()
 
 	mongodDBPath := backupCursor.BackupCursorMeta.DBPath
-	composerMaker := NewDirDatabaseTarBallComposerMaker()
+	composerMaker, err := newTarBallComposerMaker()
+	if err != nil {
+		return err
+	}
 	concurrentUploader, err := internal.CreateConcurrentUploader(
 		ctx,
 		internal.CreateConcurrentUploaderArgs{
@@ -237,8 +240,6 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 		backupService.Sentinel.Top100Namespaces = *metadataCollector.top100Ns
 		backupService.Sentinel.NamespacesCount = metadataCollector.counter
 	}
-	backupService.Sentinel.FileParts = composerMaker.fileParts
-
 	return backupService.Finalize(ctx, concurrentUploader, backupCursor.BackupCursorMeta, args.CountJournals)
 }
 
@@ -268,6 +269,10 @@ func (backupService *BackupService) Finalize(ctx context.Context,
 	uploader *internal.ConcurrentUploader, backupCursorMeta *BackupCursorMeta,
 	countJournals bool) error {
 	sentinel := &backupService.Sentinel
+	sentinel.FileParts = nil
+	if composer, ok := uploader.GetTarBallComposer().(*filePartsTarBallComposer); ok && len(composer.fileParts.Files) > 0 {
+		sentinel.FileParts = composer.fileParts
+	}
 	sentinel.FinishLocalTime = utility.TimeNowCrossPlatformLocal()
 	sentinel.UncompressedSize = uploader.UncompressedSize
 	sentinel.CompressedSize = uploader.CompressedSize

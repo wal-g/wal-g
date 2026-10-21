@@ -42,11 +42,12 @@ Completed parts are preserved during retries within the running
 `binary-backup-fetch` process. Starting a new fetch performs the usual dbPath
 cleanup and downloads the backup again.
 
-The backup sentinel records the split files and their sizes; each part carries
-its byte offset and complete file size in PAX records. Restore writes parts to
-their original offsets and checks that every expected part is present before
-starting MongoDB. Full and partial restores support split files. Restore detects
-the format automatically; this setting is only needed when creating the backup.
+The backup sentinel records one shared part size and the size of each split
+file; each part carries its byte offset and complete file size in PAX records.
+Restore writes parts to their original offsets and checks that every expected
+part is present before starting MongoDB. Full and partial restores support split
+files. Restore detects the format automatically; this setting is only needed
+when creating the backup.
 Use a WAL-G version supporting file parts to restore these backups. This version
 continues to restore existing backups created without file splitting.
 

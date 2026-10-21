@@ -25,36 +25,35 @@ import (
 )
 
 func TestFilePartsBackupRestore(t *testing.T) {
+	const partSize = 1024
 	for _, compressor := range []compression.Compressor{none.Compressor{}, lz4.Compressor{}} {
-		for _, split := range []bool{false, true} {
-			t.Run(fmt.Sprintf("compression=%s/split=%t", compressor.FileExtension(), split), func(t *testing.T) {
-				const partSize = 1024
+		for _, configuredPartSize := range []int{0, partSize, partSize * 64} {
+			split := configuredPartSize == partSize
+			t.Run(fmt.Sprintf("compression=%s/partSize=%d", compressor.FileExtension(), configuredPartSize), func(t *testing.T) {
 				const backupName = "binary_20261019T000000Z"
 				setFilePartsTestConfig(t, map[string]any{
-					conf.MongoDBBackupFilePartSize:    0,
+					conf.MongoDBBackupFilePartSize:    configuredPartSize,
 					conf.UploadDiskConcurrencySetting: 3,
 					conf.UploadQueueSetting:           2,
 					conf.DownloadConcurrencySetting:   4,
 					conf.TarSizeThresholdSetting:      1536,
 					conf.TarDisableFsyncSetting:       true,
 				})
-				if split {
-					viper.Set(conf.MongoDBBackupFilePartSize, partSize)
-				}
 				files := map[string][]byte{
-					"db/collection-1.wt": filePartsTestData(partSize*11 + 17),
-					"db/index-1.wt":      filePartsTestData(partSize * 5),
-					"db/index-small.wt":  filePartsTestData(partSize),
-					"db/collection-2.wt": filePartsTestData(partSize*3 + 1),
-					"WiredTiger":         filePartsTestData(partSize*2 + 7),
+					"collection-1.wt": filePartsTestData(partSize*11 + 17),
+					"index-1.wt":      filePartsTestData(partSize * 5),
+					"index-small.wt":  filePartsTestData(partSize),
+					"collection-2.wt": filePartsTestData(partSize*3 + 1),
+					"WiredTiger":      filePartsTestData(partSize*2 + 7),
 				}
-				modes := map[string]os.FileMode{"db/index-1.wt": 0400}
+				modes := map[string]os.FileMode{"index-1.wt": 0400}
 				source := t.TempDir()
 				folder := fs.NewFolder(t.TempDir(), "")
 				uploader := internal.NewRegularUploader(compressor, folder)
-				maker := NewDirDatabaseTarBallComposerMaker()
+				maker, err := newTarBallComposerMaker()
+				require.NoError(t, err)
 				concurrent, err := internal.CreateConcurrentUploader(t.Context(), internal.CreateConcurrentUploaderArgs{
-					Uploader: uploader, BackupName: backupName, Directory: source, TarBallComposerMaker: maker,
+					Uploader: uploader, BackupName: backupName, Directory: filepath.ToSlash(source), TarBallComposerMaker: maker,
 				})
 				require.NoError(t, err)
 				for name, data := range files {
@@ -65,8 +64,9 @@ func TestFilePartsBackupRestore(t *testing.T) {
 						mode = 0600
 					}
 					require.NoError(t, os.WriteFile(filename, data, mode))
-					meta, err := internal.GetBackupFileMeta(filename)
+					meta, err := internal.GetBackupFileMeta(filepath.ToSlash(filename))
 					require.NoError(t, err)
+					modes[name] = meta.Mode().Perm()
 					require.NoError(t, concurrent.Upload(meta))
 				}
 				sets, err := concurrent.Finalize()
@@ -74,15 +74,17 @@ func TestFilePartsBackupRestore(t *testing.T) {
 				assert.Equal(t, int64(totalFilePartsTestSize(files)), concurrent.UncompressedSize)
 
 				collector := NewPartialMetadataCollector()
-				collector.HandleNsInfo(makeNsInfo("testdb.selected", "statistics:table:db/collection-1", map[string]string{
-					"_id_": "statistics:table:db/index-1", "small": "statistics:table:db/index-small",
+				collector.HandleNsInfo(makeNsInfo("testdb.selected", "statistics:table:collection-1", map[string]string{
+					"_id_": "statistics:table:index-1", "small": "statistics:table:index-small",
 				}))
-				collector.HandleNsInfo(makeNsInfo("testdb.excluded", "statistics:table:db/collection-2", nil))
+				collector.HandleNsInfo(makeNsInfo("testdb.excluded", "statistics:table:collection-2", nil))
 				require.NoError(t, collector.EnrichWithTarPaths(sets.Get()))
 				require.NoError(t, internal.UploadMetadata(t.Context(), uploader, collector.GetRoutes(), backupName))
-				require.NoError(t, internal.UploadSentinel(t.Context(), uploader, &models.Backup{
-					BackupName: backupName, BackupType: "binary", FileParts: maker.fileParts,
-				}, backupName))
+				backupService := &BackupService{
+					Uploader: uploader,
+					Sentinel: models.Backup{BackupName: backupName, BackupType: "binary"},
+				}
+				require.NoError(t, backupService.Finalize(t.Context(), concurrent, &BackupCursorMeta{}, false))
 
 				archiveFolder := folder.GetSubFolder(backupName + internal.TarPartitionFolderName)
 				objects, subfolders, err := archiveFolder.ListFolder(t.Context())
@@ -129,18 +131,25 @@ func TestFilePartsBackupRestore(t *testing.T) {
 					require.NoError(t, stream.Close())
 				}
 				if split {
-					require.Len(t, maker.fileParts, 3)
-					require.Greater(t, entries["db/collection-1.wt"], 1)
-					require.Greater(t, entries["db/index-1.wt"], 1)
-					require.Greater(t, entries["db/collection-2.wt"], 1)
+					require.NotNil(t, backupService.Sentinel.FileParts)
+					require.Equal(t, int64(partSize), backupService.Sentinel.FileParts.PartSize)
+					require.Equal(t, map[string]int64{
+						"/collection-1.wt": int64(len(files["collection-1.wt"])),
+						"/index-1.wt":      int64(len(files["index-1.wt"])),
+						"/collection-2.wt": int64(len(files["collection-2.wt"])),
+					}, backupService.Sentinel.FileParts.Files)
+					require.Greater(t, entries["collection-1.wt"], 1)
+					require.Greater(t, entries["index-1.wt"], 1)
+					require.Greater(t, entries["collection-2.wt"], 1)
 				} else {
-					require.Empty(t, maker.fileParts)
+					require.Nil(t, backupService.Sentinel.FileParts)
 					for name := range files {
 						require.Equal(t, 1, entries[name])
 					}
 				}
-				require.Equal(t, 1, entries["db/index-small.wt"])
+				require.Equal(t, 1, entries["index-small.wt"])
 				require.Equal(t, 1, entries["WiredTiger"])
+				viper.Set(conf.MongoDBBackupFilePartSize, 0)
 
 				for _, partial := range []bool{false, true} {
 					t.Run(fmt.Sprintf("partial=%t", partial), func(t *testing.T) {
@@ -153,7 +162,7 @@ func TestFilePartsBackupRestore(t *testing.T) {
 						require.NoError(t, service.DoRestore(t.Context(), RsConfig{}, ShConfig{}, MongoCfgConfig{}, ReplyOplogConfig{}, args))
 						for name, original := range files {
 							filename := filepath.Join(restored, name)
-							if partial && name == "db/collection-2.wt" {
+							if partial && name == "collection-2.wt" {
 								require.NoFileExists(t, filename)
 								continue
 							}
@@ -174,7 +183,7 @@ func TestFilePartsBackupRestore(t *testing.T) {
 					var excludedArchives []string
 					for archive, names := range sets.Get() {
 						for _, name := range names {
-							if name == "/db/collection-2.wt" {
+							if name == "/collection-2.wt" {
 								excludedArchives = append(excludedArchives, archive)
 							}
 						}
@@ -195,7 +204,7 @@ func TestFilePartsBackupRestore(t *testing.T) {
 							args := RestoreArgs{BackupName: backupName, SkipChecks: true, SkipMongoReconfig: true}
 							service := &RestoreService{Uploader: uploader, LocalStorage: CreateLocalStorage(t.TempDir())}
 							err := service.DoRestore(t.Context(), RsConfig{}, ShConfig{}, MongoCfgConfig{}, ReplyOplogConfig{}, args)
-							require.ErrorContains(t, err, "/db/collection-2.wt")
+							require.ErrorContains(t, err, "/collection-2.wt")
 							require.ErrorContains(t, err, "missing")
 
 							args.Whitelist = []string{"testdb.selected"}
@@ -226,15 +235,24 @@ func TestFilePartsComposerConfiguration(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			setFilePartsTestConfig(t, map[string]any{conf.MongoDBBackupFilePartSize: test.value})
-			maker := NewDirDatabaseTarBallComposerMaker()
-			composer, err := maker.Make(t.Context(), internal.NewBundle(t.TempDir(), nil, 1024, nil))
+			maker, err := newTarBallComposerMaker()
 			if test.invalid {
 				require.ErrorContains(t, err, conf.MongoDBBackupFilePartSize)
 				return
 			}
 			require.NoError(t, err)
+			if test.split {
+				require.IsType(t, &FilePartsTarBallComposerMaker{}, maker)
+			} else {
+				require.IsType(t, &DirDatabaseTarBallComposerMaker{}, maker)
+			}
+			composer, err := maker.Make(t.Context(), internal.NewBundle(t.TempDir(), nil, 1024, nil))
+			require.NoError(t, err)
 			_, splitsFiles := composer.(*filePartsTarBallComposer)
 			require.Equal(t, test.split, splitsFiles)
+			baseComposer, err := NewDirDatabaseTarBallComposerMaker().Make(t.Context(), internal.NewBundle(t.TempDir(), nil, 1024, nil))
+			require.NoError(t, err)
+			require.IsType(t, &internal.DirDatabaseTarBallComposer{}, baseComposer)
 		})
 	}
 }

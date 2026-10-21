@@ -75,6 +75,10 @@ func (concurrentUploader *ConcurrentUploader) Upload(backupFile *BackupFileMeta)
 	return concurrentUploader.bundle.AddToBundle(backupFile.Path, backupFile, nil)
 }
 
+func (concurrentUploader *ConcurrentUploader) GetTarBallComposer() TarBallComposer {
+	return concurrentUploader.bundle.TarBallComposer
+}
+
 func (concurrentUploader *ConcurrentUploader) Finalize() (TarFileSets, error) {
 	tracelog.InfoLogger.Println("Packing ...")
 	tarFileSets, err := concurrentUploader.bundle.FinishComposing()

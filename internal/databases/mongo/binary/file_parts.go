@@ -30,13 +30,13 @@ type restoredFileParts struct {
 type FilePartsTarInterpreter struct {
 	directory string
 	regular   internal.TarInterpreter
-	expected  map[string]models.FilePartsInfo
+	expected  *models.FilePartsInfo
 	fsync     bool
 	mutex     sync.Mutex
 	files     map[string]*restoredFileParts
 }
 
-func NewFilePartsTarInterpreter(directory string, expected map[string]models.FilePartsInfo) *FilePartsTarInterpreter {
+func NewFilePartsTarInterpreter(directory string, expected *models.FilePartsInfo) *FilePartsTarInterpreter {
 	return &FilePartsTarInterpreter{
 		directory: directory,
 		regular:   internal.NewFileTarInterpreter(directory),
@@ -50,8 +50,10 @@ func (i *FilePartsTarInterpreter) Interpret(reader io.Reader, header *tar.Header
 	offsetValue, hasOffset := header.PAXRecords[filePartOffsetPAX]
 	sizeValue, hasSize := header.PAXRecords[fileSizePAX]
 	if !hasOffset && !hasSize {
-		if _, split := i.expected[header.Name]; split {
-			return errors.Errorf("MongoDB split file %s is missing part metadata", header.Name)
+		if i.expected != nil {
+			if _, split := i.expected.Files[header.Name]; split {
+				return errors.Errorf("MongoDB split file %s is missing part metadata", header.Name)
+			}
 		}
 		return i.regular.Interpret(reader, header)
 	}
@@ -66,21 +68,37 @@ func (i *FilePartsTarInterpreter) Interpret(reader io.Reader, header *tar.Header
 	if err != nil {
 		return errors.Wrapf(err, "invalid MongoDB file size for %s", header.Name)
 	}
-	expected, ok := i.expected[header.Name]
-	if !ok {
-		return errors.Errorf("MongoDB file part %s is absent from the backup manifest", header.Name)
-	}
-	if expected.Size <= 0 || expected.PartSize <= 0 || size != expected.Size ||
-		offset < 0 || offset >= size || offset%expected.PartSize != 0 ||
-		header.Size != min(expected.PartSize, size-offset) {
-		return errors.Errorf("invalid MongoDB file part range for %s: offset %d, length %d, file size %d",
-			header.Name, offset, header.Size, size)
+	if err := i.validatePartRange(header, offset, size); err != nil {
+		return err
 	}
 	relative := strings.TrimPrefix(header.Name, "/")
 	if !filepath.IsLocal(relative) {
 		return errors.Errorf("invalid MongoDB file part path %s", header.Name)
 	}
 	target := filepath.Join(i.directory, relative)
+	return i.writeFilePart(reader, header, target, offset, size)
+}
+
+func (i *FilePartsTarInterpreter) validatePartRange(header *tar.Header, offset, size int64) error {
+	if i.expected == nil {
+		return errors.Errorf("MongoDB file part %s is absent from the backup manifest", header.Name)
+	}
+	expectedSize, ok := i.expected.Files[header.Name]
+	if !ok {
+		return errors.Errorf("MongoDB file part %s is absent from the backup manifest", header.Name)
+	}
+	if expectedSize <= 0 || i.expected.PartSize <= 0 || size != expectedSize ||
+		offset < 0 || offset >= size || offset%i.expected.PartSize != 0 ||
+		header.Size != min(i.expected.PartSize, size-offset) {
+		return errors.Errorf("invalid MongoDB file part range for %s: offset %d, length %d, file size %d",
+			header.Name, offset, header.Size, size)
+	}
+	return nil
+}
+
+func (i *FilePartsTarInterpreter) writeFilePart(reader io.Reader, header *tar.Header,
+	target string, offset, size int64,
+) error {
 	if err := i.prepareFile(target, header, size); err != nil {
 		return err
 	}
@@ -146,26 +164,15 @@ func (i *FilePartsTarInterpreter) prepareFile(target string, header *tar.Header,
 func (i *FilePartsTarInterpreter) Validate() error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
-	for name, expected := range i.expected {
-		if expected.Size <= 0 || expected.PartSize <= 0 {
-			return errors.Errorf("invalid MongoDB split file manifest for %s", name)
-		}
-		state, ok := i.files[name]
-		if !ok {
-			return errors.Errorf("MongoDB split file %s is missing from the backup", name)
-		}
-		for offset := int64(0); offset < expected.Size; {
-			if !state.completed[offset] {
-				return errors.Errorf("MongoDB file %s is missing a part at offset %d", name, offset)
-			}
-			offset += min(expected.PartSize, expected.Size-offset)
-		}
-		info, err := os.Stat(filepath.Join(i.directory, strings.TrimPrefix(name, "/")))
-		if err != nil {
-			return errors.Wrapf(err, "check restored MongoDB split file %s", name)
-		}
-		if info.Size() != expected.Size {
-			return fmt.Errorf("restored MongoDB split file %s has size %d, expected %d", name, info.Size(), expected.Size)
+	if i.expected == nil {
+		return nil
+	}
+	if i.expected.PartSize <= 0 {
+		return errors.New("invalid MongoDB file part size in the backup manifest")
+	}
+	for name, expectedSize := range i.expected.Files {
+		if err := i.validateFile(name, expectedSize); err != nil {
+			return err
 		}
 	}
 	for name, state := range i.files {
@@ -185,6 +192,30 @@ func (i *FilePartsTarInterpreter) Validate() error {
 		if closeErr != nil {
 			return errors.Wrapf(closeErr, "close restored MongoDB split file %s", name)
 		}
+	}
+	return nil
+}
+
+func (i *FilePartsTarInterpreter) validateFile(name string, expectedSize int64) error {
+	if expectedSize <= 0 {
+		return errors.Errorf("invalid MongoDB split file manifest for %s", name)
+	}
+	state, ok := i.files[name]
+	if !ok {
+		return errors.Errorf("MongoDB split file %s is missing from the backup", name)
+	}
+	for offset := int64(0); offset < expectedSize; {
+		if !state.completed[offset] {
+			return errors.Errorf("MongoDB file %s is missing a part at offset %d", name, offset)
+		}
+		offset += min(i.expected.PartSize, expectedSize-offset)
+	}
+	info, err := os.Stat(filepath.Join(i.directory, strings.TrimPrefix(name, "/")))
+	if err != nil {
+		return errors.Wrapf(err, "check restored MongoDB split file %s", name)
+	}
+	if info.Size() != expectedSize {
+		return fmt.Errorf("restored MongoDB split file %s has size %d, expected %d", name, info.Size(), expectedSize)
 	}
 	return nil
 }

@@ -21,21 +21,32 @@ type filePartsTarBallComposer struct {
 	ctx       context.Context //nolint:containedctx // backup context outlives asynchronous archive uploads
 	bundle    *internal.Bundle
 	sets      internal.TarFileSets
-	partSize  int64
-	fileParts map[string]models.FilePartsInfo
+	fileParts *models.FilePartsInfo
 	files     []*internal.ComposeFileInfo
+}
+
+func newFilePartsTarBallComposer(ctx context.Context, bundle *internal.Bundle,
+	composer internal.TarBallComposer, sets internal.TarFileSets, partSize int64,
+) *filePartsTarBallComposer {
+	return &filePartsTarBallComposer{
+		TarBallComposer: composer,
+		ctx:             ctx,
+		bundle:          bundle,
+		sets:            sets,
+		fileParts:       &models.FilePartsInfo{PartSize: partSize, Files: make(map[string]int64)},
+	}
 }
 
 func (c *filePartsTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
 	name := path.Base(info.Header.Name)
 	isWiredTigerFile := strings.HasSuffix(name, ".wt") &&
 		(strings.HasPrefix(name, "collection-") || strings.HasPrefix(name, "index-"))
-	if !isWiredTigerFile || info.Header.Size <= c.partSize {
+	if !isWiredTigerFile || info.Header.Size <= c.fileParts.PartSize {
 		c.TarBallComposer.AddFile(info)
 		return
 	}
 	c.files = append(c.files, info)
-	c.fileParts[info.Header.Name] = models.FilePartsInfo{Size: info.Header.Size, PartSize: c.partSize}
+	c.fileParts.Files[info.Header.Name] = info.Header.Size
 }
 
 func (c *filePartsTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
@@ -68,7 +79,7 @@ func (c *filePartsTarBallComposer) packFileParts(ctx context.Context, info *inte
 	c.GetFiles().AddFile(info.Header, info.FileInfo, info.IsIncremented)
 
 	for offset := int64(0); offset < info.Header.Size; {
-		size := min(c.partSize, info.Header.Size-offset)
+		size := min(c.fileParts.PartSize, info.Header.Size-offset)
 		if err := c.packFilePart(ctx, info.Header, reader, offset, size); err != nil {
 			return err
 		}

@@ -64,6 +64,11 @@ func (pmc *PartialMetadataCollector) EnrichWithTarPaths(tarPaths map[string][]st
 		}
 	}
 
+	pmc.enrichServiceTarPaths(tarFilesSet, visited)
+	return nil
+}
+
+func (pmc *PartialMetadataCollector) enrichServiceTarPaths(tarFilesSet SetMap, visited map[string]struct{}) {
 	serviceTarPaths := make(map[string][]string)
 	for tarFile, tarFileSet := range tarFilesSet {
 		if _, ok := visited[tarFile]; !ok {
@@ -82,8 +87,6 @@ func (pmc *PartialMetadataCollector) EnrichWithTarPaths(tarPaths map[string][]st
 			pmc.routes.ServiceTarPaths[dbFile] = tarPaths
 		}
 	}
-
-	return nil
 }
 
 func (pmc *PartialMetadataCollector) HandleNsInfo(nsInfo *models.NsInfo) {
@@ -169,6 +172,19 @@ func GetTarFilesFilter(
 	}
 
 	return pathFilter, tarFilter
+}
+
+func filterFileParts(parts *models.FilePartsInfo, paths map[string]struct{}) *models.FilePartsInfo {
+	if parts == nil {
+		return nil
+	}
+	filtered := &models.FilePartsInfo{PartSize: parts.PartSize, Files: make(map[string]int64)}
+	for name, size := range parts.Files {
+		if _, selected := paths[name]; selected {
+			filtered.Files[name] = size
+		}
+	}
+	return filtered
 }
 
 func convertToFile(ident string) string {

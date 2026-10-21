@@ -71,14 +71,9 @@ func (restoreService *RestoreService) DoRestore(
 	}
 
 	if !args.SkipBackupDownload {
-		expectedParts := make(map[string]models.FilePartsInfo)
-		for name, parts := range sentinel.FileParts {
-			if args.IsPartial() {
-				if _, selected := onHostFilesFilter[name]; !selected {
-					continue
-				}
-			}
-			expectedParts[name] = parts
+		expectedParts := sentinel.FileParts
+		if args.IsPartial() {
+			expectedParts = filterFileParts(expectedParts, onHostFilesFilter)
 		}
 		if err = restoreService.downloadBackup(ctx, args.BackupName, tarFilesFilter, expectedParts); err != nil {
 			return err
@@ -107,7 +102,7 @@ func (restoreService *RestoreService) DoRestore(
 }
 
 func (restoreService *RestoreService) downloadBackup(ctx context.Context,
-	backupName string, tarFilter map[string]struct{}, expectedParts map[string]models.FilePartsInfo) error {
+	backupName string, tarFilter map[string]struct{}, expectedParts *models.FilePartsInfo) error {
 	err := restoreService.LocalStorage.CleanupMongodDBPath()
 	if err != nil {
 		return err
@@ -148,7 +143,7 @@ func (restoreService *RestoreService) reconfigMongo(
 }
 
 func (restoreService *RestoreService) downloadFromTarArchives(ctx context.Context,
-	backupName string, filter map[string]struct{}, expectedParts map[string]models.FilePartsInfo) error {
+	backupName string, filter map[string]struct{}, expectedParts *models.FilePartsInfo) error {
 	folder := restoreService.Uploader.Folder().GetSubFolder(strings.Trim(backupName+internal.TarPartitionFolderName, "/"))
 	objects, subfolders, err := folder.ListFolder(ctx)
 	if err != nil {
