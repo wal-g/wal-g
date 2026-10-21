@@ -5,6 +5,16 @@ Base: deployed `36138cabcc04e087a3cc35fb1a372ccf93869134`, followed by
 isolation, SDK v1). No SDK or dependency upgrade. Build using the deployed
 packaging recipe with this branch as the source revision and a distinct version.
 
+Also includes an SDK-v1 adaptation of
+[#2656](https://github.com/wal-g/wal-g/pull/2656)
+(upstream commit `a0650408fdaca0a6abfb999e3bdfd72a43335d19`):
+`S3_ADDITIONAL_RETRYABLE_ERROR_CODES`, for example `InvalidRequest,BadDigest`.
+These are case-sensitive S3 error codes, not HTTP status numbers. Without the
+setting, the existing retry policy and serialized storage config remain unchanged.
+Configured codes add retries for any HTTP status, still subject to
+`WALG_S3_MAX_RETRIES` and request cancellation/deadlines. This does not import
+the SDK-v2 migration or its other retry-policy changes.
+
 ## Changes
 
 - Daemon WAL uploads share a bounded pipeline across archive commands. A reply
@@ -68,6 +78,15 @@ arrivals, bounded candidate batches, listing cleanup and retry-state expiry.
 The upstream follow-up passed golangci-lint, the full PostgreSQL unit package,
 race tests and Windows/amd64 test cross-compilation. This reproduces the scheduler
 limitation, not the production CPU-wave root cause or a throughput improvement.
+
+For #2656, the S3 package passed `-race -count=3`, including SDK-v1 PUT and
+multipart retry loops with body replay, unset/other/case-mismatched codes,
+HTTP 400/403, retry exhaustion, zero retries and cancellation. Existing network
+and HTTP-status retries and empty-config serialization are also checked. The
+PostgreSQL, upload, daemon, ASM and multistorage suites passed again, and the
+PostgreSQL binary built. S3 lint passed with SDK-v1 deprecation warnings excluded
+in a temporary lint configuration; no repository lint settings were changed.
+No live S3 endpoint was used for this validation.
 
 This is a build/review candidate, not a production rollout approval. Linux
 packaging, real PostgreSQL archiving, and real S3 failover/load tests remain to

@@ -47,6 +47,7 @@ const (
 	maxRetriesSetting              = "S3_MAX_RETRIES"
 	minThrottlingRetryDelaySetting = "S3_MIN_THROTTLING_RETRY_DELAY"
 	maxThrottlingRetryDelaySetting = "S3_MAX_THROTTLING_RETRY_DELAY"
+	retryableErrorCodesSetting     = "S3_ADDITIONAL_RETRYABLE_ERROR_CODES"
 	disable100ContinueSetting      = "S3_DISABLE_100_CONTINUE"
 	enableVersioningSetting        = "S3_ENABLE_VERSIONING"
 	deleteBatchSizeSetting         = "S3_DELETE_BATCH_SIZE"
@@ -84,6 +85,7 @@ var SettingList = []string{
 	requestAdditionalHeadersSetting,
 	minThrottlingRetryDelaySetting,
 	maxThrottlingRetryDelaySetting,
+	retryableErrorCodesSetting,
 	retentionPeriodSetting,
 	retentionModeSetting,
 	disable100ContinueSetting,
@@ -225,6 +227,7 @@ func configureStorage(
 		RequestAdditionalHeaders: settings[requestAdditionalHeadersSetting],
 		UseListObjectsV1:         useListObjectsV1,
 		MaxRetries:               maxRetries,
+		RetryableErrorCodes:      parseErrorCodes(settings[retryableErrorCodesSetting]),
 		LogLevel:                 settings[logLevelSetting],
 		Uploader: &UploaderConfig{
 			UploadConcurrency:            uploadConcurrency,
@@ -250,4 +253,15 @@ func configureStorage(
 		return nil, fmt.Errorf("create S3 storage: %w", err)
 	}
 	return st, nil
+}
+
+func parseErrorCodes(value string) map[string]struct{} {
+	codes := make(map[string]struct{})
+	for _, code := range strings.Split(value, ",") {
+		code = strings.TrimSpace(code)
+		if code != "" {
+			codes[code] = struct{}{}
+		}
+	}
+	return codes
 }
