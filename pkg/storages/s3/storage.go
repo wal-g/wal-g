@@ -17,36 +17,40 @@ type Storage struct {
 }
 
 type Config struct {
-	Secrets                  *Secrets `json:"-"`
-	Region                   string
-	Endpoint                 string
-	EndpointSource           string
-	EndpointPort             string
-	EndpointProtocol         string
-	Bucket                   string
-	RootPath                 string
-	AccessKey                string
-	SessionToken             string
-	RoleARN                  string
-	DualStack                bool
-	SessionName              string
-	CACertFile               string
-	SkipValidation           bool
-	UseYCSessionToken        string
-	ForcePathStyle           bool
-	RequestAdditionalHeaders string
-	MaxRetries               int
-	RequestTimeout           time.Duration
-	LogLevel                 string
-	Uploader                 *UploaderConfig
-	RangeBatchEnabled        bool
-	RangeMaxRetries          int
-	MinThrottlingRetryDelay  time.Duration
-	MaxThrottlingRetryDelay  time.Duration
-	Disable100Continue       bool
-	EnableVersioning         string
-	DeleteBatchSize          int
-	showAllVersions          bool // When true, include deleted objects in listing (for st ls --all-versions)
+	IsolateEndpointSource      bool     `json:"-"`
+	Secrets                    *Secrets `json:"-"`
+	Region                     string
+	Endpoint                   string
+	EndpointSource             string
+	EndpointPort               string
+	EndpointProtocol           string
+	Bucket                     string
+	RootPath                   string
+	AccessKey                  string
+	SessionToken               string
+	RoleARN                    string
+	DualStack                  bool
+	SessionName                string
+	CACertFile                 string
+	SkipValidation             bool
+	UseYCSessionToken          string
+	ForcePathStyle             bool
+	RequestChecksumCalculation string
+	ResponseChecksumValidation string
+	RequestAdditionalHeaders   string
+	MaxRetries                 int
+	RetryableErrorCodes        map[string]struct{}
+	RequestTimeout             time.Duration
+	LogLevel                   string
+	Uploader                   *UploaderConfig
+	RangeBatchEnabled          bool
+	RangeMaxRetries            int
+	MinThrottlingRetryDelay    time.Duration
+	MaxThrottlingRetryDelay    time.Duration
+	Disable100Continue         bool
+	EnableVersioning           string
+	DeleteBatchSize            int
+	showAllVersions            bool // When true, include deleted objects in listing (for st ls --all-versions)
 }
 
 type Secrets struct {

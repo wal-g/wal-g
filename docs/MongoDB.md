@@ -92,7 +92,9 @@ Copies one backup or all backups between storage configurations without transfor
 wal-g copy --from=config_from.json --to=config_to.json --backup-name=LATEST
 ```
 
-Add `--with-history` to synchronize a continuous oplog sequence from the selected backup through the latest archived entry. Repeating the command adds newly archived oplog objects and skips immutable objects already present at the destination.
+Add `--with-history` to synchronize a continuous oplog sequence from the selected backup through the latest archived entry. Repeating the command adds newly archived oplog objects and skips immutable objects already present at the destination with the same path and size.
+
+Size conflicts fail the command before any transfers by default. Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to overwrite all size conflicts with source bytes, including zero-byte destinations. Each planned replacement is logged with both sizes; equal-sized immutable objects are still skipped. Transfer failures remain fatal after applicable retries; cancellation remains fatal.
 
 ### ``backup-push``
 

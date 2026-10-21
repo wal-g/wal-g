@@ -36,6 +36,11 @@ Overrides the default hostname to connect to an S3-compatible service. i.e, `htt
 
 Use to bypass balancer and connect directly to host. In the balancer-bypass mode we replace the request host with the address of a specific node returned by the endpoint source.
 
+Failover storages inherit this setting unless overridden. To use a different S3 service without discovery,
+set `S3_ENDPOINT_SOURCE: ""` and its `AWS_ENDPOINT` explicitly in that storage's `WALG_FAILOVER_STORAGES` section.
+Only secondary storages use an isolated discovery transport with keep-alives disabled.
+Primary discovery behavior is unchanged, even when failover storages are configured or selected.
+
 * `S3_ENDPOINT_PORT`
 
 Sets port to use for s3 connection. By default 443 is used.
@@ -48,9 +53,21 @@ When `S3_ENDPOINT_SOURCE` is set, use this option to specify protocol (http, htt
 
 To enable path-style addressing (i.e., `http://s3.amazonaws.com/BUCKET/KEY`) when connecting to an S3-compatible service that lack of support for sub-domain style bucket URLs (i.e., `http://BUCKET.s3.amazonaws.com/KEY`). Defaults to `false`.
 
+* `AWS_REQUEST_CHECKSUM_CALCULATION`
+
+Controls automatic S3 request checksum calculation, including multipart uploads, for all supported databases. Accepts `WHEN_SUPPORTED` (calculate when the operation supports checksums) or `WHEN_REQUIRED` (calculate only when required by the operation or when a checksum algorithm is explicitly selected), without regard to case. Available as an environment variable or config file setting, including in individual storage configs. An explicit storage config value takes precedence over the environment. If unset or empty, the AWS SDK uses the environment or the AWS profile's `request_checksum_calculation` setting, defaulting to `WHEN_SUPPORTED`.
+
+* `AWS_RESPONSE_CHECKSUM_VALIDATION`
+
+Controls S3 response checksum validation for all supported databases. Accepts `WHEN_SUPPORTED` (validate when the operation supports checksums) or `WHEN_REQUIRED` (validate when explicitly enabled for the operation), without regard to case. Available as an environment variable or config file setting, including in individual storage configs. An explicit storage config value takes precedence over the environment. If unset or empty, the AWS SDK uses the environment or the AWS profile's `response_checksum_validation` setting, defaulting to `WHEN_SUPPORTED`.
+
 * `WALG_S3_STORAGE_CLASS`
 
 To configure the S3 storage class used for backup files, use `WALG_S3_STORAGE_CLASS`. By default, WAL-G uses the "STANDARD" storage class. Other supported values include "STANDARD_IA" for Infrequent Access and "REDUCED_REDUNDANCY" for Reduced Redundancy.
+
+* `WALG_S3_MAX_PART_SIZE`
+
+Sets the S3 multipart upload part size in bytes. When it is not set and the input size is known, WAL-G selects at least 20 MiB and increases the part size when necessary to keep that object within S3's 10,000-part limit. Storage-to-storage copy passes the inventoried source-object size to the uploader, and seekable inputs are measured without reading them. Unknown-size inputs, such as newly compressed backup streams, remain direct streaming uploads with the 20 MiB default; WAL-G does not create temporary files. Set this option explicitly to use a fixed part size for every upload.
 
 * `WALG_S3_SSE`
 
@@ -70,15 +87,15 @@ To configure AWS KMS key for client-side encryption and decryption. By default, 
 
 * `WALG_S3_RANGE_BATCH_ENABLED`
 
-Set to TRUE to allow wal-g in case of network problems to continue downloading from the point that was already downloaded using HTTP Range query. This option is useful when download big files more than few hours.
+Set to TRUE to resume interrupted S3 downloads from the last byte read using HTTP Range requests. Disabled by default. Resumed requests retain SSE-C headers and the original object version or ETag when supplied by S3; inconsistent ranges or changed objects fail the read.
 
 * `WALG_S3_RANGE_MAX_RETRIES`
 
-If `WALG_S3_RANGE_BATCH_ENABLED` enabled, wal-g will try to reconnect N times, by default 10 times
+When `WALG_S3_RANGE_BATCH_ENABLED` is enabled, limits additional connections over the entire lifetime of one object reader. Default is 10; zero disables reconnection. The budget is not reset after a successful read.
 
 * `WALG_S3_MAX_RETRIES`
 
-Overrides the default request retry limit while interacting with S3. Default is 15.
+Limits additional attempts for each S3 request. Default is 15 (at most 16 total attempts); zero disables request retries. This WAL-G setting, including its default, takes precedence over AWS_MAX_ATTEMPTS and AWS profile retry settings. The SDK retry quota may stop retries before this limit.
 
 * `WALG_S3_RESPONSE_HEADER_TIMEOUT`
 
@@ -90,7 +107,15 @@ Overrides the default minimum time between retries when throttled in millisecond
 
 * `S3_MAX_THROTTLING_RETRY_DELAY`
 
-Overrides the default minimum time between retries when throttled in milliseconds. Default is 300000ms.
+Sets the maximum request retry delay in milliseconds. Default is 300000ms. The minimum throttling delay must be nonnegative and no greater than this positive maximum.
+
+* `S3_ADDITIONAL_RETRYABLE_ERROR_CODES`
+
+Comma-separated list of S3 error codes to retry in addition to the default ones, for example `InvalidRequest`. A response is retried if its error code is in the list, for any HTTP status. Codes are case-sensitive. The number of attempts is limited by `WALG_S3_MAX_RETRIES`. Empty by default.
+
+Copy operations also use `WALG_DOWNLOAD_FILE_RETRIES` for whole-object retries (default 15 additional attempts; zero disables them). Database `copy`/`backup-copy` and `st copy` reopen the source and restart the destination upload after a transient source or destination failure, including a truncated source stream (`unexpected EOF`). The explicit source config value takes precedence over the main config or environment; destination config does not set this budget. Invalid or negative budgets are rejected.
+
+These retry layers have separate budgets: SDK retries replay individual requests, optional range recovery resumes a download, and copy retries restart the entire object. Whole-object retries use exponential backoff starting at one second, with jitter and a 30-second cap. Cancellation interrupts backoff. Permanent errors stop immediately. Database copy publishes backup completion metadata only after payload transfers succeed, except for explicitly configured disaster-copy skips, which apply after retries are exhausted.
 
 * `S3_RETENTION_PERIOD`
 

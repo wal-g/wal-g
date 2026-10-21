@@ -13,40 +13,43 @@ import (
 // TODO: Merge the settings and their default values with ones defined in internal/config.go
 
 const (
-	endpointSetting                 = "AWS_ENDPOINT"
-	regionSetting                   = "AWS_REGION"
-	forcePathStyleSetting           = "AWS_S3_FORCE_PATH_STYLE"
-	accessKeyIDSetting              = "AWS_ACCESS_KEY_ID"
-	accessKeySetting                = "AWS_ACCESS_KEY"
-	secretAccessKeySetting          = "AWS_SECRET_ACCESS_KEY"
-	secretKeySetting                = "AWS_SECRET_KEY"
-	sessionTokenSetting             = "AWS_SESSION_TOKEN"
-	sessionNameSetting              = "AWS_ROLE_SESSION_NAME"
-	roleARNSetting                  = "AWS_ROLE_ARN"
-	dualStackSetting                = "AWS_DUAL_STACK"
-	skipValidationSetting           = "S3_SKIP_VALIDATION"
-	useYcSessionTokenSetting        = "S3_USE_YC_SESSION_TOKEN"
-	sseSetting                      = "S3_SSE"
-	sseCSetting                     = "S3_SSE_C"
-	sseKmsIDSetting                 = "S3_SSE_KMS_ID"
-	storageClassSetting             = "S3_STORAGE_CLASS"
-	uploadConcurrencySetting        = "UPLOAD_CONCURRENCY"
-	caCertFileSetting               = "S3_CA_CERT_FILE"
-	maxPartSizeSetting              = "S3_MAX_PART_SIZE"
-	endpointSourceSetting           = "S3_ENDPOINT_SOURCE"
-	endpointPortSetting             = "S3_ENDPOINT_PORT"
-	endpointProtocolSetting         = "S3_ENDPOINT_PROTOCOL"
-	logLevelSetting                 = "S3_LOG_LEVEL"
-	rangeBatchEnabledSetting        = "S3_RANGE_BATCH_ENABLED"
-	rangeQueriesMaxRetriesSetting   = "S3_RANGE_MAX_RETRIES"
-	requestAdditionalHeadersSetting = "S3_REQUEST_ADDITIONAL_HEADERS"
-	retentionPeriodSetting          = "S3_RETENTION_PERIOD"
-	retentionModeSetting            = "S3_RETENTION_MODE"
+	endpointSetting                   = "AWS_ENDPOINT"
+	regionSetting                     = "AWS_REGION"
+	forcePathStyleSetting             = "AWS_S3_FORCE_PATH_STYLE"
+	requestChecksumCalculationSetting = "AWS_REQUEST_CHECKSUM_CALCULATION"
+	responseChecksumValidationSetting = "AWS_RESPONSE_CHECKSUM_VALIDATION"
+	accessKeyIDSetting                = "AWS_ACCESS_KEY_ID"
+	accessKeySetting                  = "AWS_ACCESS_KEY"
+	secretAccessKeySetting            = "AWS_SECRET_ACCESS_KEY"
+	secretKeySetting                  = "AWS_SECRET_KEY"
+	sessionTokenSetting               = "AWS_SESSION_TOKEN"
+	sessionNameSetting                = "AWS_ROLE_SESSION_NAME"
+	roleARNSetting                    = "AWS_ROLE_ARN"
+	dualStackSetting                  = "AWS_DUAL_STACK"
+	skipValidationSetting             = "S3_SKIP_VALIDATION"
+	useYcSessionTokenSetting          = "S3_USE_YC_SESSION_TOKEN"
+	sseSetting                        = "S3_SSE"
+	sseCSetting                       = "S3_SSE_C"
+	sseKmsIDSetting                   = "S3_SSE_KMS_ID"
+	storageClassSetting               = "S3_STORAGE_CLASS"
+	uploadConcurrencySetting          = "UPLOAD_CONCURRENCY"
+	caCertFileSetting                 = "S3_CA_CERT_FILE"
+	maxPartSizeSetting                = "S3_MAX_PART_SIZE"
+	endpointSourceSetting             = "S3_ENDPOINT_SOURCE"
+	endpointPortSetting               = "S3_ENDPOINT_PORT"
+	endpointProtocolSetting           = "S3_ENDPOINT_PROTOCOL"
+	logLevelSetting                   = "S3_LOG_LEVEL"
+	rangeBatchEnabledSetting          = "S3_RANGE_BATCH_ENABLED"
+	rangeQueriesMaxRetriesSetting     = "S3_RANGE_MAX_RETRIES"
+	requestAdditionalHeadersSetting   = "S3_REQUEST_ADDITIONAL_HEADERS"
+	retentionPeriodSetting            = "S3_RETENTION_PERIOD"
+	retentionModeSetting              = "S3_RETENTION_MODE"
 	// limiters for retry policy during interaction with S3
 	maxRetriesSetting              = "S3_MAX_RETRIES"
 	requestTimeoutSetting          = "S3_RESPONSE_HEADER_TIMEOUT"
 	minThrottlingRetryDelaySetting = "S3_MIN_THROTTLING_RETRY_DELAY"
 	maxThrottlingRetryDelaySetting = "S3_MAX_THROTTLING_RETRY_DELAY"
+	retryableErrorCodesSetting     = "S3_ADDITIONAL_RETRYABLE_ERROR_CODES"
 	disable100ContinueSetting      = "S3_DISABLE_100_CONTINUE"
 	enableVersioningSetting        = "S3_ENABLE_VERSIONING"
 	deleteBatchSizeSetting         = "S3_DELETE_BATCH_SIZE"
@@ -59,6 +62,8 @@ var SettingList = []string{
 	endpointProtocolSetting,
 	regionSetting,
 	forcePathStyleSetting,
+	requestChecksumCalculationSetting,
+	responseChecksumValidationSetting,
 	accessKeyIDSetting,
 	accessKeySetting,
 	secretAccessKeySetting,
@@ -84,6 +89,7 @@ var SettingList = []string{
 	requestAdditionalHeadersSetting,
 	minThrottlingRetryDelaySetting,
 	maxThrottlingRetryDelaySetting,
+	retryableErrorCodesSetting,
 	retentionPeriodSetting,
 	retentionModeSetting,
 	disable100ContinueSetting,
@@ -109,13 +115,25 @@ const (
 	defaultDeleteBatchSize         = 1000
 )
 
-// TODO: Unit tests
-//
-//nolint:funlen,gocyclo
 func ConfigureStorage(
+	ctx context.Context, prefix string, settings map[string]string, rootWraps ...storage.WrapRootFolder,
+) (storage.HashableStorage, error) {
+	return configureStorage(ctx, prefix, settings, false, rootWraps...)
+}
+
+// ConfigureStorageWithFailover configures a secondary storage without changing primary discovery.
+func ConfigureStorageWithFailover(
+	ctx context.Context, prefix string, settings map[string]string, rootWraps ...storage.WrapRootFolder,
+) (storage.HashableStorage, error) {
+	return configureStorage(ctx, prefix, settings, true, rootWraps...)
+}
+
+//nolint:funlen,gocyclo
+func configureStorage(
 	ctx context.Context,
 	prefix string,
 	settings map[string]string,
+	isolateEndpointSource bool,
 	rootWraps ...storage.WrapRootFolder,
 ) (storage.HashableStorage, error) {
 	bucket, rootPath, err := storage.GetPathFromPrefix(prefix)
@@ -143,6 +161,9 @@ func ConfigureStorage(
 	if err != nil {
 		return nil, err
 	}
+	if maxRetries < 0 || maxRetries == int(^uint(0)>>1) {
+		return nil, fmt.Errorf("%s must be nonnegative and leave room for the initial attempt", maxRetriesSetting)
+	}
 	requestTimeout, err := setting.IntOptional(settings, requestTimeoutSetting, defaultRequestTimeout)
 	if err != nil {
 		return nil, err
@@ -155,6 +176,10 @@ func ConfigureStorage(
 	if err != nil {
 		return nil, err
 	}
+	if minThrottlingRetryDelay < 0 || maxThrottlingRetryDelay <= 0 || minThrottlingRetryDelay > maxThrottlingRetryDelay ||
+		int64(maxThrottlingRetryDelay) > int64((1<<63-1)/time.Millisecond) {
+		return nil, fmt.Errorf("S3 retry delays must satisfy 0 <= minimum <= maximum, with a positive representable maximum")
+	}
 	uploadConcurrency, err := setting.Int(settings, uploadConcurrencySetting)
 	if err != nil {
 		return nil, err
@@ -163,6 +188,8 @@ func ConfigureStorage(
 	if err != nil {
 		return nil, err
 	}
+	_, explicitlyConfiguredPartSize := settings[maxPartSizeSetting]
+	autoPartSize := !explicitlyConfiguredPartSize
 	storageClass := defaultStorageClass
 	if class, ok := settings[storageClassSetting]; ok {
 		storageClass = class
@@ -174,6 +201,9 @@ func ConfigureStorage(
 	rangeMaxRetries, err := setting.IntOptional(settings, rangeQueriesMaxRetriesSetting, defaultRangeMaxRetries)
 	if err != nil {
 		return nil, err
+	}
+	if rangeMaxRetries < 0 {
+		return nil, fmt.Errorf("%s must be nonnegative", rangeQueriesMaxRetriesSetting)
 	}
 	retentionPeriod, err := setting.IntOptional(settings, retentionPeriodSetting, defaultDisabledRetentionPeriod)
 	if err != nil {
@@ -193,29 +223,34 @@ func ConfigureStorage(
 		Secrets: &Secrets{
 			SecretKey: strings.TrimSpace(setting.FirstDefined(settings, secretAccessKeySetting, secretKeySetting)),
 		},
-		Region:                   settings[regionSetting],
-		Endpoint:                 settings[endpointSetting],
-		EndpointSource:           settings[endpointSourceSetting],
-		EndpointPort:             port,
-		EndpointProtocol:         settings[endpointProtocolSetting],
-		Bucket:                   bucket,
-		RootPath:                 rootPath,
-		AccessKey:                strings.TrimSpace(setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting)),
-		SessionToken:             settings[sessionTokenSetting],
-		RoleARN:                  settings[roleARNSetting],
-		DualStack:                dualStack,
-		SessionName:              settings[sessionNameSetting],
-		CACertFile:               settings[caCertFileSetting],
-		SkipValidation:           skipValidation,
-		UseYCSessionToken:        settings[useYcSessionTokenSetting],
-		ForcePathStyle:           forcePathStyle,
-		RequestAdditionalHeaders: settings[requestAdditionalHeadersSetting],
-		MaxRetries:               maxRetries,
-		RequestTimeout:           time.Duration(requestTimeout) * time.Second,
-		LogLevel:                 settings[logLevelSetting],
+		Region:                     settings[regionSetting],
+		Endpoint:                   settings[endpointSetting],
+		EndpointSource:             settings[endpointSourceSetting],
+		IsolateEndpointSource:      isolateEndpointSource,
+		EndpointPort:               port,
+		EndpointProtocol:           settings[endpointProtocolSetting],
+		Bucket:                     bucket,
+		RootPath:                   rootPath,
+		AccessKey:                  strings.TrimSpace(setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting)),
+		SessionToken:               settings[sessionTokenSetting],
+		RoleARN:                    settings[roleARNSetting],
+		DualStack:                  dualStack,
+		SessionName:                settings[sessionNameSetting],
+		CACertFile:                 settings[caCertFileSetting],
+		SkipValidation:             skipValidation,
+		UseYCSessionToken:          settings[useYcSessionTokenSetting],
+		ForcePathStyle:             forcePathStyle,
+		RequestChecksumCalculation: settings[requestChecksumCalculationSetting],
+		ResponseChecksumValidation: settings[responseChecksumValidationSetting],
+		RequestAdditionalHeaders:   settings[requestAdditionalHeadersSetting],
+		MaxRetries:                 maxRetries,
+		RetryableErrorCodes:        parseErrorCodes(settings[retryableErrorCodesSetting]),
+		RequestTimeout:             time.Duration(requestTimeout) * time.Second,
+		LogLevel:                   settings[logLevelSetting],
 		Uploader: &UploaderConfig{
 			UploadConcurrency:            uploadConcurrency,
 			MaxPartSize:                  maxPartSize,
+			AutoPartSize:                 autoPartSize,
 			StorageClass:                 storageClass,
 			ServerSideEncryption:         settings[sseSetting],
 			ServerSideEncryptionCustomer: settings[sseCSetting],
@@ -237,4 +272,15 @@ func ConfigureStorage(
 		return nil, fmt.Errorf("create S3 storage: %w", err)
 	}
 	return st, nil
+}
+
+func parseErrorCodes(value string) map[string]struct{} {
+	codes := make(map[string]struct{})
+	for _, code := range strings.Split(value, ",") {
+		code = strings.TrimSpace(code)
+		if code != "" {
+			codes[code] = struct{}{}
+		}
+	}
+	return codes
 }

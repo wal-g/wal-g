@@ -161,20 +161,26 @@ func (folder *Folder) CopyObject(ctx context.Context, srcPath string, dstPath st
 	return err
 }
 
-func (folder *Folder) ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error) {
-	objectPath := folder.path + objectRelativePath
+func (folder *Folder) getObjectInput(objectPath string) *s3.GetObjectInput {
 	input := &s3.GetObjectInput{
 		Bucket: folder.bucket,
 		Key:    aws.String(objectPath),
 	}
 
-	if folder.uploader.serverSideEncryption != "" && folder.uploader.SSECustomerKey != "" {
+	if folder.uploader != nil && folder.uploader.serverSideEncryption != "" && folder.uploader.SSECustomerKey != "" {
 		input.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
 		input.SSECustomerKey = aws.String(sseCustomerKeyB64(folder.uploader.SSECustomerKey))
 
 		customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
 		input.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
 	}
+
+	return input
+}
+
+func (folder *Folder) ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error) {
+	objectPath := folder.path + objectRelativePath
+	input := folder.getObjectInput(objectPath)
 
 	object, err := folder.s3API.GetObject(ctx, input)
 	if err != nil {
@@ -185,7 +191,7 @@ func (folder *Folder) ReadObject(ctx context.Context, objectRelativePath string)
 	}
 	reader := object.Body
 	if folder.config.RangeBatchEnabled {
-		reader = NewRangeReader(ctx, object.Body, objectPath, folder.config.RangeMaxRetries, folder)
+		reader = newRangeReader(ctx, input, object, folder.config.RangeMaxRetries, folder)
 	}
 	return NewContentLengthValidator(reader, aws.ToInt64(object.ContentLength), objectPath), nil
 }

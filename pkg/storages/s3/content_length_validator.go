@@ -20,6 +20,13 @@ func (e ContentLengthMismatchError) Error() string {
 	)
 }
 
+func (e ContentLengthMismatchError) Unwrap() error {
+	if e.Actual < e.Expected {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+
 // СontentLengthValidator wraps an io.ReadCloser and validates that the total
 // number of bytes read matches the expected Content-Length when EOF is reached.
 // If expectedSize is 0 (e.g. Content-Length was not set), the validator
