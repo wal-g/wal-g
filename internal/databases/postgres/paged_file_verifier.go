@@ -276,7 +276,9 @@ func verifySinglePage(path string, blockNo, segmentBlockOffset uint32, pageBlock
 // cannot be trusted: garbage can look recent and bypass validation.
 //
 // An empty read or a missing file means the relation was truncated or dropped, so the page is gone.
-// For other errors, keep the original verdict: a real corruption must not be hidden by an I/O error.
+// A partial read is neither: PostgreSQL never cuts a relation in the middle of a block, so the
+// verdict stands. For other errors, keep the original verdict too: a real corruption must not be
+// hidden by an I/O error.
 func shouldSkipCorruption(path string, blockNo uint32, asRead []byte) bool {
 	file, err := os.Open(path)
 	if err != nil {
@@ -300,6 +302,12 @@ func shouldSkipCorruption(path string, blockNo uint32, asRead []byte) bool {
 	// block is past the end now: the relation was truncated, recovery will truncate it again
 	if read == 0 {
 		return true
+	}
+	// block is only partly there: neither a rewritten page nor a truncation, keep the corruption verdict
+	if read < int(DatabasePageSize) {
+		tracelog.WarningLogger.Printf("shouldSkipCorruption: re-read of %s/[%d] returned %d of %d bytes, keeping the corruption verdict\n",
+			path, blockNo, read, DatabasePageSize)
+		return false
 	}
 	// isPageCorrupted has zeroed pd_checksum in the page we hold, so zero it here as well.
 	for i := PdChecksumOffset; i < PdChecksumOffset+PdChecksumLen; i++ {
