@@ -290,6 +290,15 @@ func Execute(ctx context.Context, plan *Plan, options ExecuteOptions) error {
 		return err
 	}
 
+	var objects, size int64
+	for _, entries := range byOrder {
+		for _, entry := range entries {
+			objects++
+			size += entry.Size
+		}
+	}
+	tracelog.InfoLogger.Printf("Copying %d objects, %d bytes.", objects, size)
+
 	orders := make([]publicationOrder, 0, len(byOrder))
 	for order := range byOrder {
 		orders = append(orders, order)
@@ -391,7 +400,7 @@ func copyObjectAttempt(ctx context.Context, from, to storage.Folder, entry Entry
 		if err := to.PutObject(ctx, entry.TargetPath, bytes.NewReader(entry.inline)); err != nil {
 			return &transferError{"write destination metadata", to, err}
 		}
-		tracelog.InfoLogger.Printf("Published metadata %q.", entry.TargetPath)
+		tracelog.InfoLogger.Printf("Published metadata %q (%d bytes).", entry.TargetPath, entry.Size)
 		return nil
 	}
 
@@ -399,6 +408,10 @@ func copyObjectAttempt(ctx context.Context, from, to storage.Folder, entry Entry
 		if copier, ok := to.(storage.CrossFolderCopier); ok && copier.CanCopyFrom(from) {
 			*serverCopyErr = copier.CopyObjectFrom(ctx, from, entry.SourcePath, entry.TargetPath, entry.Size)
 			if *serverCopyErr == nil {
+				tracelog.InfoLogger.Printf(
+					"Copied %q to %q on the storage side (%d bytes).",
+					entry.SourcePath, entry.TargetPath, entry.Size,
+				)
 				return nil
 			}
 			if ctx.Err() != nil || errors.Is(*serverCopyErr, context.Canceled) ||
@@ -415,6 +428,9 @@ func copyObjectAttempt(ctx context.Context, from, to storage.Folder, entry Entry
 	if err := streamObject(ctx, from, to, entry.SourcePath, entry.TargetPath, entry.Size, nil); err != nil {
 		return fmt.Errorf("copy %q to %q: %w", entry.SourcePath, entry.TargetPath, err)
 	}
-	tracelog.InfoLogger.Printf("Streamed %q to %q through WAL-G without transformation.", entry.SourcePath, entry.TargetPath)
+	tracelog.InfoLogger.Printf(
+		"Streamed %q to %q through WAL-G without transformation (%d bytes).",
+		entry.SourcePath, entry.TargetPath, entry.Size,
+	)
 	return nil
 }
