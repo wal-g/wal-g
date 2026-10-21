@@ -13,6 +13,10 @@ var daemonCmd = &cobra.Command{
 	Short: DaemonShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		if consoleEnabled(cmd) {
+			startConsoleServer(cmd.Context())
+		}
+
 		daemonOpts := postgres.DaemonOptions{
 			SocketPath: args[0],
 		}
@@ -22,4 +26,5 @@ var daemonCmd = &cobra.Command{
 
 func init() {
 	Cmd.AddCommand(daemonCmd)
+	daemonCmd.Flags().Bool(withConsoleFlag, false, withConsoleDescription)
 }
