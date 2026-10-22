@@ -65,9 +65,45 @@ func TestBackupNameReservationRejectsLegacyData(t *testing.T) {
 	}
 }
 
+func TestBackupNameReservationEmptyDirectories(t *testing.T) {
+	for _, wrapped := range []bool{false, true} {
+		for _, data := range []string{"", "metadata.json", "tar_partitions/part_001.tar.lz4", "nested/deeper/zero-byte"} {
+			t.Run(fmt.Sprintf("wrapped=%t/data=%s", wrapped, data), func(t *testing.T) {
+				var folder storage.Folder = fs.NewFolder(t.TempDir(), "")
+				if wrapped {
+					folder = internal.NewLimitedFolder(folder, rate.NewLimiter(rate.Inf, 1))
+					folder = multistorage.NewFolder(map[string]storage.Folder{"default": folder}, stats.NewNopCollector([]string{"default"}))
+					var err error
+					folder, err = multistorage.UseSpecificStorage(t.Context(), "default", folder)
+					require.NoError(t, err)
+				}
+				backup := folder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(reservationTestName)
+				// Filesystem-backed S3 services can retain empty directories after
+				// deleting all objects. A directory alone is not backup data.
+				backup.GetSubFolder("tar_partitions")
+				backup.GetSubFolder("nested/deeper")
+				if data != "" {
+					require.NoError(t, backup.PutObject(t.Context(), data, strings.NewReader("")))
+				}
+				err := reserveBackupName(t.Context(), folder, utility.BaseBackupPath, reservationTestName)
+				if data == "" {
+					require.NoError(t, err)
+				} else {
+					require.ErrorIs(t, err, storage.ErrObjectAlreadyExists)
+				}
+				// Even when the directory is empty, the permanent reservation
+				// still prevents another writer from reusing the name.
+				require.ErrorIs(t, reserveBackupName(t.Context(), folder, utility.BaseBackupPath, reservationTestName),
+					storage.ErrObjectAlreadyExists)
+			})
+		}
+	}
+}
+
 type reservationInspectionFailure struct {
 	storage.Folder
-	list bool
+	list       bool
+	listSuffix string
 }
 
 func (f reservationInspectionFailure) CreateObject(ctx context.Context, name string, content []byte) error {
@@ -75,7 +111,8 @@ func (f reservationInspectionFailure) CreateObject(ctx context.Context, name str
 }
 
 func (f reservationInspectionFailure) GetSubFolder(name string) storage.Folder {
-	return reservationInspectionFailure{Folder: f.Folder.GetSubFolder(name), list: f.list}
+	f.Folder = f.Folder.GetSubFolder(name)
+	return f
 }
 
 func (f reservationInspectionFailure) Exists(ctx context.Context, name string) (bool, error) {
@@ -85,8 +122,23 @@ func (f reservationInspectionFailure) Exists(ctx context.Context, name string) (
 	return f.Folder.Exists(ctx, name)
 }
 
-func (f reservationInspectionFailure) ListFolder(context.Context) ([]storage.Object, []storage.Folder, error) {
+func (f reservationInspectionFailure) ListFolder(ctx context.Context) ([]storage.Object, []storage.Folder, error) {
+	if f.listSuffix != "" && !strings.HasSuffix(f.GetPath(), f.listSuffix) {
+		objects, folders, err := f.Folder.ListFolder(ctx)
+		for i, folder := range folders {
+			folders[i] = reservationInspectionFailure{Folder: folder, list: f.list, listSuffix: f.listSuffix}
+		}
+		return objects, folders, err
+	}
 	return nil, nil, errors.New("LIST unavailable")
+}
+
+func TestBackupNameReservationNestedInspectionFailure(t *testing.T) {
+	folder := fs.NewFolder(t.TempDir(), "")
+	folder.GetSubFolder(path.Join(utility.BaseBackupPath, reservationTestName, "unreadable"))
+	broken := reservationInspectionFailure{Folder: folder, list: true, listSuffix: "unreadable/"}
+	require.ErrorContains(t, reserveBackupName(t.Context(), broken, utility.BaseBackupPath, reservationTestName), "LIST unavailable")
+	require.ErrorIs(t, reserveBackupName(t.Context(), folder, utility.BaseBackupPath, reservationTestName), storage.ErrObjectAlreadyExists)
 }
 
 func TestBackupNameReservationInspectionFailure(t *testing.T) {

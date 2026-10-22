@@ -50,12 +50,21 @@ func reserveBackupName(ctx context.Context, root storage.Folder, backupsPath, na
 	if exists {
 		return fmt.Errorf("backup %q already exists: %w", name, storage.ErrObjectAlreadyExists)
 	}
-	objects, folders, err := backups.GetSubFolder(name).ListFolder(ctx)
-	if err != nil {
-		return fmt.Errorf("check existing backup data %q: %w", name, err)
-	}
-	if len(objects) != 0 || len(folders) != 0 {
-		return fmt.Errorf("backup data for %q already exists: %w", name, storage.ErrObjectAlreadyExists)
+	// Some S3-compatible services retain empty directories after deleting
+	// their objects. Only actual objects constitute legacy backup data.
+	// Stay within this backup's directory and stop at the first object.
+	folders := []storage.Folder{backups.GetSubFolder(name)}
+	for len(folders) > 0 {
+		current := folders[len(folders)-1]
+		folders = folders[:len(folders)-1]
+		objects, children, err := current.ListFolder(ctx)
+		if err != nil {
+			return fmt.Errorf("check existing backup data %q: %w", name, err)
+		}
+		if len(objects) != 0 {
+			return fmt.Errorf("backup data for %q already exists: %w", name, storage.ErrObjectAlreadyExists)
+		}
+		folders = append(folders, children...)
 	}
 	return nil
 }
