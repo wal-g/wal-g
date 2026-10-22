@@ -524,6 +524,36 @@ wal-g wal-receive
 ```
 
 
+### ``wal-send``
+
+The counterpart of ``wal-receive``: serve the WAL stored in the archive to connecting
+clients (a standby, `pg_receivewal`, etc.) over the PostgreSQL
+[streaming replication](https://www.postgresql.org/docs/current/protocol-replication.html)
+protocol. This effectively turns WAL-G into a read-only "primary" fed by the WAL archive.
+
+```bash
+wal-g wal-send [--address 127.0.0.1:8000] [--poll-interval 5s]
+```
+
+Flags:
+* `--address` — address to listen replication connections on
+  (default `127.0.0.1:8000`: the server serves WAL with trust auth and no TLS,
+  so it binds to the loopback interface unless an address is given explicitly);
+* `--poll-interval` — how often to poll the storage for new WAL segments and
+  send keepalive messages to idle clients (default `5s`).
+
+Notes:
+* trust authentication, no TLS; replication slots are accepted and ignored —
+  the WAL is served from the storage as-is;
+* `IDENTIFY_SYSTEM` reports the system identifier taken from the latest backup
+  sentinel, the timeline from the backup name and the backup end LSN;
+* WAL segments are opened in the storage directly, one after another — the WAL
+  folder is never listed, which keeps the server fast even on very large
+  archives; a missing segment is retried with the poll interval;
+* when the timeline is exhausted, wal-send waits for further segments of the
+  same timeline; timeline switches require the client to reconnect.
+
+
 ### ``backup-mark``
 
 Backups can be marked as permanent to prevent them from being removed when running ``delete``. Backup permanence can be altered via this command by passing in the name of the backup (retrievable via `wal-g backup-list --pretty --detail --json`), which will mark the named backup and all previous related backups as permanent. The reverse is also possible by providing the `-i` flag.
