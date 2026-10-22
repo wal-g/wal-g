@@ -9,6 +9,7 @@ MAIN_ETCD_PATH := main/etcd
 # Keep the golang docker image's toolchain in sync with go.mod instead of hardcoding it.
 GO_VERSION := $(shell awk '/^go /{print $$2; exit}' go.mod)
 export GO_VERSION
+PULL_OR_BUILD := .github/scripts/pull_or_build.sh
 export GOEXPERIMENT=simd
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go internal/**/**/**/*.go)
@@ -44,7 +45,7 @@ GIT_REVISION ?= `git rev-parse --short HEAD`
 
 # disable_grpc_modules drops gRPC DirectPath (xDS/envoy) from cloud.google.com/go/storage,
 # wal-g uses the HTTP GCS client only
-BUILD_TAGS:=disable_grpc_modules $(EXTRA_BUILD_TAGS)
+BUILD_TAGS:=disable_grpc_modules grpcnotrace $(EXTRA_BUILD_TAGS)
 
 ifdef USE_BROTLI
 	BUILD_TAGS:=$(BUILD_TAGS) brotli
@@ -133,7 +134,7 @@ pg_matrix_test:
 .PHONY: load_golang_image
 load_golang_image:
 	@if ! docker image inspect wal-g/golang:latest >/dev/null 2>&1; then \
-		(docker pull ghcr.io/wal-g/golang:$(GO_VERSION) && docker tag ghcr.io/wal-g/golang:$(GO_VERSION) wal-g/golang) || docker compose build golang; \
+		sh $(PULL_OR_BUILD) ghcr.io/wal-g/golang:$(GO_VERSION) wal-g/golang docker/golang/Dockerfile golang; \
 	fi
 
 pg_integration_test: clean_compose
@@ -196,10 +197,10 @@ sqlserver_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_SQLSERVER_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g$(BINARY_EXT) -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
 
 load_ubuntu_18_04:
-	(docker pull ghcr.io/wal-g/ubuntu:18.04 && docker tag ghcr.io/wal-g/ubuntu:18.04 wal-g/ubuntu:18.04) || docker compose build ubuntu
+	@sh $(PULL_OR_BUILD) ghcr.io/wal-g/ubuntu:18.04 wal-g/ubuntu:18.04 docker/ubuntu/Dockerfile ubuntu
 
 load_ubuntu_22_04:
-	(docker pull ghcr.io/wal-g/ubuntu:22.04 && docker tag ghcr.io/wal-g/ubuntu:22.04 wal-g/ubuntu:22.04) || docker compose build ubuntu_22_04
+	@sh $(PULL_OR_BUILD) ghcr.io/wal-g/ubuntu:22.04 wal-g/ubuntu:22.04 docker/ubuntu/Dockerfile_22_04 ubuntu_22_04
 
 load_docker_common: load_ubuntu_18_04 load_ubuntu_22_04 load_golang_image
 	docker compose build s3
@@ -320,11 +321,7 @@ gp_install: gp_build
 gp_test: deps gp_build unlink_brotli gp_integration_test
 
 gp_integration_test: load_docker_common
-	@if docker pull ghcr.io/wal-g/gp:latest; then \
-		docker tag ghcr.io/wal-g/gp:latest wal-g/gp:latest; \
-	else \
-		docker compose build gp; \
-	fi
+	@sh $(PULL_OR_BUILD) ghcr.io/wal-g/gp:latest wal-g/gp:latest docker/gp/Dockerfile gp
 	docker compose build gp_tests
 	docker compose up --exit-code-from gp_tests gp_tests
 
@@ -337,11 +334,7 @@ cloudberry_install: gp_install
 cloudberry_test: deps cloudberry_build unlink_brotli cloudberry_integration_test
 
 cloudberry_integration_test: load_docker_common
-	@if docker pull ghcr.io/wal-g/cloudberry:latest; then \
-		docker tag ghcr.io/wal-g/cloudberry:latest wal-g/cloudberry:latest; \
-	else \
-		docker compose build cloudberry; \
-	fi
+	@sh $(PULL_OR_BUILD) ghcr.io/wal-g/cloudberry:latest wal-g/cloudberry:latest docker/cloudberry/Dockerfile cloudberry
 	docker compose build cloudberry_tests
 	docker compose up s3 cloudberry_tests --force-recreate --exit-code-from cloudberry_tests
 

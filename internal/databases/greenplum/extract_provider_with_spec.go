@@ -38,10 +38,11 @@ func (m RestoreDescMaker) FromAoSegNamespace(tableName string) bool {
 type ExtractProviderDBSpec struct {
 	restoreParameters []string
 	restoreDescMaker  RestoreDescMaker
+	allowDataLoss     bool
 }
 
-func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec {
-	return &ExtractProviderDBSpec{restoreParameters, RestoreDescMaker{}}
+func NewExtractProviderDBSpec(restoreParameters []string, allowDataLoss bool) *ExtractProviderDBSpec {
+	return &ExtractProviderDBSpec{restoreParameters, RestoreDescMaker{}, allowDataLoss}
 }
 
 func (p ExtractProviderDBSpec) Get(
@@ -59,5 +60,6 @@ func (p ExtractProviderDBSpec) Get(
 	tracelog.ErrorLogger.FatalOnError(err)
 	desc.FilterFilesToUnwrap(filesToUnwrap)
 
-	return ExtractProviderImpl{}.Get(ctx, backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
+	return ExtractProviderImpl{AllowDataLoss: p.allowDataLoss}.Get(
+		ctx, backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }

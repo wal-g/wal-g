@@ -17,6 +17,7 @@ type Storage struct {
 }
 
 type Config struct {
+	IsolateEndpointSource      bool     `json:"-"`
 	Secrets                    *Secrets `json:"-"`
 	Region                     string
 	Endpoint                   string

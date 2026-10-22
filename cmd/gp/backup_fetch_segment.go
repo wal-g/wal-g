@@ -25,6 +25,7 @@ var fileMask string
 var restoreSpec string
 var targetUserData string
 var segBackupFetchTurbo bool
+var segBackupFetchAllowDataLoss bool
 
 // segBackupFetchCmd is a subcommand to fetch a backup of a single segment.
 // It is called remotely by a backup-fetch command from the master host
@@ -59,9 +60,9 @@ var segBackupFetchCmd = &cobra.Command{
 		var extractProv postgres.ExtractProvider
 
 		if partialRestoreArgs != nil {
-			extractProv = greenplum.NewExtractProviderDBSpec(partialRestoreArgs)
+			extractProv = greenplum.NewExtractProviderDBSpec(partialRestoreArgs, segBackupFetchAllowDataLoss)
 		} else {
-			extractProv = greenplum.ExtractProviderImpl{}
+			extractProv = greenplum.ExtractProviderImpl{AllowDataLoss: segBackupFetchAllowDataLoss}
 		}
 
 		pgFetcher := postgres.GetFetcherOld(args[0], fileMask, restoreSpec, extractProv)
@@ -95,6 +96,8 @@ func init() {
 	segBackupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only", nil, restoreOnlyDescription)
 	segBackupFetchCmd.Flags().BoolVar(&segBackupFetchTurbo, "turbo", false,
 		"Ignore all kinds of throttling defined in config")
+	segBackupFetchCmd.Flags().BoolVar(&segBackupFetchAllowDataLoss, "allow-dataloss", false,
+		"Continue backup-fetch when AO files cannot be restored, replacing missing data with zeroes")
 	// Since this is a utility command called by backup-fetch, it should not be exposed to the end user.
 	segBackupFetchCmd.Hidden = true
 	cmd.AddCommand(segBackupFetchCmd)
