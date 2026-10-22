@@ -80,6 +80,25 @@ Removing a sentinel also does not protect a restore that has already read it.
 - Recursive filesystem listings can contain leading slashes. Normalize paths
   before applying protected-prefix filters, and test both forms through wrappers.
 
+## Avoid listings in hot paths
+
+- Design around direct object access rather than directory enumeration (`ls`,
+  `ReadDir`) or S3 LIST. Directories and prefixes can contain thousands or
+  millions of entries. Local `pg_wal` enumeration has been observed to become
+  the main archival bottleneck; local filesystem access is not automatically
+  cheap. Review scan frequency in `bguploader.go` as well as storage LIST calls.
+- Prefer deriving the next WAL filename or numbered tar name from the format,
+  or using recorded metadata, instead of listing to discover predictable names.
+  Respect timeline/segment-size rules and the actual tar naming scheme; a
+  missing predicted object must not silently hide gaps or late arrivals.
+- For every necessary listing, state the approximate expected entry count,
+  prefix/directory scope and frequency. Bound traversal and memory use, stop
+  early when possible, and avoid rescanning per WAL or per object. Pagination
+  alone does not make a full scan of millions of keys inexpensive.
+- Listings can still be appropriate, for example to verify that deletion left
+  no unexpected objects. Keep such checks scoped to the affected backup prefix,
+  outside the steady-state hot path where possible, and account for their cost.
+
 ## WAL pipelines
 
 - Distinguish foreground WAL completion, background work, metadata flushes and
