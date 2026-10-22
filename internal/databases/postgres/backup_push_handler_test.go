@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -88,5 +90,42 @@ func TestHandleJournalInfo(t *testing.T) {
 		ji2, err := internal.NewJournalInfo(t.Context(), bh2.CurBackupInfo.Name, folder, utility.WalPath)
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), ji2.SizeToNextBackup)
+	})
+}
+
+func TestWaitForWALArchive(t *testing.T) {
+	const timeline = uint32(3)
+	firstSegment := WalSegmentNo(10)
+	lastSegment := WalSegmentNo(12)
+
+	newHandler := func(folder storage.Folder) *BackupHandler {
+		return &BackupHandler{
+			CurBackupInfo: CurBackupInfo{
+				Name:     "base_" + firstSegment.GetFilename(timeline),
+				startLSN: firstSegment.firstLsn() + 1,
+				endLSN:   lastSegment.firstLsn() + 1,
+			},
+			Arguments: BackupArguments{
+				Uploader:          internal.NewRegularUploader(lz4.Compressor{}, folder),
+				waitForWALArchive: true,
+			},
+		}
+	}
+
+	t.Run("wait is canceled while a required WAL segment is missing", func(t *testing.T) {
+		folder := memory.NewFolder("", memory.NewKVS())
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		err := newHandler(folder).waitForWALArchive(ctx, folder)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("does nothing when the option is disabled", func(t *testing.T) {
+		folder := memory.NewFolder("", memory.NewKVS())
+		handler := newHandler(folder)
+		handler.Arguments.waitForWALArchive = false
+
+		require.NoError(t, handler.waitForWALArchive(t.Context(), folder))
 	})
 }
