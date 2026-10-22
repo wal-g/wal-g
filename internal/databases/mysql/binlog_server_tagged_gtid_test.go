@@ -5,6 +5,7 @@ import (
 	"io"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/stretchr/testify/require"
@@ -72,7 +73,7 @@ func TestHandleEventTaggedGTIDLargeGNO(t *testing.T) {
 	// go-mysql v1.16.0 decodes this GNO as 1, which can report completion
 	// before the actual GTID is applied.
 	e := taggedGTIDFixture([]byte{0xff, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01})
-	p, sink := newTestProcessor(t, nil, at(ts))
+	p, sink := newTestProcessor(t, nil, at(ts).Add(time.Second))
 	rows := writeRowsEvent(ts)
 	require.NoError(t, p.handleEvent(e))
 	require.NoError(t, p.handleEvent(rows))
