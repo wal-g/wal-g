@@ -9,6 +9,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewBackupSentinelDto_SetsWalFileNames(t *testing.T) {
+	const timeline = uint32(3)
+	startLSN := LSN(2 * WalSegmentSize)
+	endLSN := LSN(4*WalSegmentSize - 1)
+	handler := &BackupHandler{
+		CurBackupInfo: CurBackupInfo{
+			startLSN: startLSN,
+			endLSN:   endLSN,
+		},
+		PgInfo: BackupPgInfo{Timeline: timeline},
+	}
+
+	dto := NewBackupSentinelDto(handler, nil)
+
+	assert.Equal(t, "000000030000000000000001", dto.StartWalFileName)
+	assert.Equal(t, "000000030000000000000003", dto.EndWalFileName)
+}
+
 func TestBackupSentinelDto_IsIncremental(t *testing.T) {
 	testFromLSN := LSN(uint64(rand.Uint32())<<32 + uint64(rand.Uint32()))
 	testFrom := "fromString"
@@ -102,6 +120,23 @@ func TestBackupSentinelDto_UnmarshalJSON_NoSpec(t *testing.T) {
 	err := json.Unmarshal([]byte(jsonData), &dto)
 	require.NoError(t, err)
 	assert.Nil(t, dto.TablespaceSpec, "TablespaceSpec should be nil when spec is missing")
+}
+
+func TestBackupSentinelDto_WalFileNamesJSONRoundTrip(t *testing.T) {
+	expected := BackupSentinelDto{
+		StartWalFileName: "000000010000000000000001",
+		EndWalFileName:   "000000010000000000000002",
+	}
+
+	data, err := json.Marshal(expected)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"StartWalFileName":"000000010000000000000001"`)
+	assert.Contains(t, string(data), `"EndWalFileName":"000000010000000000000002"`)
+
+	var actual BackupSentinelDto
+	require.NoError(t, json.Unmarshal(data, &actual))
+	assert.Equal(t, expected.StartWalFileName, actual.StartWalFileName)
+	assert.Equal(t, expected.EndWalFileName, actual.EndWalFileName)
 }
 
 func TestBackupSentinelDto_MarshalJSON_OutputsUppercase(t *testing.T) {

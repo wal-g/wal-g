@@ -16,6 +16,8 @@ const MetadataDatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
 // BackupSentinelDto describes file structure of json sentinel
 type BackupSentinelDto struct {
 	BackupStartLSN    *LSN    `json:"LSN"`
+	StartWalFileName  string  `json:"StartWalFileName,omitempty"`
+	EndWalFileName    string  `json:"EndWalFileName,omitempty"`
 	IncrementFromLSN  *LSN    `json:"DeltaLSN,omitempty"`
 	IncrementFrom     *string `json:"DeltaFrom,omitempty"`
 	IncrementFullName *string `json:"DeltaFullName,omitempty"`
@@ -41,6 +43,8 @@ type BackupSentinelDto struct {
 func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSentinelDto {
 	sentinel := BackupSentinelDto{
 		BackupStartLSN:       &bh.CurBackupInfo.startLSN,
+		StartWalFileName:     NewWalSegmentNo(bh.CurBackupInfo.startLSN - 1).GetFilename(bh.PgInfo.Timeline),
+		EndWalFileName:       NewWalSegmentNo(bh.CurBackupInfo.endLSN).GetFilename(bh.PgInfo.Timeline),
 		IncrementFromLSN:     bh.prevBackupInfo.sentinelDto.BackupStartLSN,
 		PgVersion:            bh.PgInfo.PgVersion,
 		TablespaceSpec:       tbsSpec,
