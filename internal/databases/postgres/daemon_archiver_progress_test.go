@@ -123,7 +123,9 @@ func TestDaemonArchiveScanBoundsAndClosesListing(t *testing.T) {
 	scan.follow(other)
 	require.Empty(t, scan.pending)
 	require.Nil(t, scan.listing)
-	_, err := listing.Stat()
+	// Stat can return a native invalid-handle error on Windows. Read reports
+	// os.ErrClosed consistently, including for a closed directory handle.
+	_, err := listing.Read(make([]byte, 1))
 	require.ErrorIs(t, err, os.ErrClosed)
 	require.Equal(t, other, scan.cursor)
 }
