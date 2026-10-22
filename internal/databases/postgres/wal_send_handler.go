@@ -723,6 +723,15 @@ func (st *walSendStream) run(ctx context.Context) error {
 	tracelog.InfoLogger.Printf("wal-send: %s started replication at %s, timeline %d",
 		c.conn.RemoteAddr(), st.pos(), timeline)
 
+	// download segments ahead of the streaming position in the background,
+	// so that the stream reads from the local disk. The prefetch directory
+	// is removed when this context is canceled, i.e. when the copy ends
+	prefetcher, err := startWalSendPrefetcher(ctx, st, timeline)
+	if err != nil {
+		tracelog.WarningLogger.Printf("wal-send: failed to start WAL prefetching (%v), "+
+			"will read the segments from the storage directly", err)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -734,28 +743,31 @@ func (st *walSendStream) run(ctx context.Context) error {
 		segNo := uint64(pos) / WalSegmentSize
 		segmentFileName := formatWALFileName(timeline, segNo)
 
-		segment, err := internal.DownloadAndDecompressStorageFile(ctx, server.reader, segmentFileName)
-		if err != nil {
-			if _, notExist := err.(internal.ArchiveNonExistenceError); notExist {
-				// a segment archived as .partial never becomes complete:
-				// the timeline ended before the segment was finished.
-				// Fail immediately instead of polling forever
-				partialExists, partialErr := internal.StorageFileExists(ctx, server.reader,
-					segmentFileName+".partial")
-				if partialErr == nil && partialExists {
-					return fmt.Errorf("WAL segment %s exists in the storage only as a partial file: "+
-						"the timeline ended, reconnect with the next timeline", segmentFileName)
+		segment, fromPrefetch := st.fetchPrefetched(prefetcher, segmentFileName)
+		if segment == nil {
+			segment, err = internal.DownloadAndDecompressStorageFile(ctx, server.reader, segmentFileName)
+			if err != nil {
+				if _, notExist := err.(internal.ArchiveNonExistenceError); notExist {
+					// a segment archived as .partial never becomes complete:
+					// the timeline ended before the segment was finished.
+					// Fail immediately instead of polling forever
+					partialExists, partialErr := internal.StorageFileExists(ctx, server.reader,
+						segmentFileName+".partial")
+					if partialErr == nil && partialExists {
+						return fmt.Errorf("WAL segment %s exists in the storage only as a partial file: "+
+							"the timeline ended, reconnect with the next timeline", segmentFileName)
+					}
+					// the segment is not in the storage yet,
+					// retry the direct download after the poll interval
+					st.waitOnePoll(ctx, segmentFileName)
+					continue
 				}
-				// the segment is not in the storage yet,
-				// retry the direct download after the poll interval
-				st.waitOnePoll(ctx, segmentFileName)
-				continue
+				return fmt.Errorf("read the WAL segment %s from the storage: %w", segmentFileName, err)
 			}
-			return fmt.Errorf("read the WAL segment %s from the storage: %w", segmentFileName, err)
 		}
 
-		tracelog.InfoLogger.Printf("wal-send: %s: streaming WAL segment %s (segment #%d, position %s, timeline %d)",
-			c.conn.RemoteAddr(), segmentFileName, segNo, pos, timeline)
+		tracelog.InfoLogger.Printf("wal-send: %s: streaming WAL segment %s (segment #%d, position %s, timeline %d)%s",
+			c.conn.RemoteAddr(), segmentFileName, segNo, pos, timeline, prefetchSource(fromPrefetch))
 
 		offset := uint64(pos) % WalSegmentSize
 		err = st.streamSegment(ctx, segment, offset)
@@ -766,8 +778,32 @@ func (st *walSendStream) run(ctx context.Context) error {
 			}
 			return fmt.Errorf("stream the WAL segment %s: %w", segmentFileName, err)
 		}
+		if prefetcher != nil {
+			prefetcher.remove(segmentFileName)
+		}
 		st.setPos(LSN((segNo + 1) * WalSegmentSize))
 	}
+}
+
+// fetchPrefetched returns the prefetched segment file from the local disk,
+// or nil when it is not downloaded yet
+func (st *walSendStream) fetchPrefetched(prefetcher *walSendPrefetcher,
+	segmentFileName string) (segment io.ReadCloser, fromPrefetch bool) {
+	if prefetcher == nil {
+		return nil, false
+	}
+	file, ok := prefetcher.fetch(segmentFileName)
+	if !ok {
+		return nil, false
+	}
+	return file, true
+}
+
+func prefetchSource(fromPrefetch bool) string {
+	if fromPrefetch {
+		return " (prefetched)"
+	}
+	return ""
 }
 
 // waitOnePoll sleeps for one poll interval while the requested WAL segment
