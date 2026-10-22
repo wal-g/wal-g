@@ -50,4 +50,6 @@ tags
 # AI tools files and directories
 .claude
 AGENTS.md
+# Keep the shared repository guidance; nested local agent notes remain ignored.
+!/AGENTS.md
 .mcp.json
