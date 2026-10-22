@@ -25,6 +25,7 @@ const (
 	deltaFromNameFlag          = "delta-from-name"
 	addUserDataFlag            = "add-user-data"
 	withoutFilesMetadataFlag   = "without-files-metadata"
+	waitForArchiveFlag         = "wait-for-archive"
 	countJournalsFlag          = "count-journals"
 
 	permanentShorthand             = "p"
@@ -110,6 +111,10 @@ var (
 				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
 				userData, withoutFilesMetadata, countJournals, json, pretty)
 
+			if waitForArchive {
+				arguments.EnableWaitForWALArchive()
+			}
+
 			backupHandler, err := postgres.NewBackupHandler(cmd.Context(), arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush(cmd.Context())
@@ -126,6 +131,7 @@ var (
 	deltaFromUserData     = ""
 	userDataRaw           = ""
 	withoutFilesMetadata  = false
+	waitForArchive        = false
 	countJournals         = false
 )
 
@@ -180,6 +186,8 @@ func init() {
 		"", "Write the provided user data to the backup sentinel and metadata files.")
 	backupPushCmd.Flags().BoolVar(&withoutFilesMetadata, withoutFilesMetadataFlag,
 		false, "Do not track files metadata, significantly reducing memory usage")
+	backupPushCmd.Flags().BoolVar(&waitForArchive, waitForArchiveFlag,
+		false, "Wait until all WAL segments required for the backup are uploaded to storage")
 	backupPushCmd.Flags().BoolVar(&countJournals, countJournalsFlag,
 		false, "Create 'journal_<backup>' objects in storage and maintain the WAL volume required to get from one backup to the next")
 	backupPushCmd.Flags().StringVar(&targetStorage, "target-storage", "",
