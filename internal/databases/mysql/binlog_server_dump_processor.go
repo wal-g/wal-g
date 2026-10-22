@@ -16,11 +16,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// errUntilTSReached signals that an event's timestamp has exceeded the
-// target PITR time (untilTS). Since binlog events are ordered by
-// timestamp within and across files, no further events can be relevant,
-// so streaming stops immediately.
-var errUntilTSReached = errors.New("event timestamp is after untilTS")
+// errUntilTSReached signals that an event's header timestamp in seconds has
+// reached or exceeded the target PITR time (untilTS), matching mysqlbinlog
+// --stop-datetime. Streaming stops before this event and skips all subsequent
+// events and files, even if their timestamps are earlier.
+var errUntilTSReached = errors.New("event timestamp is at or after untilTS")
 
 const binlogFileHeaderSize = 4
 
@@ -261,7 +261,7 @@ func (p *BinlogDumpProcessor) handleEvent(e *replication.BinlogEvent) error {
 	p.logPos += uint64(len(e.RawData))
 	p.fileStats.addEvent(e)
 
-	if int64(e.Header.Timestamp) > p.untilTS.Unix() {
+	if int64(e.Header.Timestamp) >= p.untilTS.Unix() {
 		tracelog.InfoLogger.Printf("Reached PITR cutoff in %s at position %d: event=%s timestamp=%s until=%s",
 			p.currentFile, p.logPos, e.Header.EventType, time.Unix(int64(e.Header.Timestamp), 0).UTC().Format(time.RFC3339),
 			p.untilTS.UTC().Format(time.RFC3339))
