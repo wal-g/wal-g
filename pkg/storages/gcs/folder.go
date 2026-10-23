@@ -90,6 +90,29 @@ func (folder *Folder) ListFolder(ctx context.Context) (objects []storage.Object,
 	return objects, subFolders, err
 }
 
+func (folder *Folder) ListObjectsWithPrefix(ctx context.Context, prefix string) ([]storage.Object, error) {
+	base := storage.AddDelimiterToPath(folder.path)
+	ctx, cancel := folder.createTimeoutContext(ctx)
+	defer cancel()
+	query := &gcs.Query{Prefix: base + prefix}
+	if err := query.SetAttrSelection([]string{"Name", "Size", "Updated"}); err != nil {
+		return nil, fmt.Errorf("select GCS listing attributes: %w", err)
+	}
+	iter := folder.bucket.Objects(ctx, query)
+	var objects []storage.Object
+	for {
+		attrs, err := iter.Next()
+		if err == iterator.Done {
+			return objects, nil
+		}
+		if err != nil {
+			return nil, fmt.Errorf("list GCS objects with prefix %q: %w", base+prefix, err)
+		}
+		name := strings.TrimPrefix(attrs.Name, base)
+		objects = append(objects, storage.NewLocalObject(name, attrs.Updated, attrs.Size))
+	}
+}
+
 func (folder *Folder) createTimeoutContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, folder.config.ContextTimeout)
 }
@@ -251,6 +274,12 @@ func (folder *Folder) CopyObject(ctx context.Context, srcPath string, dstPath st
 func (folder *Folder) joinPath(one string, another string) string {
 	if folder.config.NormalizePrefix {
 		return storage.JoinPath(one, another)
+	}
+	if one == "" {
+		return another
+	}
+	if another == "" {
+		return one
 	}
 	if one[len(one)-1] == '/' {
 		one = one[:len(one)-1]
