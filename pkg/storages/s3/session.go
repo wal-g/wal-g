@@ -144,7 +144,8 @@ func buildS3Options(cfg *Config, scheme, host string) ([]func(*s3.Options), erro
 	}
 
 	if cfg.EndpointSource != "" {
-		s3Opts = append(s3Opts, withDynamicEndpoint(cfg.EndpointSource, cfg.EndpointPort, cfg.Endpoint, scheme, host))
+		s3Opts = append(s3Opts, withDynamicEndpoint(cfg.EndpointSource, cfg.EndpointPort, cfg.Endpoint, scheme, host,
+			cfg.IsolateEndpointSource))
 	}
 
 	if cfg.RequestAdditionalHeaders != "" {
@@ -284,13 +285,16 @@ func detectAWSRegionByBucket(ctx context.Context, awsCfg *aws.Config, bucket, en
 // withDynamicEndpoint rewrites the request URL host using a value fetched from
 // EndpointSource on each request. It runs as a Build middleware so the rewrite
 // happens before signing, matching v1's Validate handler timing.
-func withDynamicEndpoint(endpointSource, port, staticEndpoint, scheme, host string) func(*s3.Options) {
+func withDynamicEndpoint(endpointSource, port, staticEndpoint, scheme, host string, isolateTransport bool) func(*s3.Options) {
 	mw := &dynamicEndpointMiddleware{
 		source:         endpointSource,
 		port:           port,
 		staticEndpoint: staticEndpoint,
 		scheme:         scheme,
 		host:           host,
+	}
+	if isolateTransport {
+		mw.client = newEndpointSourceClient()
 	}
 	return func(o *s3.Options) {
 		o.APIOptions = append(o.APIOptions, func(s *middleware.Stack) error {
@@ -300,6 +304,7 @@ func withDynamicEndpoint(endpointSource, port, staticEndpoint, scheme, host stri
 }
 
 type dynamicEndpointMiddleware struct {
+	client         *http.Client
 	source         string
 	port           string
 	staticEndpoint string
@@ -316,7 +321,7 @@ func (m *dynamicEndpointMiddleware) HandleBuild(
 	if !ok {
 		return next.HandleBuild(ctx, in)
 	}
-	endpoint := requestEndpointFromSource(ctx, m.source, m.port)
+	endpoint := requestEndpointFromSource(ctx, m.source, m.port, m.client)
 	if endpoint != nil {
 		tracelog.DebugLogger.Printf("using S3 endpoint %s", *endpoint)
 		req.Host = m.host
@@ -442,12 +447,22 @@ func tlsServerName(host string) string {
 	return host
 }
 
-func requestEndpointFromSource(ctx context.Context, endpointSource, port string) *string {
-	t := http.DefaultTransport
-	c := http.DefaultClient
-	if tr, ok := t.(*http.Transport); ok {
-		tr.DisableKeepAlives = true
-		c = &http.Client{Transport: tr}
+// Clone once at construction, without reading the shared transport during secondary requests.
+func newEndpointSourceClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DisableKeepAlives = true
+	return &http.Client{Transport: transport}
+}
+
+func requestEndpointFromSource(ctx context.Context, endpointSource, port string, c *http.Client) *string {
+	if c == nil {
+		// Preserve the primary's existing behavior, regardless of failover configuration or selection.
+		t := http.DefaultTransport
+		c = http.DefaultClient
+		if tr, ok := t.(*http.Transport); ok {
+			tr.DisableKeepAlives = true
+			c = &http.Client{Transport: tr}
+		}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpointSource, nil)
 	if err != nil {
