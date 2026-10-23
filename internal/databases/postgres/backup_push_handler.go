@@ -855,10 +855,10 @@ func addPgIsAliveChecker(ctx context.Context, queryRunner *PgQueryRunner, errCh 
 	pgWatcher := NewPgWatcher(ctx, queryRunner, stateUpdateInterval)
 
 	go func() {
-		err := <-pgWatcher.Err
+		err, ok := <-pgWatcher.Err
 		// Normal backup completion cancels the watcher before closing the
 		// connection; do not report that cleanup as a failed backup.
-		if ctx.Err() != nil {
+		if !ok || ctx.Err() != nil {
 			return
 		}
 		errCh <- fmt.Errorf("PG alive check failed: %v", err)

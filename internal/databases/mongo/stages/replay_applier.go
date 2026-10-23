@@ -213,6 +213,9 @@ func (a *CheckpointingApplier) checkpoint(ctx context.Context, timer *time.Timer
 	if err := a.makeDurable(ctx); err != nil {
 		return err
 	}
+	if err := replayCheckpointTestBarrier(ctx, a.progress); err != nil {
+		return err
+	}
 	a.checkpointDue = false
 	timer.Reset(a.interval)
 	return nil

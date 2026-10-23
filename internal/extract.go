@@ -57,6 +57,12 @@ type finalizingTarInterpreter interface {
 	Finalize() error
 }
 
+// FailedFilesRecoverer can recover selected files after ExtractAll exhausted
+// its configured retries. It must return the files that it could not recover.
+type FailedFilesRecoverer interface {
+	RecoverFailedFiles(ctx context.Context, files []ReaderMaker) ([]ReaderMaker, error)
+}
+
 type DevNullWriter struct {
 	io.WriteCloser
 	statPrinter sync.Once
@@ -166,6 +172,16 @@ func ExtractAllWithSleeper(ctx context.Context, tarInterpreter TarInterpreter, f
 		if downloadingConcurrency > 1 {
 			downloadingConcurrency /= 2
 		} else if len(failed) == len(currentRun) && retries <= 0 {
+			if recoverer, ok := tarInterpreter.(FailedFilesRecoverer); ok {
+				unrecovered, recoverErr := recoverer.RecoverFailedFiles(ctx, failed)
+				if recoverErr != nil {
+					return recoverErr
+				}
+				if len(unrecovered) == 0 {
+					return nil
+				}
+				failed = unrecovered
+			}
 			return errors.Errorf("failed to extract files:\n%s\n",
 				strings.Join(readerMakersToFilePaths(failed), "\n"))
 		}

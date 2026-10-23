@@ -3,8 +3,10 @@ package s3
 import (
 	"crypto/md5"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/require"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 func TestLoadAWSConfigWithHTTPSEndpointSourceTwice(t *testing.T) {
@@ -132,4 +135,47 @@ func TestChecksumKeptOnPutObject(t *testing.T) {
 
 	require.Empty(t, capture.header.Get("Content-Md5"))
 	require.NotEmpty(t, capture.header.Get("X-Amz-Checksum-Crc32"))
+}
+
+func TestEndpointSourceIsolationPreservesConfigHash(t *testing.T) {
+	cfg := &Config{EndpointSource: "http://discovery.invalid"}
+	before, err := storage.ComputeConfigHash("s3", cfg)
+	require.NoError(t, err)
+	cfg.IsolateEndpointSource = true
+	after, err := storage.ComputeConfigHash("s3", cfg)
+	require.NoError(t, err)
+	require.Equal(t, before, after)
+}
+
+func TestEndpointSourceTransportIsolation(t *testing.T) {
+	for _, isolate := range []bool{false, true} {
+		t.Run(fmt.Sprintf("isolate=%t", isolate), func(t *testing.T) {
+			original := http.DefaultTransport
+			transport := original.(*http.Transport).Clone()
+			transport.DisableKeepAlives = false
+			http.DefaultTransport = transport
+			t.Cleanup(func() { http.DefaultTransport = original; transport.CloseIdleConnections() })
+			source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !r.Close {
+					t.Error("discovery must close connections, including after redirects")
+				}
+				if r.URL.Path == "/redirect" {
+					http.Redirect(w, r, "/node", http.StatusFound)
+					return
+				}
+				_, _ = io.WriteString(w, "127.0.0.1")
+			}))
+			defer source.Close()
+
+			var client *http.Client
+			if isolate {
+				client = newEndpointSourceClient()
+				defer client.CloseIdleConnections()
+			}
+			got := requestEndpointFromSource(t.Context(), source.URL+"/redirect", "443", client)
+			require.Equal(t, "127.0.0.1:443", aws.ToString(got))
+			require.Equal(t, !isolate, transport.DisableKeepAlives,
+				"primary behavior must stay unchanged; secondary discovery must not mutate the default transport")
+		})
+	}
 }

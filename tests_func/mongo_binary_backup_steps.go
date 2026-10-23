@@ -99,12 +99,17 @@ func (tctx *TestContext) restoreMongoBinaryBackupWithInterruptedPITR(
 		return err
 	}
 
+	checkpointDir, err := walg.PrepareInterruptedReplay()
+	if err != nil {
+		return err
+	}
+	defer walg.CleanupInterruptedReplay(checkpointDir)
 	killC := make(chan error, 1)
 	go func() {
-		killC <- tctx.crashReplayMongod(walg, container)
+		killC <- tctx.crashReplayMongod(walg, container, checkpointDir)
 	}()
 	result, restoreErr := walg.FetchBinaryBackupWithPITR(
-		backup, configPath, mongodbVersion, since.String(), until.String())
+		backup, configPath, mongodbVersion, since.String(), until.String(), checkpointDir)
 	killErr := <-killC
 	if killErr != nil {
 		return killErr
@@ -129,15 +134,15 @@ func (tctx *TestContext) restoreMongoBinaryBackupWithInterruptedPITR(
 	return tctx.initiateReplSet(container)
 }
 
-func (tctx *TestContext) crashReplayMongod(walg *helpers.WalgUtil, container string) error {
+func (tctx *TestContext) crashReplayMongod(walg *helpers.WalgUtil, container, checkpointDir string) error {
 	host := tctx.ContainerFQDN(container)
 	deadline := time.Now().Add(time.Minute)
 	for time.Now().Before(deadline) {
-		checkpointLogged, err := walg.InterruptedReplayCheckpointLogged()
+		checkpointReady, err := walg.InterruptedReplayCheckpointReady(checkpointDir)
 		if err != nil {
 			return err
 		}
-		if !checkpointLogged {
+		if !checkpointReady {
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
@@ -146,7 +151,7 @@ func (tctx *TestContext) crashReplayMongod(walg *helpers.WalgUtil, container str
 for proc in /proc/[0-9]*; do
     while IFS= read -r -d '' arg; do
         case "$arg" in
-            *takeUnstableCheckpointOnShutdown=true*)
+            takeUnstableCheckpointOnShutdown=true)
                 printf '%s\n' "${proc##*/}"
                 exit 0
                 ;;
@@ -167,7 +172,10 @@ exit 1
 			_, err = helpers.RunCommandStrict(tctx.Context, host, []string{
 				"bash", "-c", `kill -ABRT "$1"`, "--", strconv.Itoa(pid),
 			})
-			return err
+			if err != nil {
+				return err
+			}
+			return walg.ReleaseInterruptedReplayCheckpoint(checkpointDir)
 		}
 		return fmt.Errorf("replay mongod exited before it could be interrupted")
 	}

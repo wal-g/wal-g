@@ -149,7 +149,7 @@ func taggedGTIDEvent(ts string, sid uuid.UUID, tag string, gno byte) *replicatio
 func TestHandleEventMalformedGTID(t *testing.T) {
 	for _, kind := range []replication.EventType{replication.GTID_EVENT, replication.GTID_TAGGED_LOG_EVENT} {
 		for _, body := range [][]byte{nil, {2}, {2, 6, 18}, {2, 10, 18, 0, 1}} {
-			p, sink := newTestProcessor(t, nil, at("2026-01-01 00:00:01"))
+			p, sink := newTestProcessor(t, nil, at("2026-01-01 00:00:02"))
 			err := p.handleEvent(rawEvent(kind, "2026-01-01 00:00:01", body))
 			require.Error(t, err, "%s %x", kind, body)
 			require.Empty(t, sink.recorded())
@@ -169,7 +169,7 @@ func TestTaggedGTIDWithCommitGroupTicket(t *testing.T) {
 	e.RawData = append(e.RawData, 0, 0, 0, 0)
 	rawBefore := append([]byte(nil), e.RawData...)
 	gtid := requireGTIDSet(t, uuid1.String()+":review:1")
-	p, sink := newTestProcessor(t, nil, at(ts))
+	p, sink := newTestProcessor(t, nil, at(ts).Add(time.Second))
 	require.NoError(t, p.handleEvent(e))
 	require.Equal(t, rawBefore, e.RawData, "replication metadata must be forwarded unchanged")
 	require.Equal(t, []*replication.BinlogEvent{e}, sink.recorded())
@@ -200,7 +200,7 @@ func TestTaggedGTIDRequiresIdentityFields(t *testing.T) {
 			// Keep framing valid so the error comes from the identity field.
 			body[1] = byte(len(body) << 1)
 			e = rawEvent(replication.GTID_TAGGED_LOG_EVENT, ts, body)
-			p, sink := newTestProcessor(t, nil, at(ts))
+			p, sink := newTestProcessor(t, nil, at(ts).Add(time.Second))
 			require.ErrorContains(t, p.handleEvent(e), tc.wantError)
 			require.Empty(t, sink.recorded())
 			require.True(t, p.sentGTIDs.IsEmpty())
@@ -459,14 +459,14 @@ func TestProcess(t *testing.T) {
 			// GTID events carry the transaction's commit timestamp, which
 			// is the latest timestamp in the transaction; the row events
 			// that make up the transaction body are timestamped earlier,
-			// at their individual execution time. Once an event past
+			// at their individual execution time. Once an event at or past
 			// untilTS is encountered, streaming stops for good (there is
 			// nothing further worth sending), so the transaction whose
-			// commit time exceeds untilTS is dropped along with
+			// commit time reaches or exceeds untilTS is dropped along with
 			// everything after it, including any later files - only the
 			// earlier, fully-committed-before-the-cutoff transaction is
 			// forwarded.
-			name: "untilTS stops streaming for good once a transaction commits after the cutoff",
+			name: "untilTS stops streaming for good once a transaction commits at or after the cutoff",
 			files: []binlogFile{
 				{
 					name: "a.000001",
@@ -474,7 +474,7 @@ func TestProcess(t *testing.T) {
 						gtidEvent("2026-01-01 00:00:09", uuid1, 1),
 						tableMapEvent("2026-01-01 00:00:09"),
 						writeRowsEvent("2026-01-01 00:00:09"),
-						gtidEvent("2026-01-01 00:00:12", uuid1, 2),
+						gtidEvent("2026-01-01 00:00:11", uuid1, 2),
 						tableMapEvent("2026-01-01 00:00:10"),
 						writeRowsEvent("2026-01-01 00:00:10"),
 						rotateEvent("2026-01-01 00:00:13", "a.000002", 4),
