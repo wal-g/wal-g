@@ -144,6 +144,11 @@ Removing a sentinel also does not protect a restore that has already read it.
   CLI integration tests must isolate inherited configuration variables; otherwise
   defaults such as `WALG_PG_WAL_SIZE=16` override an explicit 64 MiB config file.
   See `wal_send_cli_test.go:walSendCLIStandby`.
+- A compiled Go test binary still runs all package initializers with `-test.run`.
+  PostgreSQL's pagefile fixtures load `../../../test/testdata` before any test;
+  ship those files with the binary and preserve its package-relative working
+  directory. `docker/pg_tests/Dockerfile_prefix` checks that runtime layout with
+  `postgres.test -test.run='^$'` during the image build.
 - Check Windows behavior rather than assuming Unix error identities. Cross-
   compilation does not execute Windows tests.
 - Report what actually ran: mocked SDK calls, a real storage service, a real

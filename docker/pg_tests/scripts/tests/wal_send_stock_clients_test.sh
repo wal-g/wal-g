@@ -7,6 +7,7 @@ set -e -x
 require_pg_ge 14
 
 export WALG_TEST_PG_BIN="/usr/lib/postgresql/${PG_MAJOR}/bin"
+cd /tmp/test_bins/internal/databases/postgres
 /tmp/test_bins/postgres.test \
   -test.run='^TestWalSend(StockReceivewal(Live)?TimelineSwitch|RealPostgresStandby)$' \
   -test.v -test.timeout=180s

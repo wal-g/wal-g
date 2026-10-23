@@ -50,11 +50,17 @@ RUN apt-get update && \
 COPY --from=build /go/src/github.com/wal-g/wal-g/pkg/storages/swift/swift.test /tmp/test_bins/
 COPY --from=build /go/src/github.com/wal-g/wal-g/pkg/storages/sh/sh.test /tmp/test_bins/
 COPY --from=build /tmp/postgres.test /tmp/test_bins/
+COPY --from=build /go/src/github.com/wal-g/wal-g/test/testdata/ /tmp/test_bins/test/testdata/
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 COPY --from=build /go/src/github.com/wal-g/wal-g/bin/walg-daemon-client /usr/bin
 
 COPY docker/pg_tests/scripts/ /tmp
 
-RUN mkdir -p /tmp/logs/ && chmod 777 /tmp/configs/ && chmod 777 /tmp/logs/
+# Package initializers read ../../../test/testdata even when -test.run selects
+# only integration tests. Check the runtime layout before the long test suite.
+RUN mkdir -p /tmp/logs/ /tmp/test_bins/internal/databases/postgres && \
+    chmod 777 /tmp/configs/ /tmp/logs/ && \
+    cd /tmp/test_bins/internal/databases/postgres && \
+    /tmp/test_bins/postgres.test -test.run='^$'
 
 RUN chmod 777 /tmp/tests/wal_perftest_with_throttling.sh
