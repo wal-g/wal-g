@@ -269,6 +269,10 @@ func (folder *Folder) ListFolderSegment(
 	if startAfterKey != nil {
 		startAfterPrefix = aws.String(*prefix + *startAfterKey)
 	}
+	var endBeforePrefix *string
+	if endBeforeKey != nil {
+		endBeforePrefix = aws.String(*prefix + *endBeforeKey)
+	}
 
 	listFunc := func(commonPrefixes []types.CommonPrefix, contents []types.Object) bool {
 		cont := true
@@ -278,7 +282,7 @@ func (folder *Folder) ListFolderSegment(
 		}
 		for _, object := range contents {
 			key := *object.Key
-			if endBeforeKey != nil && key > *endBeforeKey {
+			if endBeforePrefix != nil && key > *endBeforePrefix {
 				cont = false
 				break
 			}

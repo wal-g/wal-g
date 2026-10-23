@@ -15,12 +15,15 @@ const (
 	WithCatchUpReconfigDescription          = "Reconfig MongoDB oplog service collections for mongod replica oplog catch up"
 	MinimalOplogReplayConfigPathFlag        = "minimal-mongod-config-path"
 	MinimalOplogReplayConfigPathDescription = "Path to mongod config with minimal working configuration"
+	FollowLatestFlag                        = "follow-latest"
+	FollowLatestDescription                 = "Continue replaying new oplog archives until MongoDB catches up with storage"
 )
 
 var (
 	partial                     bool
 	withCatchUpReconfig         bool
 	minimalOplogReplyConfigPath string
+	followLatest                bool
 )
 
 // oplogReplayCmd represents oplog replay procedure
@@ -32,7 +35,7 @@ var oplogReplayCmd = &cobra.Command{
 		var err error
 		defer func() { tracelog.ErrorLogger.FatalOnError(err) }()
 
-		replayArgs, mongodbURL, err := buildOplogReplayRunArgs(args, partial, withCatchUpReconfig,
+		replayArgs, mongodbURL, err := buildOplogReplayRunArgs(args, partial, withCatchUpReconfig, followLatest,
 			minimalOplogReplyConfigPath)
 		if err != nil {
 			return
@@ -44,9 +47,10 @@ var oplogReplayCmd = &cobra.Command{
 
 func buildOplogReplayRunArgs(
 	cmdargs []string, partial,
-	withCatchUpReconfig bool, minimalConfigPath string,
+	withCatchUpReconfig, followLatest bool, minimalConfigPath string,
 ) (binary.ReplyOplogConfig, string, error) {
-	args, err := binary.NewReplyOplogConfig(cmd.Context(), cmdargs[0], cmdargs[1], partial, withCatchUpReconfig, minimalConfigPath)
+	args, err := binary.NewReplyOplogConfig(
+		cmd.Context(), cmdargs[0], cmdargs[1], partial, withCatchUpReconfig, followLatest, minimalConfigPath)
 	if err != nil {
 		return args, "", err
 	}
@@ -64,5 +68,6 @@ func init() {
 	oplogReplayCmd.Flags().BoolVar(&withCatchUpReconfig, WithCatchUpReconfigFlag, false, WithCatchUpReconfigDescription)
 	oplogReplayCmd.Flags().StringVar(&minimalOplogReplyConfigPath, MinimalOplogReplayConfigPathFlag,
 		"", MinimalOplogReplayConfigPathDescription)
+	oplogReplayCmd.Flags().BoolVar(&followLatest, FollowLatestFlag, false, FollowLatestDescription)
 	cmd.AddCommand(oplogReplayCmd)
 }

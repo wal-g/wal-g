@@ -78,6 +78,29 @@ Format: [golang duration string](https://golang.org/pkg/time/#ParseDuration).
 Exposes http-handler with oplog archiving statistics: `stats/oplog_push`.
 HTTP-server listens `HTTP_LISTEN` port (default: 8090).
 
+* `OPLOG_REPLAY_FOLLOW_POLL_INTERVAL`
+
+Storage polling interval for `oplog-replay --follow-latest`. Default: `5s`.
+
+* `OPLOG_REPLAY_CATCHUP_OBSERVATION_WINDOW`
+
+Window used to compare storage and replay timestamp rates. Default: `5m`.
+
+* `OPLOG_REPLAY_CATCHUP_TIMEOUT`
+
+Time for which a replay with a significant backlog may fail to converge before WAL-G stops it and recommends initial sync.
+The timeout starts after the observation window is populated. Default: `15m`.
+
+* `OPLOG_REPLAY_STALL_TIMEOUT`
+
+Maximum time without processed timestamp progress while catch-up cannot complete, including an incomplete transaction at
+the storage head. Default: `5m`.
+
+* `OPLOG_REPLAY_CATCHUP_MAX_LAG`
+
+Maximum timestamp lag accepted while confirming catch-up. Default: `0s`, which requires reaching the current continuous
+storage head. All replay follow settings use [Go duration strings](https://golang.org/pkg/time/#ParseDuration).
+
 
 Usage
 -----
@@ -257,6 +280,22 @@ durable progress and defaults to `5`.
 
 Recovery has at-least-once semantics: MongoDB may have persisted some operations after the last completed `fsync`, so an
 automatic restart can apply those operations again.
+
+Use `--follow-latest` together with `UNTIL=LATEST` to continue polling storage for archives uploaded after replay starts:
+
+```bash
+wal-g oplog-replay LATEST_ON_REPLICA LATEST \
+  --follow-latest \
+  --with-catch-up-reconfig \
+  --minimal-mongod-config-path /etc/mongod-minimal.conf
+```
+
+The static behavior of `LATEST` is unchanged without the flag. In follow mode WAL-G tracks the continuous storage head,
+the processed and durable timestamps, timestamp lag, and the storage/replay rates. It finishes only after rechecking that
+no next archive is available, then flushes the final batch and runs `fsync`. If replay stalls or its lag does not converge,
+WAL-G exits with an error that recommends initial sync; it never starts initial sync automatically.
+
+For `binary-backup-fetch`, enable the same behavior with `--pitr-follow-latest` and `--pitr-until LATEST`.
 
 ### Common constraints:
 

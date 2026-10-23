@@ -18,6 +18,7 @@ func HandleBinaryFetchPush(
 	shardConnectionStrings []string,
 	skipBackupDownload, skipReconfig, skipChecks bool,
 	pitrSince, pitrUntil string,
+	pitrFollowLatest bool,
 	whitelist, blacklist []string,
 ) error {
 	config, err := binary.CreateMongodConfig(mongodConfigPath)
@@ -65,12 +66,10 @@ func HandleBinaryFetchPush(
 		return err
 	}
 
-	var replyOplogConfig binary.ReplyOplogConfig
-	if pitrSince != "" && pitrUntil != "" {
-		replyOplogConfig, err = binary.NewReplyOplogConfig(ctx, pitrSince, pitrUntil, len(whitelist)+len(blacklist) > 0, false, "")
-		if err != nil {
-			return err
-		}
+	replyOplogConfig, err := buildBinaryFetchReplayConfig(
+		ctx, pitrSince, pitrUntil, pitrFollowLatest, len(whitelist)+len(blacklist) > 0)
+	if err != nil {
+		return err
 	}
 
 	return restoreService.DoRestore(
@@ -91,4 +90,20 @@ func HandleBinaryFetchPush(
 			Blacklist: blacklist,
 		},
 	)
+}
+
+func buildBinaryFetchReplayConfig(
+	ctx context.Context,
+	pitrSince, pitrUntil string,
+	followLatest, partial bool,
+) (binary.ReplyOplogConfig, error) {
+	if followLatest && (pitrSince == "" || pitrUntil == "") {
+		return binary.ReplyOplogConfig{}, fmt.Errorf(
+			"pitr-follow-latest requires both pitr-since and pitr-until")
+	}
+	if pitrSince == "" || pitrUntil == "" {
+		return binary.ReplyOplogConfig{}, nil
+	}
+	return binary.NewReplyOplogConfig(
+		ctx, pitrSince, pitrUntil, partial, false, followLatest, "")
 }

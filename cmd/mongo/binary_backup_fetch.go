@@ -34,6 +34,8 @@ const (
 	PitrSinceDescription          = "Timestamp point in time recovery start"
 	PitrUntilFlag                 = "pitr-until"
 	PitrUntilDescription          = "Timestamp point in time recovery finish"
+	PitrFollowLatestFlag          = "pitr-follow-latest"
+	PitrFollowLatestDescription   = "Continue PITR while new oplog archives appear until MongoDB catches up with storage"
 
 	BlacklistFlag        = "blacklist"
 	BlacklistDescription = "Comma separated dbname.colname records from wished databases " +
@@ -56,6 +58,7 @@ var (
 	skipCheckFlag            bool
 	pitrSince                string
 	pitrUntil                string
+	pitrFollowLatest         bool
 	whitelist                []string
 	blacklist                []string
 )
@@ -72,7 +75,8 @@ var binaryBackupFetchCmd = &cobra.Command{
 		mongodVersion := args[2]
 		err := mongo.HandleBinaryFetchPush(cmd.Context(), mongodConfigPath, minimalConfigPath, backupName, mongodVersion,
 			rsName, rsMembers, rsMemberIDs, shardName, mongocfgConnectionString, shardConnectionStrings,
-			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag, pitrSince, pitrUntil, whitelist, blacklist)
+			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag, pitrSince, pitrUntil, pitrFollowLatest,
+			whitelist, blacklist)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
@@ -90,6 +94,7 @@ func init() {
 	binaryBackupFetchCmd.Flags().BoolVar(&skipCheckFlag, SkipChecksFlag, false, SkipChecksDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&pitrSince, PitrSinceFlag, "", PitrSinceDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&pitrUntil, PitrUntilFlag, "", PitrUntilDescription)
+	binaryBackupFetchCmd.Flags().BoolVar(&pitrFollowLatest, PitrFollowLatestFlag, false, PitrFollowLatestDescription)
 	binaryBackupFetchCmd.Flags().StringSliceVar(&blacklist, BlacklistFlag,
 		[]string{}, BlacklistDescription)
 	binaryBackupFetchCmd.Flags().StringSliceVar(&whitelist, WhitelistFlag,
