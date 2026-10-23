@@ -49,9 +49,11 @@ To configure how many concurrency streams are reading disk during ```backup-push
 
 Overrides the default `number of WAL files to upload during one scan`. By default, at most 32 WAL files will be uploaded.
 
-In daemon mode (without `WALG_USE_WAL_DELTA`), this instead bounds the lookahead window:
-the requested WAL plus up to `TOTAL_BG_UPLOADED_LIMIT - 1` subsequent ready segments.
-The window advances on every archive request, including acknowledgements of already uploaded segments.
+In daemon mode (without `WALG_USE_WAL_DELTA`), this bounds discovery batches to
+`TOTAL_BG_UPLOADED_LIMIT - 1` candidates, not total background progress. After the
+first WAL request, the daemon keeps draining ready segments independently of
+further requests. Values at or below 1 disable background uploads. Periodic
+directory passes rediscover failed uploads and late ready files behind the cursor.
 
 * `WALG_SENTINEL_USER_DATA`
 
@@ -664,8 +666,9 @@ in the existing archive status manager and survive daemon restarts. Failed uploa
 not acknowledged. Background failures are retried with a short delay; PostgreSQL can
 retry a failed foreground request immediately.
 
-Next WAL names are predicted arithmetically and checked for `.ready` status. A cached,
-throttled directory scan handles gaps. Storage selection is repeated for each new upload
+Next WAL names are predicted arithmetically and checked for `.ready` status. A bounded,
+streaming directory scan handles gaps and periodically revisits failures and late ready
+files. Directory passes are separated by at least five seconds. Storage selection is repeated for each new upload
 using the existing multi-storage health cache; in-flight uploads are not moved between
 storages. Standalone `wal-push` and WAL delta mode retain their batch lifecycle.
 
