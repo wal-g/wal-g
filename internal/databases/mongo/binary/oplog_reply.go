@@ -89,6 +89,7 @@ func runOplogReplay(
 		replayArgs.FsyncInterval,
 		attempt.progress,
 		replayArgs.ApplyBatchSize,
+		replayArgs.WithCatchUpReconfig,
 	)
 
 	// set up storage downloader client
@@ -112,26 +113,7 @@ func runOplogReplay(
 	if err = HandleOplogReplay(ctx, since, replayArgs.Until, oplogFetcher, oplogApplier); err != nil {
 		return err
 	}
-	if err = finalizeCatchUp(ctx, replayArgs, mongoClient, attempt.progress); err != nil {
-		return err
-	}
 	return nil
-}
-
-func finalizeCatchUp(
-	ctx context.Context,
-	replayArgs ReplyOplogConfig,
-	db client.MongoDriver,
-	progress *stages.ReplayProgress,
-) error {
-	if !replayArgs.WithCatchUpReconfig {
-		return nil
-	}
-	checkpoint := progress.Snapshot()
-	if checkpoint.Generation == 0 {
-		return nil
-	}
-	return db.ChangeOplogLastTimestamp(ctx, checkpoint.OpTime)
 }
 
 func resolveOplogReplaySequence(

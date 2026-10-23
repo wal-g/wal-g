@@ -245,8 +245,11 @@ SINCE is included and UNTIL is NOT.
 wal-g oplog-replay 1593554109.1 1593559109.1
 ```
 
-During replay, WAL-G runs `fsync` periodically and remembers the last durable oplog timestamp in memory. The interval is
-configured with `OPLOG_REPLAY_FSYNC_INTERVAL` and defaults to `10m`.
+During replay, WAL-G creates durable checkpoints periodically and remembers the last checkpointed oplog timestamp in memory.
+The interval is configured with `OPLOG_REPLAY_FSYNC_INTERVAL` and defaults to `10m`. A regular replay checkpoint runs
+`fsync`. A catch-up replay checkpoint also records the last applied optime in the local oplog, updates `replset.minvalid`,
+clears `replset.oplogTruncateAfterPoint`, and then runs `fsync`. This leaves MongoDB consistent through that checkpoint if
+replay is stopped before reaching the requested end timestamp.
 
 When `binary-backup-fetch` replays PITR data using its temporary `mongod`, WAL-G restarts that process after an unexpected
 exit and resumes after the last durable timestamp. `OPLOG_REPLAY_MAX_MONGOD_RESTARTS` limits consecutive restarts without
