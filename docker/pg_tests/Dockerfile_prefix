@@ -32,6 +32,9 @@ RUN --mount=type=cache,target=/gocache GOCACHE=/gocache \
 
 RUN --mount=type=cache,target=/gocache cd pkg/storages/swift && GOCACHE=/gocache go test -v -c
 RUN --mount=type=cache,target=/gocache cd pkg/storages/sh && GOCACHE=/gocache go test -v -c
+RUN --mount=type=cache,target=/gocache GOCACHE=/gocache GOEXPERIMENT=simd \
+    go test -mod=vendor -race -tags='disable_grpc_modules grpcnotrace' \
+    -c -o /tmp/postgres.test ./internal/databases/postgres
 
 FROM ${PG_IMAGE}
 
@@ -46,6 +49,7 @@ RUN apt-get update && \
 
 COPY --from=build /go/src/github.com/wal-g/wal-g/pkg/storages/swift/swift.test /tmp/test_bins/
 COPY --from=build /go/src/github.com/wal-g/wal-g/pkg/storages/sh/sh.test /tmp/test_bins/
+COPY --from=build /tmp/postgres.test /tmp/test_bins/
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 COPY --from=build /go/src/github.com/wal-g/wal-g/bin/walg-daemon-client /usr/bin
 

@@ -559,7 +559,9 @@ Notes:
   never authorizes a transition;
 * `SHOW data_directory_mode` and `SHOW wal_segment_size` support stock
   `pg_receivewal`. Set `WALG_TEST_PG_BIN` to a PostgreSQL `bin` directory to run
-  the opt-in stock-client and real-standby tests in `TestWalSend*`.
+  the opt-in stock-client and real-standby tests in `TestWalSend*`. Docker CI
+  runs them with the race detector on PostgreSQL 14–18 via
+  `docker/pg_tests/scripts/tests/wal_send_stock_clients_test.sh`.
 
 
 ### ``backup-mark``

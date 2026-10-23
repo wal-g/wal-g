@@ -39,9 +39,23 @@ func walSendPostgresCommand(t *testing.T, ctx context.Context, bin, program stri
 	return output
 }
 
+func walSendPostgresMajor(t *testing.T, bin string) int {
+	t.Helper()
+	output := walSendPostgresCommand(t, t.Context(), bin, "postgres", "--version")
+	var major int
+	_, err := fmt.Sscanf(string(output), "postgres (PostgreSQL) %d", &major)
+	require.NoError(t, err)
+	return major
+}
+
 func TestWalSendStockReceivewalTimelineSwitch(t *testing.T) {
 	bin := walSendPostgresBin(t)
 	folder := memory.NewFolder("archive/", memory.NewKVS())
+	// Stock clients reject a server that advertises a newer major version.
+	version, err := json.Marshal(postgres.BackupSentinelDto{PgVersion: walSendPostgresMajor(t, bin) * 10000})
+	require.NoError(t, err)
+	putPlainObject(t, folder.GetSubFolder(utility.BaseBackupPath),
+		"base_000000010000000000000001"+utility.SentinelSuffix, version)
 	walFolder := folder.GetSubFolder(utility.WalPath)
 	oldSegment, newSegment := makeWalSendSegmentData(1), makeWalSendSegmentData(2)
 	putPlainObject(t, walFolder, "000000010000000000000001", oldSegment)
@@ -167,7 +181,9 @@ func TestWalSendRealPostgresStandby(t *testing.T) {
 	walSendPostgresSQL(t, ctx, primaryAddress, "SELECT pg_switch_wal()")
 	folder := memory.NewFolder("archive/", memory.NewKVS())
 	walSendArchivePostgresWAL(t, ctx, primary, primaryAddress, folder)
-	sentinel, err := json.Marshal(postgres.BackupSentinelDto{SystemIdentifier: &sysID, PgVersion: 180000, BackupFinishLSN: &finish})
+	sentinel, err := json.Marshal(postgres.BackupSentinelDto{
+		SystemIdentifier: &sysID, PgVersion: walSendPostgresMajor(t, bin) * 10000, BackupFinishLSN: &finish,
+	})
 	require.NoError(t, err)
 	putPlainObject(t, folder.GetSubFolder(utility.BaseBackupPath), "base_000000010000000000000001"+utility.SentinelSuffix, sentinel)
 	archiveAddress := startWalSendTestServer(t, folder, 50*time.Millisecond)
