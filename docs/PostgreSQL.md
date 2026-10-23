@@ -565,7 +565,9 @@ Notes:
   `TestWalSendCLIStandby` additionally requires `WALG_TEST_WALG_BIN` and
   `WALG_TEST_CLI_CONFIG` (a self-contained S3 or filesystem config with a PGP key).
   It runs backup/restore and streaming through the CLI with encrypted LZ4 WAL;
-  Docker CI supplies the S3 service via `wal_send_cli_test.sh`.
+  Docker CI supplies the S3 service via `wal_send_cli_test.sh` and repeats the
+  CLI recovery with 64 MiB WAL on PostgreSQL 14–18. Regular unit CI also checks
+  64 MiB prefetch and the WAL filename rollover at `1/0`.
 
 
 ### ``backup-mark``

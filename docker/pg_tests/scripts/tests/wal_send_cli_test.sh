@@ -8,4 +8,4 @@ trap 'rm -f /tmp/configs/wal_send_cli.json' EXIT
 export WALG_TEST_PG_BIN="/usr/lib/postgresql/${PG_MAJOR}/bin"
 export WALG_TEST_WALG_BIN=/usr/bin/wal-g
 export WALG_TEST_CLI_CONFIG=/tmp/configs/wal_send_cli.json
-/tmp/test_bins/postgres.test -test.run='^TestWalSendCLIStandby$' -test.v -test.timeout=180s
+/tmp/test_bins/postgres.test -test.run='^TestWalSendCLIStandby(64MB)?$' -test.v -test.timeout=300s
