@@ -114,6 +114,10 @@ Removing a sentinel also does not protect a restore that has already read it.
   the decoder to EOF before releasing the final streaming chunk. Serialize late
   prefetch publication with foreground cleanup so consumed files cannot reappear;
   see `wal_send_regression_test.go`.
+- `pg_walfile_name()` maps an exact segment boundary to the preceding file.
+  Archive fixtures that exclude the active WAL must use the insertion LSN + 1
+  and omit future/preallocated files, or they may drop the just-switched segment.
+  See `wal_send_cli_test.go` and `wal_send_postgres_test.go`.
 - Distinguish foreground WAL completion, background work, metadata flushes and
   acknowledgment to PostgreSQL. Trace standalone and daemon paths separately;
   a client timeout is not evidence that all server-side work was cancelled.

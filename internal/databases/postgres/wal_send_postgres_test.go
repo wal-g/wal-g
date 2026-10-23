@@ -138,12 +138,13 @@ func walSendPostgresSQL(t *testing.T, ctx context.Context, address, query string
 
 func walSendArchivePostgresWAL(t *testing.T, ctx context.Context, dir, address string, folder storage.Folder) {
 	t.Helper()
-	current := walSendPostgresSQL(t, ctx, address, "SELECT pg_walfile_name(pg_current_wal_lsn())")
+	current := walSendPostgresSQL(t, ctx, address, "SELECT pg_walfile_name(pg_current_wal_insert_lsn() + 1)")
 	entries, err := os.ReadDir(filepath.Join(dir, "pg_wal"))
 	require.NoError(t, err)
 	for _, entry := range entries {
 		name := entry.Name()
-		if entry.IsDir() || name == current || (len(name) != 24 && !strings.HasSuffix(name, ".history") && !strings.HasSuffix(name, ".partial")) {
+		if entry.IsDir() || (len(name) == 24 && name >= current) ||
+			(len(name) != 24 && !strings.HasSuffix(name, ".history") && !strings.HasSuffix(name, ".partial")) {
 			continue
 		}
 		data, err := os.ReadFile(filepath.Join(dir, "pg_wal", name))
