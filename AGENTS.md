@@ -74,6 +74,11 @@ Removing a sentinel also does not protect a restore that has already read it.
 - Cancellation or a lost response does not imply that an object was not written.
   Test ambiguous success and retries; avoid silently releasing ownership or
   retrying on another destination after an exclusivity conflict.
+- Optional S3 completion reconciliation must confirm the current attempt, not
+  merely object existence: old objects can occupy the same key.
+  `WALG_S3_VERIFY_UPLOAD_ON_NOSUCHUPLOAD` checks atomically published attempt
+  metadata only after `CompleteMultipartUpload` returns `404 NoSuchUpload`.
+  See `pkg/storages/s3/upload_reconcile_test.go` for the lost-success regression.
 - Keep per-storage endpoint discovery, credentials and HTTP transport changes
   isolated. Changing a shared transport can affect an already active primary
   client. Check `pkg/storages/s3/session.go` and its tests.

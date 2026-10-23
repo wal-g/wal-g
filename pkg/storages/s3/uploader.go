@@ -10,11 +10,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 type UploaderConfig struct {
+	VerifyUploadOnNoSuchUpload   bool
 	UploadConcurrency            int
 	MaxPartSize                  int
 	AutoPartSize                 bool
@@ -47,21 +51,31 @@ func createUploader(s3Client *s3.Client, config *UploaderConfig) (*Uploader, err
 		config.RetentionMode,
 		config.RetentionPeriod,
 	)
+	uploader.verifyUploadOnNoSuchUpload = config.VerifyUploadOnNoSuchUpload
+	uploader.headAPI = s3Client
 	uploader.partSize = int64(config.MaxPartSize)
 	uploader.autoPartSize = config.AutoPartSize
 	return uploader, nil
 }
 
+type headObjectAPI interface {
+	HeadObject(context.Context, *s3.HeadObjectInput, ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
+}
+
+const uploadAttemptMetadataKey = "walg-upload-attempt"
+
 type Uploader struct {
-	uploaderAPI          UploaderAPI
-	partSize             int64
-	autoPartSize         bool
-	serverSideEncryption string
-	SSECustomerKey       string
-	SSEKMSKeyID          string
-	StorageClass         string
-	RetentionMode        string
-	RetentionPeriod      time.Duration
+	verifyUploadOnNoSuchUpload bool
+	headAPI                    headObjectAPI
+	uploaderAPI                UploaderAPI
+	partSize                   int64
+	autoPartSize               bool
+	serverSideEncryption       string
+	SSECustomerKey             string
+	SSEKMSKeyID                string
+	StorageClass               string
+	RetentionMode              string
+	RetentionPeriod            time.Duration
 }
 
 func NewUploader(uploaderAPI UploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyID, storageClass,
@@ -114,22 +128,56 @@ func (uploader *Uploader) createUploadInput(bucket, path string, content io.Read
 
 func (uploader *Uploader) upload(ctx context.Context, bucket, path string, content io.Reader) error {
 	input := uploader.createUploadInput(bucket, path, content)
-	if !uploader.autoPartSize {
-		_, err := uploader.uploaderAPI.Upload(ctx, input)
-		return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
+	if uploader.verifyUploadOnNoSuchUpload {
+		// S3 publishes the metadata atomically with the completed object. A fresh
+		// token distinguishes this upload from an old object at the same key.
+		attempt, err := uuid.NewRandom()
+		if err != nil {
+			return errors.Wrap(err, "generate S3 upload attempt ID")
+		}
+		input.Metadata = map[string]string{uploadAttemptMetadataKey: attempt.String()}
 	}
-
-	size, known := uploadSize(content)
-	if !known {
-		_, err := uploader.uploaderAPI.Upload(ctx, input)
-		return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
+	var options []func(*manager.Uploader)
+	if size, known := uploadSize(content); uploader.autoPartSize && known {
+		partSize := max((size+int64(manager.MaxUploadParts)-1)/int64(manager.MaxUploadParts), uploader.partSize)
+		options = append(options, func(o *manager.Uploader) { o.PartSize = partSize })
 	}
-
-	partSize := max((size+int64(manager.MaxUploadParts)-1)/int64(manager.MaxUploadParts), uploader.partSize)
-	_, err := uploader.uploaderAPI.Upload(ctx, input, func(options *manager.Uploader) {
-		options.PartSize = partSize
-	})
+	_, err := uploader.uploaderAPI.Upload(ctx, input, options...)
+	if err != nil && uploader.verifyUploadOnNoSuchUpload && isMissingCompletedUpload(err) {
+		err = uploader.verifyCompletedUpload(ctx, input, err)
+	}
 	return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
+}
+
+// Only reconcile an absent multipart session at completion, never a missing
+// part/session while UploadPart is still running, or an unrelated HTTP 404.
+func isMissingCompletedUpload(err error) bool {
+	var operation *smithy.OperationError
+	var apiErr smithy.APIError
+	var response interface{ HTTPStatusCode() int }
+	return errors.As(err, &operation) && operation.Operation() == "CompleteMultipartUpload" &&
+		errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchUpload" &&
+		errors.As(err, &response) && response.HTTPStatusCode() == 404
+}
+
+func (uploader *Uploader) verifyCompletedUpload(ctx context.Context, input *s3.PutObjectInput, uploadErr error) error {
+	if uploader.headAPI == nil {
+		return uploadErr
+	}
+	output, err := uploader.headAPI.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: input.Bucket, Key: input.Key,
+		SSECustomerAlgorithm: input.SSECustomerAlgorithm,
+		SSECustomerKey:       input.SSECustomerKey, SSECustomerKeyMD5: input.SSECustomerKeyMD5,
+	})
+	if err != nil {
+		return errors.Wrapf(uploadErr, "could not verify completed upload with HeadObject: %v", err)
+	}
+	attempt := input.Metadata[uploadAttemptMetadataKey]
+	if attempt == "" || output == nil || output.Metadata[uploadAttemptMetadataKey] != attempt {
+		return errors.Wrap(uploadErr, "HeadObject did not confirm this upload attempt")
+	}
+	tracelog.WarningLogger.Printf("Confirmed completed S3 upload of %q with HeadObject after NoSuchUpload", aws.ToString(input.Key))
+	return nil
 }
 
 // uploadSize obtains the remaining content size without reading or buffering

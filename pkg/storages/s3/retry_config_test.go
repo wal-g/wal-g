@@ -66,6 +66,7 @@ func TestThrottleDelayBounds(t *testing.T) {
 func TestRejectInvalidRetrySettings(t *testing.T) {
 	for _, tc := range []struct{ key, value string }{
 		{maxRetriesSetting, "-1"}, {maxRetriesSetting, strconv.Itoa(int(^uint(0) >> 1))},
+		{verifyUploadOnNoSuchUploadSetting, "invalid"},
 		{maxRetriesSetting, "invalid"}, {rangeQueriesMaxRetriesSetting, "-1"},
 		{minThrottlingRetryDelaySetting, "-1"}, {maxThrottlingRetryDelaySetting, "0"},
 		{maxThrottlingRetryDelaySetting, "400"}, {maxThrottlingRetryDelaySetting, "9223372036854775807"},

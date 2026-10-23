@@ -476,6 +476,8 @@ var (
 		"WALG_S3_MAX_RETRIES":             true,
 		"WALG_S3_RESPONSE_HEADER_TIMEOUT": true,
 
+		"WALG_S3_VERIFY_UPLOAD_ON_NOSUCHUPLOAD": true,
+
 		// Azure
 		"WALG_AZ_PREFIX":         true,
 		AzureStorageAccount:      true,

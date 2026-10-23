@@ -93,6 +93,23 @@ Set to TRUE to resume interrupted S3 downloads from the last byte read using HTT
 
 When `WALG_S3_RANGE_BATCH_ENABLED` is enabled, limits additional connections over the entire lifetime of one object reader. Default is 10; zero disables reconnection. The budget is not reset after a successful read.
 
+* `WALG_S3_VERIFY_UPLOAD_ON_NOSUCHUPLOAD`
+
+Disabled by default.
+Set to `true` to reconcile `CompleteMultipartUpload` failures with HTTP 404
+and error code `NoSuchUpload`, for example when S3 completed the upload but
+returned a transient error and the SDK retried completion.
+WAL-G adds a unique `walg-upload-attempt` object metadata value to each upload.
+On this specific failure it issues `HeadObject` against the same bucket and key
+and accepts success only if the metadata identifies the current attempt.
+S3 publishes this metadata atomically with the completed object;
+merely finding an existing object is not sufficient.
+This verifies publication of this attempt, not an independent checksum of the payload.
+A missing object, mismatched or missing metadata, or a failed HEAD keeps the upload failed.
+The option requires permission to HEAD the uploaded objects and preserves SSE-C headers.
+It does not resume failed backups or retry the whole upload.
+No extra HEAD requests are made for successful uploads or other errors.
+
 * `WALG_S3_MAX_RETRIES`
 
 Limits additional attempts for each S3 request. Default is 15 (at most 16 total attempts); zero disables request retries. This WAL-G setting, including its default, takes precedence over AWS_MAX_ATTEMPTS and AWS profile retry settings. The SDK retry quota may stop retries before this limit.
