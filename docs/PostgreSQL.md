@@ -49,6 +49,12 @@ To configure how many concurrency streams are reading disk during ```backup-push
 
 Overrides the default `number of WAL files to upload during one scan`. By default, at most 32 WAL files will be uploaded.
 
+In daemon mode (without `WALG_USE_WAL_DELTA`), this bounds discovery batches to
+`TOTAL_BG_UPLOADED_LIMIT - 1` candidates, not total background progress. After the
+first WAL request, the daemon keeps draining ready segments independently of
+further requests. Values at or below 1 disable background uploads. Periodic
+directory passes rediscover failed uploads and late ready files behind the cursor.
+
 * `WALG_SENTINEL_USER_DATA`
 
 This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups. Note: UserData must be a valid JSON string.
@@ -649,7 +655,22 @@ Configuration:
 
 * `WALG_DAEMON_WAL_UPLOAD_TIMEOUT`
 
-Per-archive operation time limit. Operations exceeding it are interrupted. Default `60s`.
+Per-archive request and per-upload time limit. Default `60s`. Background uploads have
+their own deadline starting when they begin; they are not cancelled by a client disconnect.
+
+Without `WALG_USE_WAL_DELTA`, the daemon maintains a shared archival pipeline across
+requests. A successful reply waits for the requested WAL and its metadata, not unrelated
+background uploads. At most `WALG_UPLOAD_CONCURRENCY` WAL uploads run concurrently;
+at most `WALG_UPLOAD_CONCURRENCY - 1` are speculative. Completed uploads are recorded
+in the existing archive status manager and survive daemon restarts. Failed uploads are
+not acknowledged. Background failures are retried with a short delay; PostgreSQL can
+retry a failed foreground request immediately.
+
+Next WAL names are predicted arithmetically and checked for `.ready` status. A bounded,
+streaming directory scan handles gaps and periodically revisits failures and late ready
+files. Directory passes are separated by at least five seconds. Storage selection is repeated for each new upload
+using the existing multi-storage health cache; in-flight uploads are not moved between
+storages. Standalone `wal-push` and WAL delta mode retain their batch lifecycle.
 
 ##### ``walg-daemon-client``
 
