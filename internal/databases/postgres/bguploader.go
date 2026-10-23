@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -131,46 +130,28 @@ func (b *BgUploader) Stop() error {
 // scanAndProcessFiles scans directory for WAL segments and attempts to upload them. It
 // makes best effort attempts to avoid duplicating work (re-uploading files).
 func (b *BgUploader) scanAndProcessFiles() {
+	scanner, err := newWALReadyScanner(b.dir, b.firstWalName, b.maxNumUploaded)
+	if err != nil {
+		tracelog.ErrorLogger.Print("Error configuring parallel WAL scan: ", err)
+		return
+	}
 	fileChan := make(chan string)
 	defer close(fileChan)
 	go b.processFiles(fileChan)
 
-	walName := b.firstWalName
-
-	for i := int32(0); i < b.maxNumUploaded; i++ {
-		var err error
-		walName, err = GetNextWalFilename(walName)
-		if err != nil {
-			break
-		}
-		stat, err := os.Stat(filepath.Join(b.dir, archiveStatusDir, walName+readySuffix))
-		if err != nil {
-			break
-		}
-		select {
-		case <-b.ctx.Done():
-			return
-		case fileChan <- stat.Name():
-		}
-	}
-
 	for {
-		files, err := os.ReadDir(filepath.Join(b.dir, archiveStatusDir))
+		files, err := scanner.candidates(time.Now())
+		for _, name := range files {
+			select {
+			case <-b.ctx.Done():
+				return
+			case fileChan <- name:
+			}
+		}
 		if err != nil {
 			tracelog.ErrorLogger.Print("Error of parallel upload: ", err)
 			return
 		}
-
-		for _, f := range files {
-			select {
-			case <-b.ctx.Done():
-				return
-			case fileChan <- f.Name():
-			}
-		}
-
-		// Sleep 5 seconds before scanning filesystem again. Exit if
-		// BgUploader.Stop() has been invoked.
 		select {
 		case <-b.ctx.Done():
 			return
