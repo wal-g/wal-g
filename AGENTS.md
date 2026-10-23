@@ -125,6 +125,9 @@ Removing a sentinel also does not protect a restore that has already read it.
   PostgreSQL behavior changes.
 - Check Windows behavior rather than assuming Unix error identities. Cross-
   compilation does not execute Windows tests.
+- Sleeping past a timer deadline does not prove its goroutine handled the event.
+  For in-process timer tests, use `testing/synctest` and wait for goroutines to
+  block before changing fixture state; see `replay_applier_test.go` in Mongo stages.
 - Report what actually ran: mocked SDK calls, a real storage service, a real
   PostgreSQL restore and the Docker matrix are different levels of evidence.
   Local green tests do not mean CI is green or a production rollout is proven.

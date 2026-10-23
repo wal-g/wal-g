@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/mock"
@@ -79,32 +80,45 @@ func TestCheckpointingApplierMakesHandledTimestampDurable(t *testing.T) {
 }
 
 func TestCheckpointingApplierWaitsForTransactionBoundary(t *testing.T) {
-	db := clientmocks.NewMongoDriver(t)
-	fsynced := make(chan struct{})
-	db.On("Fsync", mock.Anything).Run(func(mock.Arguments) { close(fsynced) }).Return(nil).Once()
+	synctest.Test(t, func(t *testing.T) {
+		db := clientmocks.NewMongoDriver(t)
+		fsynced := make(chan struct{})
+		db.On("Fsync", mock.Anything).Run(func(mock.Arguments) { close(fsynced) }).Return(nil).Once()
 
-	stub := &replayApplierStub{pending: true}
-	progress := NewReplayProgress(models.Timestamp{TS: 100})
-	applier := NewCheckpointingApplier(db, stub, 10*time.Millisecond, progress,
-		DefaultReplayApplyBatchSize)
-	ops := make(chan *models.Oplog)
-	errC, err := applier.Apply(t.Context(), ops)
-	require.NoError(t, err)
-	ops <- &models.Oplog{TS: models.Timestamp{TS: 101}}
-	time.Sleep(30 * time.Millisecond)
+		stub := &replayApplierStub{pending: true}
+		progress := NewReplayProgress(models.Timestamp{TS: 100})
+		applier := NewCheckpointingApplier(db, stub, 10*time.Millisecond, progress,
+			DefaultReplayApplyBatchSize)
+		ops := make(chan *models.Oplog)
+		errC, err := applier.Apply(t.Context(), ops)
+		require.NoError(t, err)
+		ops <- &models.Oplog{TS: models.Timestamp{TS: 101}}
+		// Advance virtual time and let both timers finish processing while the
+		// transaction is pending. A wall-clock sleep does not establish this.
+		time.Sleep(30 * time.Millisecond)
+		synctest.Wait()
 
-	checkpoint := progress.Snapshot()
-	require.Equal(t, models.Timestamp{TS: 100}, checkpoint.OpTime.TS)
+		applied, ok := stub.LastAppliedOpTime()
+		require.True(t, ok)
+		require.Equal(t, models.Timestamp{TS: 101}, applied.TS)
+		checkpoint := progress.Snapshot()
+		require.Equal(t, models.Timestamp{TS: 100}, checkpoint.OpTime.TS)
+		require.Zero(t, checkpoint.Generation)
+		db.AssertNotCalled(t, "Fsync", mock.Anything)
 
-	stub.setPending(false)
-	ops <- &models.Oplog{TS: models.Timestamp{TS: 102}}
-	select {
-	case <-fsynced:
-	case <-time.After(time.Second):
-		t.Fatal("fsync was not called after transaction boundary")
-	}
-	close(ops)
-	require.NoError(t, <-errC)
+		stub.setPending(false)
+		ops <- &models.Oplog{TS: models.Timestamp{TS: 102}}
+		select {
+		case <-fsynced:
+		case <-time.After(time.Second):
+			t.Fatal("fsync was not called after transaction boundary")
+		}
+		close(ops)
+		require.NoError(t, <-errC)
+		checkpoint = progress.Snapshot()
+		require.Equal(t, models.OpTime{TS: models.Timestamp{TS: 102}, Term: 7}, checkpoint.OpTime)
+		require.Equal(t, uint64(1), checkpoint.Generation)
+	})
 }
 
 func TestCheckpointingApplierBatchesFiftyEntries(t *testing.T) {
