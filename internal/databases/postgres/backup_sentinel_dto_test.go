@@ -27,6 +27,32 @@ func TestNewBackupSentinelDto_SetsWalFileNames(t *testing.T) {
 	assert.Equal(t, "000000030000000000000003", dto.EndWalFileName)
 }
 
+func TestNewBackupSentinelDto_EndWalFileNameBoundary(t *testing.T) {
+	// The stop LSN is exclusive: PostgreSQL uses XLByteToPrevSeg(stoppoint)
+	// when determining which segment must be archived for the backup.
+	tests := []struct {
+		name   string
+		endLSN LSN
+		want   string
+	}{
+		{"before segment boundary", LSN(4*WalSegmentSize - 8), "000000030000000000000003"},
+		{"at segment boundary", LSN(4 * WalSegmentSize), "000000030000000000000003"},
+		{"after segment boundary", LSN(4*WalSegmentSize + 40), "000000030000000000000004"},
+		{"at log boundary", LSN(1 << 32), "0000000300000000000000FF"},
+		{"after log boundary", LSN(1<<32 + 40), "000000030000000100000000"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := &BackupHandler{
+				CurBackupInfo: CurBackupInfo{startLSN: LSN(2*WalSegmentSize + 40), endLSN: tt.endLSN},
+				PgInfo:        BackupPgInfo{Timeline: 3},
+			}
+			dto := NewBackupSentinelDto(handler, nil)
+			assert.Equal(t, tt.want, dto.EndWalFileName)
+		})
+	}
+}
+
 func TestBackupSentinelDto_IsIncremental(t *testing.T) {
 	testFromLSN := LSN(uint64(rand.Uint32())<<32 + uint64(rand.Uint32()))
 	testFrom := "fromString"

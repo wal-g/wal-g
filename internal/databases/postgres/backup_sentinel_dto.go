@@ -44,7 +44,7 @@ func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSent
 	sentinel := BackupSentinelDto{
 		BackupStartLSN:       &bh.CurBackupInfo.startLSN,
 		StartWalFileName:     NewWalSegmentNo(bh.CurBackupInfo.startLSN - 1).GetFilename(bh.PgInfo.Timeline),
-		EndWalFileName:       NewWalSegmentNo(bh.CurBackupInfo.endLSN).GetFilename(bh.PgInfo.Timeline),
+		EndWalFileName:       NewWalSegmentNo(bh.CurBackupInfo.endLSN - 1).GetFilename(bh.PgInfo.Timeline),
 		IncrementFromLSN:     bh.prevBackupInfo.sentinelDto.BackupStartLSN,
 		PgVersion:            bh.PgInfo.PgVersion,
 		TablespaceSpec:       tbsSpec,
