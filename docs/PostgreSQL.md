@@ -212,6 +212,12 @@ WAL-G will check that command argument, environment variable PGDATA and config s
 
 If a backup is started from a standby server, WAL-G will monitor the timeline of the server. If a promotion or timeline change occurs during the backup, the data will be uploaded but not finalized, and WAL-G will exit with an error. The logs will contain the necessary information to finalize the backup, which can then be used if you clearly understand the risks.
 
+Use the ``--wait-for-archive`` flag to wait until every WAL segment required to restore the backup has been uploaded to the selected storage. WAL-G waits before uploading the backup sentinel, so a backup is not reported as complete until its WAL is available. The wait can be interrupted by cancelling the command.
+
+```bash
+wal-g backup-push $PGDATA --wait-for-archive
+```
+
 ``backup-push`` can also be run with the ``--permanent`` flag, which will mark the backup as permanent and prevent it from being removed when running ``delete``.
 
 #### Journal size (WAL volume) accounting
