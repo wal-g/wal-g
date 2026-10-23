@@ -20,6 +20,7 @@ import (
 	"github.com/wal-g/wal-g/internal/compression/none"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/fileparts"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -84,6 +85,7 @@ func TestFilePartsBackupRestore(t *testing.T) {
 					Uploader: uploader,
 					Sentinel: models.Backup{BackupName: backupName, BackupType: "binary"},
 				}
+				backupService.Sentinel.FileParts = maker.FileParts()
 				require.NoError(t, backupService.Finalize(t.Context(), concurrent, &BackupCursorMeta{}, false))
 
 				archiveFolder := folder.GetSubFolder(backupName + internal.TarPartitionFolderName)
@@ -241,14 +243,10 @@ func TestFilePartsComposerConfiguration(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			if test.split {
-				require.IsType(t, &FilePartsTarBallComposerMaker{}, maker)
-			} else {
-				require.IsType(t, &DirDatabaseTarBallComposerMaker{}, maker)
-			}
+			require.Equal(t, test.split, maker.Enabled())
 			composer, err := maker.Make(t.Context(), internal.NewBundle(t.TempDir(), nil, 1024, nil))
 			require.NoError(t, err)
-			_, splitsFiles := composer.(*filePartsTarBallComposer)
+			_, splitsFiles := composer.(*fileparts.TarBallComposer)
 			require.Equal(t, test.split, splitsFiles)
 			baseComposer, err := NewDirDatabaseTarBallComposerMaker().Make(t.Context(), internal.NewBundle(t.TempDir(), nil, 1024, nil))
 			require.NoError(t, err)

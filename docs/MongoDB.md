@@ -43,7 +43,10 @@ Completed parts are preserved during retries within the running
 cleanup and downloads the backup again.
 
 The backup sentinel records one shared part size and the size of each split
-file; each part carries its byte offset and complete file size in PAX records.
+file; each part carries its byte offset and complete file size in the
+database-independent `WAL-G.FileParts.Offset` and `WAL-G.FileParts.FileSize`
+PAX records. The same composer and interpreter wrappers can be used by other
+database integrations with their own file-selection policy.
 Restore writes parts to their original offsets and checks that every expected
 part is present before starting MongoDB. Full and partial restores support split
 files. Restore detects the format automatically; this setting is only needed

@@ -53,6 +53,10 @@ type TarInterpreter interface {
 	Interpret(reader io.Reader, header *tar.Header) error
 }
 
+type finalizingTarInterpreter interface {
+	Finalize() error
+}
+
 type DevNullWriter struct {
 	io.WriteCloser
 	statPrinter sync.Once

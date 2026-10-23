@@ -232,6 +232,7 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 	if err != nil {
 		return err
 	}
+	backupService.Sentinel.FileParts = composerMaker.FileParts()
 
 	if !args.SkipMetadata {
 		if err = metadataCollector.Complete(ctx, tarFileSets); err != nil {
@@ -269,10 +270,6 @@ func (backupService *BackupService) Finalize(ctx context.Context,
 	uploader *internal.ConcurrentUploader, backupCursorMeta *BackupCursorMeta,
 	countJournals bool) error {
 	sentinel := &backupService.Sentinel
-	sentinel.FileParts = nil
-	if composer, ok := uploader.GetTarBallComposer().(*filePartsTarBallComposer); ok && len(composer.fileParts.Files) > 0 {
-		sentinel.FileParts = composer.fileParts
-	}
 	sentinel.FinishLocalTime = utility.TimeNowCrossPlatformLocal()
 	sentinel.UncompressedSize = uploader.UncompressedSize
 	sentinel.CompressedSize = uploader.CompressedSize

@@ -24,6 +24,14 @@ func CreateConcurrentDownloader(uploader Uploader, whitelist *regexp.Regexp) *Co
 }
 
 func (downloader *ConcurrentDownloader) Download(ctx context.Context, backupName, localDirectory string, filter map[string]struct{}) error {
+	return downloader.DownloadWithTarInterpreter(
+		ctx, backupName, localDirectory, filter, NewFileTarInterpreter(localDirectory),
+	)
+}
+
+func (downloader *ConcurrentDownloader) DownloadWithTarInterpreter(ctx context.Context,
+	backupName, localDirectory string, filter map[string]struct{}, tarInterpreter TarInterpreter,
+) error {
 	tarsFolder := downloader.folder.GetSubFolder(strings.Trim(backupName+TarPartitionFolderName, "/"))
 	tarsToExtract, err := downloader.getTarsToExtract(ctx, tarsFolder, filter)
 	if err != nil {
@@ -38,8 +46,13 @@ func (downloader *ConcurrentDownloader) Download(ctx context.Context, backupName
 		return fmt.Errorf("directory '%s' should be empty", localDirectory)
 	}
 
-	tarInterpreter := NewFileTarInterpreter(localDirectory)
-	return ExtractAll(ctx, tarInterpreter, tarsToExtract)
+	if err := ExtractAll(ctx, tarInterpreter, tarsToExtract); err != nil {
+		return err
+	}
+	if finalizer, ok := tarInterpreter.(finalizingTarInterpreter); ok {
+		return finalizer.Finalize()
+	}
+	return nil
 }
 
 func (downloader *ConcurrentDownloader) getTarsToExtract(ctx context.Context,
@@ -49,7 +62,7 @@ func (downloader *ConcurrentDownloader) getTarsToExtract(ctx context.Context,
 		return nil, errors.Wrapf(err, "unable to list '%s'", tarsFolder.GetPath())
 	}
 	if len(subFolders) > 0 {
-		return nil, errors.Wrapf(err, "unknown subfolders in '%s'", tarsFolder.GetPath())
+		return nil, errors.Errorf("unknown subfolders in '%s'", tarsFolder.GetPath())
 	}
 
 	tarsToExtract := make([]ReaderMaker, 0, len(tarObjects))

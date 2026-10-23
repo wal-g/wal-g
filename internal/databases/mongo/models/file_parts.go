@@ -1,6 +1,5 @@
 package models
 
-type FilePartsInfo struct {
-	PartSize int64            `json:"part_size"`
-	Files    map[string]int64 `json:"files"`
-}
+import "github.com/wal-g/wal-g/internal/fileparts"
+
+type FilePartsInfo = fileparts.Info

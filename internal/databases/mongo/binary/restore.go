@@ -2,7 +2,6 @@ package binary
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -11,7 +10,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/utility"
+	"github.com/wal-g/wal-g/internal/fileparts"
 )
 
 var (
@@ -144,35 +143,10 @@ func (restoreService *RestoreService) reconfigMongo(
 
 func (restoreService *RestoreService) downloadFromTarArchives(ctx context.Context,
 	backupName string, filter map[string]struct{}, expectedParts *models.FilePartsInfo) error {
-	folder := restoreService.Uploader.Folder().GetSubFolder(strings.Trim(backupName+internal.TarPartitionFolderName, "/"))
-	objects, subfolders, err := folder.ListFolder(ctx)
-	if err != nil {
-		return errors.Wrap(err, "list MongoDB backup archives")
-	}
-	if len(subfolders) != 0 {
-		return errors.Errorf("unexpected subfolders in MongoDB backup %s", folder.GetPath())
-	}
-	isEmpty, err := utility.IsDirectoryEmpty(restoreService.LocalStorage.MongodDBPath, restoreService.LocalStorage.whitelist)
-	if err != nil {
-		return err
-	}
-	if !isEmpty {
-		return errors.Errorf("directory %s should be empty", restoreService.LocalStorage.MongodDBPath)
-	}
-	archives := make([]internal.ReaderMaker, 0, len(objects))
-	for _, object := range objects {
-		if filter != nil {
-			if _, selected := filter[object.GetName()]; !selected {
-				continue
-			}
-		}
-		archives = append(archives, internal.NewStorageReaderMaker(folder, object.GetName()))
-	}
-	interpreter := NewFilePartsTarInterpreter(restoreService.LocalStorage.MongodDBPath, expectedParts)
-	if err := internal.ExtractAll(ctx, interpreter, archives); err != nil {
-		return err
-	}
-	return interpreter.Validate()
+	directory := restoreService.LocalStorage.MongodDBPath
+	interpreter := fileparts.NewTarInterpreter(directory, internal.NewFileTarInterpreter(directory), expectedParts)
+	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader, restoreService.LocalStorage.whitelist)
+	return downloader.DownloadWithTarInterpreter(ctx, backupName, directory, filter, interpreter)
 }
 
 func (restoreService *RestoreService) fixSystemData(

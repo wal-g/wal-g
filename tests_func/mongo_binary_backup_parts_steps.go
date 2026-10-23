@@ -131,11 +131,11 @@ func (tctx *TestContext) checkMongoBinaryBackupFileParts(backupNumber int, conta
 			if strings.TrimPrefix(header.Name, "/") != strings.TrimPrefix(file.DBPath, "/") {
 				return fmt.Errorf("object %s contains %q, expected %q", objectKey, header.Name, file.DBPath)
 			}
-			offset, err := strconv.ParseInt(header.PAXRecords["WAL-G.MongoDB.FilePartOffset"], 10, 64)
+			offset, err := strconv.ParseInt(header.PAXRecords["WAL-G.FileParts.Offset"], 10, 64)
 			if err != nil {
 				return fmt.Errorf("invalid file part offset in %s: %w", objectKey, err)
 			}
-			fileSize, err := strconv.ParseInt(header.PAXRecords["WAL-G.MongoDB.FileSize"], 10, 64)
+			fileSize, err := strconv.ParseInt(header.PAXRecords["WAL-G.FileParts.FileSize"], 10, 64)
 			if err != nil {
 				return fmt.Errorf("invalid full file size in %s: %w", objectKey, err)
 			}

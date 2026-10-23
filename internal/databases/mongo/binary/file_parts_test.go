@@ -19,6 +19,12 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/fileparts"
+)
+
+const (
+	filePartOffsetPAX = fileparts.OffsetPAX
+	fileSizePAX       = fileparts.FileSizePAX
 )
 
 func TestFilePartsTarInterpreterRestoresBytes(t *testing.T) {
@@ -32,7 +38,7 @@ func TestFilePartsTarInterpreterRestoresBytes(t *testing.T) {
 					data[i] = byte((i*31 + i/partSize) % 251)
 				}
 				directory := t.TempDir()
-				interpreter := NewFilePartsTarInterpreter(directory, &models.FilePartsInfo{
+				interpreter := newFilePartsTestTarInterpreter(directory, &models.FilePartsInfo{
 					PartSize: partSize, Files: map[string]int64{name: int64(size)},
 				})
 
@@ -96,7 +102,7 @@ func TestFilePartsTarInterpreterExtractAllRetriesOnlyFailedObject(t *testing.T) 
 	const name = "/db/collection-1.wt"
 	const data = "ABCDEFGHIJK"
 	directory := t.TempDir()
-	interpreter := NewFilePartsTarInterpreter(directory, &models.FilePartsInfo{
+	interpreter := newFilePartsTestTarInterpreter(directory, &models.FilePartsInfo{
 		PartSize: 4, Files: map[string]int64{name: int64(len(data))},
 	})
 	makers := make([]internal.ReaderMaker, 0, 3)
@@ -132,7 +138,7 @@ func TestFilePartsTarInterpreterRetryPreservesOtherParts(t *testing.T) {
 			const name = "/db/index-1.wt"
 			const data = "ABCDEFGHIJK"
 			directory := t.TempDir()
-			interpreter := NewFilePartsTarInterpreter(directory, &models.FilePartsInfo{
+			interpreter := newFilePartsTestTarInterpreter(directory, &models.FilePartsInfo{
 				PartSize: 4, Files: map[string]int64{name: int64(len(data))},
 			})
 			first := filePartsTestHeader(name, int64(len(data)), 0, 4)
@@ -163,7 +169,7 @@ func TestFilePartsTarInterpreterDetectsMissingData(t *testing.T) {
 	for _, missing := range []string{"first part", "middle part", "last part", "entire file"} {
 		t.Run(missing, func(t *testing.T) {
 			const name = "/collection-1.wt"
-			interpreter := NewFilePartsTarInterpreter(t.TempDir(), &models.FilePartsInfo{
+			interpreter := newFilePartsTestTarInterpreter(t.TempDir(), &models.FilePartsInfo{
 				PartSize: 4, Files: map[string]int64{name: 11},
 			})
 			for i, part := range []string{"ABCD", "EFGH", "IJK"} {
@@ -208,7 +214,7 @@ func TestFilePartsTarInterpreterRejectsInvalidParts(t *testing.T) {
 		{name: "directory with part metadata", modify: func(header *tar.Header) { header.Typeflag = tar.TypeDir }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			interpreter := NewFilePartsTarInterpreter(t.TempDir(), &models.FilePartsInfo{
+			interpreter := newFilePartsTestTarInterpreter(t.TempDir(), &models.FilePartsInfo{
 				PartSize: 4, Files: map[string]int64{name: 11},
 			})
 			header := filePartsTestHeader(name, 11, 0, 4)
@@ -224,7 +230,7 @@ func TestFilePartsTarInterpreterRequiresManifest(t *testing.T) {
 		nil,
 		{PartSize: 4, Files: map[string]int64{"/index-1.wt": 11}},
 	} {
-		interpreter := NewFilePartsTarInterpreter(t.TempDir(), expected)
+		interpreter := newFilePartsTestTarInterpreter(t.TempDir(), expected)
 		require.Error(t, interpreter.Interpret(bytes.NewBufferString("ABCD"),
 			filePartsTestHeader("/collection-1.wt", 11, 0, 4)))
 	}
@@ -232,7 +238,7 @@ func TestFilePartsTarInterpreterRequiresManifest(t *testing.T) {
 
 func TestFilePartsTarInterpreterRejectsUnsplitFileInManifest(t *testing.T) {
 	const name = "/collection-1.wt"
-	interpreter := NewFilePartsTarInterpreter(t.TempDir(), &models.FilePartsInfo{
+	interpreter := newFilePartsTestTarInterpreter(t.TempDir(), &models.FilePartsInfo{
 		PartSize: 4, Files: map[string]int64{name: 11},
 	})
 	header := &tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0600, Size: 11}
@@ -253,7 +259,7 @@ func TestFilePartsTarInterpreterRejectsInvalidManifest(t *testing.T) {
 		{name: "negative file size", partSize: 4, fileSize: -11},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			interpreter := NewFilePartsTarInterpreter(t.TempDir(), &models.FilePartsInfo{
+			interpreter := newFilePartsTestTarInterpreter(t.TempDir(), &models.FilePartsInfo{
 				PartSize: test.partSize, Files: map[string]int64{name: test.fileSize},
 			})
 			require.Error(t, interpreter.Interpret(bytes.NewBufferString("ABCD"), filePartsTestHeader(name, 11, 0, 4)))
@@ -266,7 +272,7 @@ func TestFilePartsTarInterpreterLegacyFiles(t *testing.T) {
 	for _, typeflag := range []byte{tar.TypeReg, tar.TypeRegA} {
 		t.Run(fmt.Sprintf("type=%d", typeflag), func(t *testing.T) {
 			directory := t.TempDir()
-			interpreter := NewFilePartsTarInterpreter(directory, nil)
+			interpreter := newFilePartsTestTarInterpreter(directory, nil)
 			const data = "legacy WiredTiger file"
 			header := &tar.Header{
 				Name: "/db/collection-1.wt", Typeflag: typeflag, Mode: 0600, Size: int64(len(data)),
@@ -288,6 +294,10 @@ func filePartsTestHeader(name string, size, offset, partSize int64) *tar.Header 
 			fileSizePAX:       strconv.FormatInt(size, 10),
 		},
 	}
+}
+
+func newFilePartsTestTarInterpreter(directory string, expected *models.FilePartsInfo) *fileparts.TarInterpreter {
+	return fileparts.NewTarInterpreter(directory, internal.NewFileTarInterpreter(directory), expected)
 }
 
 func filePartsTestArchive(t *testing.T, header *tar.Header, data []byte) []byte {
