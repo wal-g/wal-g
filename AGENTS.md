@@ -136,6 +136,10 @@ Removing a sentinel also does not protect a restore that has already read it.
   race tests for concurrency changes. Use the current Makefile/CI recipes for
   native dependencies and integration tests. Include Greenplum where shared
   PostgreSQL behavior changes.
+- PostgreSQL package test initializers export Viper defaults to the environment.
+  CLI integration tests must isolate inherited configuration variables; otherwise
+  defaults such as `WALG_PG_WAL_SIZE=16` override an explicit 64 MiB config file.
+  See `wal_send_cli_test.go:walSendCLIStandby`.
 - Check Windows behavior rather than assuming Unix error identities. Cross-
   compilation does not execute Windows tests.
 - Report what actually ran: mocked SDK calls, a real storage service, a real
