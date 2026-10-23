@@ -13,6 +13,7 @@ import (
 // TODO: Merge the settings and their default values with ones defined in internal/config.go
 
 const (
+	verifyUploadOnNoSuchUploadSetting = "S3_VERIFY_UPLOAD_ON_NOSUCHUPLOAD"
 	endpointSetting                   = "AWS_ENDPOINT"
 	regionSetting                     = "AWS_REGION"
 	forcePathStyleSetting             = "AWS_S3_FORCE_PATH_STYLE"
@@ -56,6 +57,7 @@ const (
 )
 
 var SettingList = []string{
+	verifyUploadOnNoSuchUploadSetting,
 	endpointPortSetting,
 	endpointSetting,
 	endpointSourceSetting,
@@ -190,6 +192,10 @@ func configureStorage(
 	}
 	_, explicitlyConfiguredPartSize := settings[maxPartSizeSetting]
 	autoPartSize := !explicitlyConfiguredPartSize
+	verifyUpload, err := setting.BoolOptional(settings, verifyUploadOnNoSuchUploadSetting, false)
+	if err != nil {
+		return nil, err
+	}
 	storageClass := defaultStorageClass
 	if class, ok := settings[storageClassSetting]; ok {
 		storageClass = class
@@ -248,6 +254,7 @@ func configureStorage(
 		RequestTimeout:             time.Duration(requestTimeout) * time.Second,
 		LogLevel:                   settings[logLevelSetting],
 		Uploader: &UploaderConfig{
+			VerifyUploadOnNoSuchUpload:   verifyUpload,
 			UploadConcurrency:            uploadConcurrency,
 			MaxPartSize:                  maxPartSize,
 			AutoPartSize:                 autoPartSize,
