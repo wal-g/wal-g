@@ -33,6 +33,13 @@ func InfosWithOptions(ctx context.Context, chs []InfoProvider, options ExecuteOp
 	if err != nil {
 		return err
 	}
+
+	var size int64
+	for _, ch := range chs {
+		size += ch.SrcObj.GetSize()
+	}
+	tracelog.InfoLogger.Printf("Copying %d objects, %d bytes at the source.", len(chs), size)
+
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(defaultRawCopyConcurrency)
 	for _, ch := range chs {
@@ -59,8 +66,9 @@ func (ch *InfoProvider) copyObject(ctx context.Context, retries int) error {
 	}
 
 	tracelog.InfoLogger.Printf(
-		"Copied '%s' from folder '%s' to '%s' in folder '%s'.",
-		ch.SrcObj.GetName(), ch.From.GetPath(), ch.targetName, ch.To.GetPath())
+		"Copied '%s' from folder '%s' to '%s' in folder '%s' (%d bytes at the source).",
+		ch.SrcObj.GetName(), ch.From.GetPath(), ch.targetName, ch.To.GetPath(), ch.SrcObj.GetSize(),
+	)
 	return nil
 }
 
