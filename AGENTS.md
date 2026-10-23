@@ -101,6 +101,19 @@ Removing a sentinel also does not protect a restore that has already read it.
 
 ## WAL pipelines
 
+- Validate `wal-send` with stock PostgreSQL clients as well as `pglogrepl`.
+  `pg_receivewal` requests `SHOW data_directory_mode` and `SHOW wal_segment_size`,
+  and physical `IDENTIFY_SYSTEM` needs a SQL NULL `dbname`, not an empty string.
+  See `wal_send_handler.go:handleQuery`, `handleIdentifySystem` and the opt-in
+  stock-client/standby tests in `wal_send_postgres_test.go`.
+- Physical `XLogData` has no timeline field. A timeline transition requires
+  ending COPY and reporting the successor timeline and switch LSN; changing the
+  storage filename cannot notify the receiver. Validate history and the fork
+  position before selecting a successor (`wal_send_handler.go:run`).
+- A WAL-sized decoded payload can still end with a checksum/read error. Drain
+  the decoder to EOF before releasing the final streaming chunk. Serialize late
+  prefetch publication with foreground cleanup so consumed files cannot reappear;
+  see `wal_send_regression_test.go`.
 - Distinguish foreground WAL completion, background work, metadata flushes and
   acknowledgment to PostgreSQL. Trace standalone and daemon paths separately;
   a client timeout is not evidence that all server-side work was cancelled.

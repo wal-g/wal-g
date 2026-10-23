@@ -2,9 +2,12 @@ package postgres
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/wal-g/tracelog"
@@ -12,7 +15,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-// walPrefetchWindowSize is how many WAL segments ahead of the streaming
+// walPrefetchWindow is how many WAL segments ahead of the streaming
 // position the prefetcher keeps downloaded on the local disk
 const walPrefetchWindow = uint64(100)
 
@@ -21,22 +24,27 @@ const walPrefetchWindow = uint64(100)
 // local disk instead of waiting for the storage. The background loop keeps
 // the window filled, redownloading whatever the stream has consumed.
 type walSendPrefetcher struct {
-	stream   *walSendStream
-	dir      string
-	reader   internal.StorageFolderReader
-	timeline uint32
-	window   uint64
+	stream         *walSendStream
+	dir            string
+	reader         internal.StorageFolderReader
+	timeline       uint32
+	window         uint64
+	mu             sync.Mutex // serializes publication with foreground cleanup
+	consumedBefore uint64
 }
 
 // startWalSendPrefetcher creates the prefetch directory and starts the
-// background download loop. The directory is removed when the context
-// is canceled, i.e. when the replication stream ends.
-func startWalSendPrefetcher(ctx context.Context, st *walSendStream,
-	timeline uint32) (*walSendPrefetcher, error) {
+// background download loop for the given timeline. The returned cancel
+// function stops the loop and removes the prefetch directory: on a timeline
+// switch (which rebinds the prefetcher to another timeline) or when the
+// replication stream ends.
+func startWalSendPrefetcher(parent context.Context, st *walSendStream,
+	timeline uint32) (*walSendPrefetcher, context.CancelFunc, error) {
 	dir, err := os.MkdirTemp("", "walg-wal-send-prefetch-")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	ctx, cancel := context.WithCancel(parent)
 	prefetcher := &walSendPrefetcher{
 		stream:   st,
 		dir:      dir,
@@ -45,7 +53,7 @@ func startWalSendPrefetcher(ctx context.Context, st *walSendStream,
 		window:   walPrefetchWindow,
 	}
 	go prefetcher.loop(ctx)
-	return prefetcher, nil
+	return prefetcher, cancel, nil
 }
 
 func (p *walSendPrefetcher) loop(ctx context.Context) {
@@ -76,6 +84,9 @@ func (p *walSendPrefetcher) fillWindow(ctx context.Context) {
 			return
 		default:
 		}
+		if segNo < uint64(p.stream.pos())/WalSegmentSize {
+			continue // the foreground overtook this window while downloading
+		}
 
 		segmentFileName := formatWALFileName(p.timeline, segNo)
 		if _, err := os.Stat(filepath.Join(p.dir, segmentFileName)); err == nil {
@@ -99,18 +110,38 @@ func (p *walSendPrefetcher) downloadSegment(ctx context.Context, segmentFileName
 	if err != nil {
 		return err // a missing or unreadable segment stops the window fill
 	}
-	defer utilityLoggedClose(segment, segmentFileName)
+	defer func() {
+		if segment != nil {
+			utilityLoggedClose(segment, segmentFileName)
+		}
+	}()
 
 	tmpPath := filepath.Join(p.dir, segmentFileName+".tmp")
+	defer func() { _ = os.Remove(tmpPath) }()
 	file, err := os.Create(tmpPath)
 	if err != nil {
 		return err
 	}
-	_, err = ioCopy(file, segment)
-	utilityLoggedClose(file, tmpPath)
+	n, copyErr := io.Copy(file, segment)
+	err = errors.Join(copyErr, file.Close(), segment.Close())
+	segment = nil
 	if err != nil {
-		_ = os.Remove(tmpPath)
 		return err
+	}
+	if n != int64(WalSegmentSize) {
+		return fmt.Errorf("WAL segment %s has %d bytes, expected %d", segmentFileName, n, WalSegmentSize)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	_, segNo, err := ParseWALFilename(segmentFileName)
+	if err != nil {
+		return err
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if segNo < p.consumedBefore || segNo < uint64(p.stream.pos())/WalSegmentSize {
+		return nil // cleanup won the race; do not resurrect the consumed file
 	}
 	// only complete files are visible to the stream
 	return os.Rename(tmpPath, filepath.Join(p.dir, segmentFileName))
@@ -128,13 +159,16 @@ func (p *walSendPrefetcher) fetch(segmentFileName string) (*os.File, bool) {
 // remove drops the segment file the stream has finished streaming,
 // keeping the prefetch directory bounded
 func (p *walSendPrefetcher) remove(segmentFileName string) {
+	_, segNo, err := ParseWALFilename(segmentFileName)
+	if err != nil {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.consumedBefore = max(p.consumedBefore, segNo+1)
 	_ = os.Remove(filepath.Join(p.dir, segmentFileName))
 }
 
 func utilityLoggedClose(closer io.Closer, what string) {
 	utility.LoggedClose(closer, "wal-send: prefetch "+what)
-}
-
-func ioCopy(dst io.Writer, src io.Reader) (int64, error) {
-	return io.Copy(dst, src)
 }

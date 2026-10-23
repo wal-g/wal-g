@@ -545,13 +545,21 @@ Flags:
 Notes:
 * trust authentication, no TLS; replication slots are accepted and ignored —
   the WAL is served from the storage as-is;
-* `IDENTIFY_SYSTEM` reports the system identifier taken from the latest backup
-  sentinel, the timeline from the backup name and the backup end LSN;
-* WAL segments are opened in the storage directly, one after another — the WAL
-  folder is never listed, which keeps the server fast even on very large
-  archives; a missing segment is retried with the poll interval;
-* when the timeline is exhausted, wal-send waits for further segments of the
-  same timeline; timeline switches require the client to reconnect.
+* `IDENTIFY_SYSTEM` takes the system identifier from the latest backup sentinel
+  and reports the newest compatible archived timeline and that timeline's WAL end;
+* WAL segments and ordinary missing-segment polls use direct object access.
+  Identifying the archive head and negotiating a timeline after finding a
+  `.partial` segment list the WAL folder, which can contain all retained WAL
+  objects. Listings are shared across connections and cached for the poll
+  interval; the retained catalogue contains one entry per timeline;
+* timeline transitions require a readable, valid history file and a fork point
+  compatible with the requested LSN. The server ends COPY at that point and
+  reports the immediate successor timeline and switch LSN. Standard clients can
+  request the next timeline on the same connection. An unavailable history file
+  never authorizes a transition;
+* `SHOW data_directory_mode` and `SHOW wal_segment_size` support stock
+  `pg_receivewal`. Set `WALG_TEST_PG_BIN` to a PostgreSQL `bin` directory to run
+  the opt-in stock-client and real-standby tests in `TestWalSend*`.
 
 
 ### ``backup-mark``

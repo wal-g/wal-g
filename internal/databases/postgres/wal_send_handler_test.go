@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -102,9 +103,7 @@ func TestWalSendServesReplicationProtocol(t *testing.T) {
 	putPlainObject(t, walFolder, "000000010000000000000001", segment1)
 	putLz4Object(t, walFolder, "000000010000000000000002", segment2)
 
-	historyContent := "1\t0/1000000\tno recovery target specified\n"
-	putPlainObject(t, walFolder, "00000002.history", []byte(historyContent))
-
+	historyContent := "1\t0/4000000\tno recovery target specified\n"
 	address := startWalSendTestServer(t, folder, 50*time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
@@ -119,6 +118,7 @@ func TestWalSendServesReplicationProtocol(t *testing.T) {
 	assert.EqualValues(t, 1, sysInfo.Timeline)
 	assert.EqualValues(t, 3*walSendTestSegmentSize, uint64(sysInfo.XLogPos))
 
+	putPlainObject(t, walFolder, "00000002.history", []byte(historyContent))
 	// TIMELINE_HISTORY must serve the .history file as-is, like a real primary does
 	history, err := pglogrepl.TimelineHistory(ctx, conn, 2)
 	require.NoError(t, err)
@@ -308,7 +308,7 @@ func TestWalSendCopyDoneCompletesQuery(t *testing.T) {
 		case *pgproto3.CopyDone:
 			gotCopyDone = true
 		case *pgproto3.CommandComplete:
-			require.Equal(t, "START_REPLICATION", string(m.CommandTag))
+			require.Contains(t, []string{"START_STREAMING", "START_REPLICATION"}, string(m.CommandTag))
 			gotCommandComplete = true
 		case *pgproto3.ReadyForQuery:
 			gotReadyForQuery = true
@@ -405,13 +405,159 @@ func TestWalSendQueryErrorCompletesQuery(t *testing.T) {
 	assert.EqualValues(t, 1, sysInfo.Timeline)
 }
 
-// TestWalSendPartialSegmentFails checks that a segment present in the storage
-// only as .partial fails the stream immediately instead of waiting forever
-func TestWalSendPartialSegmentFails(t *testing.T) {
+// walSendTestReceive receives WAL data until the given number of bytes is
+// streamed, ignoring keepalives and answering keepalive requests.
+// Returns the received WAL payload.
+func walSendTestReceive(t *testing.T, ctx context.Context, conn *pgconn.PgConn, wantBytes int) []byte {
+	t.Helper()
+	received := make([]byte, 0, wantBytes)
+	deadline := time.Now().Add(20 * time.Second)
+	for len(received) < wantBytes {
+		require.True(t, time.Now().Before(deadline), "timed out waiting for WAL data")
+
+		msg, err := conn.ReceiveMessage(ctx)
+		require.NoError(t, err)
+
+		copyData, ok := msg.(*pgproto3.CopyData)
+		if !ok {
+			continue // keepalive or similar, ignore
+		}
+
+		switch copyData.Data[0] {
+		case pglogrepl.XLogDataByteID:
+			xLogData, err := pglogrepl.ParseXLogData(copyData.Data[1:])
+			require.NoError(t, err)
+			received = append(received, xLogData.WALData...)
+		case pglogrepl.PrimaryKeepaliveMessageByteID:
+			keepalive, err := pglogrepl.ParsePrimaryKeepaliveMessage(copyData.Data[1:])
+			require.NoError(t, err)
+			if keepalive.ReplyRequested {
+				err = pglogrepl.SendStandbyStatusUpdate(ctx, conn, pglogrepl.StandbyStatusUpdate{
+					WALWritePosition: keepalive.ServerWALEnd,
+				})
+				require.NoError(t, err)
+			}
+		default:
+			t.Fatalf("unexpected copy data message type %q", copyData.Data[0])
+		}
+	}
+	return received
+}
+
+// walSendTestFinishCopy ends COPY from the client side.
+func walSendTestFinishCopy(t *testing.T, ctx context.Context, conn *pgconn.PgConn) {
+	t.Helper()
+	conn.Frontend().Send(&pgproto3.CopyDone{})
+	require.NoError(t, conn.Frontend().Flush())
+	walSendTestCopyCompletion(t, ctx, conn, 0, "")
+}
+
+// A server-initiated end must wait for the client's CopyDone, report the exact
+// next timeline/LSN, and emit no more CopyData after its own CopyDone.
+func walSendTestCopyCompletion(t *testing.T, ctx context.Context, conn *pgconn.PgConn, next uint32, switchLSN string) {
+	t.Helper()
+	gotCopyDone, gotRow := false, false
+	var tags []string
+	for {
+		msg, err := conn.ReceiveMessage(ctx)
+		require.NoError(t, err)
+		switch m := msg.(type) {
+		case *pgproto3.CopyData:
+			require.False(t, gotCopyDone, "CopyData after CopyDone")
+			require.Equal(t, byte(pglogrepl.PrimaryKeepaliveMessageByteID), m.Data[0])
+		case *pgproto3.CopyDone:
+			require.False(t, gotCopyDone)
+			gotCopyDone = true
+			if next != 0 {
+				require.NoError(t, pglogrepl.SendStandbyStatusUpdate(ctx, conn,
+					pglogrepl.StandbyStatusUpdate{ReplyRequested: true}))
+				conn.Frontend().Send(&pgproto3.CopyDone{})
+				require.NoError(t, conn.Frontend().Flush())
+			}
+		case *pgproto3.RowDescription:
+			require.True(t, gotCopyDone)
+			require.Len(t, m.Fields, 2)
+			require.Equal(t, "next_tli", string(m.Fields[0].Name))
+			require.Equal(t, "next_tli_startpos", string(m.Fields[1].Name))
+		case *pgproto3.DataRow:
+			require.NotZero(t, next)
+			require.Equal(t, [][]byte{[]byte(fmt.Sprint(next)), []byte(switchLSN)}, m.Values)
+			gotRow = true
+		case *pgproto3.CommandComplete:
+			tags = append(tags, string(m.CommandTag))
+		case *pgproto3.ReadyForQuery:
+			require.True(t, gotCopyDone)
+			require.Equal(t, next != 0, gotRow)
+			require.Equal(t, []string{"START_STREAMING", "START_REPLICATION"}, tags)
+			return
+		default:
+			t.Fatalf("unexpected COPY completion message: %#v", msg)
+		}
+	}
+}
+
+func TestWalSendPartialSwitchesToNextTimeline(t *testing.T) {
+	for _, source := range []string{"partial", "full", "descendant"} {
+		t.Run(source, func(t *testing.T) {
+			folder := memory.NewFolder("in_memory/", memory.NewKVS())
+			walFolder := folder.GetSubFolder(utility.WalPath)
+			segment1 := makeWalSendSegmentData(0)
+			segment2 := makeWalSendSegmentData(1)
+			putPlainObject(t, walFolder, "000000010000000000000001", segment1)
+			if source == "partial" {
+				putPlainObject(t, walFolder, "000000010000000000000002.partial", segment2[:walSendTestSegmentSize/2])
+			} else if source == "full" {
+				putPlainObject(t, walFolder, "000000010000000000000002", segment2)
+			}
+			putPlainObject(t, walFolder, "000000020000000000000002", segment2)
+			putPlainObject(t, walFolder, "00000002.history", []byte("1\t0/2800000\tpromotion\n"))
+			address := startWalSendTestServer(t, folder, 50*time.Millisecond)
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+			conn := dialWalSendTestServer(t, ctx, address)
+			defer func() { _ = conn.Close(context.Background()) }()
+			err := pglogrepl.StartReplication(ctx, conn, "test_slot", pglogrepl.LSN(walSendTestSegmentSize),
+				pglogrepl.StartReplicationOptions{Timeline: 1, Mode: pglogrepl.PhysicalReplication})
+			require.NoError(t, err)
+			received := walSendTestReceive(t, ctx, conn, walSendTestSegmentSize+walSendTestSegmentSize/2)
+			expected := append(append([]byte{}, segment1...), segment2[:walSendTestSegmentSize/2]...)
+			require.True(t, bytes.Equal(expected, received), "old timeline must end exactly at its fork point")
+			walSendTestCopyCompletion(t, ctx, conn, 2, "0/2800000")
+			_, err = pglogrepl.TimelineHistory(ctx, conn, 2)
+			require.NoError(t, err, "connection must be reusable after timeline negotiation")
+			err = pglogrepl.StartReplication(ctx, conn, "test_slot", pglogrepl.LSN(2*walSendTestSegmentSize),
+				pglogrepl.StartReplicationOptions{Timeline: 2, Mode: pglogrepl.PhysicalReplication})
+			require.NoError(t, err)
+			received = walSendTestReceive(t, ctx, conn, walSendTestSegmentSize)
+			require.True(t, bytes.Equal(segment2, received))
+			walSendTestFinishCopy(t, ctx, conn)
+		})
+	}
+}
+
+func TestWalSendStartsAtTimelineEndWithoutCopy(t *testing.T) {
+	folder := memory.NewFolder("in_memory/", memory.NewKVS())
+	putPlainObject(t, folder.GetSubFolder(utility.WalPath), "00000007.history", []byte("1\t0/1800123\tpromotion\n5\t0/2800000\tpromotion\n"))
+	address := startWalSendTestServer(t, folder, 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	conn := dialWalSendTestServer(t, ctx, address)
+	defer func() { _ = conn.Close(context.Background()) }()
+	results, err := conn.Exec(ctx, "START_REPLICATION 0/1800123 TIMELINE 1").ReadAll()
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	require.Equal(t, [][]byte{[]byte("5"), []byte("0/1800123")}, results[0].Rows[0])
+}
+
+// TestWalSendPartialWithoutSuccessorWaits checks that a segment present in
+// the storage only as .partial does not fail the stream when no successor
+// timeline is archived yet: the server keeps waiting for the next timeline
+// to show up, sending keepalives, like it does for missing segments
+func TestWalSendPartialWithoutSuccessorWaits(t *testing.T) {
 	folder := memory.NewFolder("in_memory/", memory.NewKVS())
 	walFolder := folder.GetSubFolder(utility.WalPath)
 
-	// the segment was archived only partially: the timeline ended mid-segment
+	// the segment was archived only partially, and no newer timeline exists
 	putPlainObject(t, walFolder, "000000010000000000000001.partial", make([]byte, 100))
 
 	address := startWalSendTestServer(t, folder, 50*time.Millisecond)
@@ -422,27 +568,98 @@ func TestWalSendPartialSegmentFails(t *testing.T) {
 	conn := dialWalSendTestServer(t, ctx, address)
 	defer func() { _ = conn.Close(context.Background()) }()
 
-	startLSN := pglogrepl.LSN(1 * walSendTestSegmentSize)
-	err := pglogrepl.StartReplication(ctx, conn, "test_slot", startLSN,
+	err := pglogrepl.StartReplication(ctx, conn, "test_slot", pglogrepl.LSN(walSendTestSegmentSize),
 		pglogrepl.StartReplicationOptions{Timeline: 1, Mode: pglogrepl.PhysicalReplication})
 	require.NoError(t, err)
 
-	gotError := false
-	deadline := time.Now().Add(5 * time.Second)
-	for !gotError {
-		require.True(t, time.Now().Before(deadline), "timed out waiting for the failure")
-
-		msg, err := conn.ReceiveMessage(ctx)
-		require.NoError(t, err)
+	// the server must send keepalives and no error response while waiting
+	gotKeepalive := false
+	deadline := time.Now().Add(1 * time.Second)
+	for time.Now().Before(deadline) {
+		msgCtx, msgCancel := context.WithTimeout(ctx, 500*time.Millisecond)
+		msg, err := conn.ReceiveMessage(msgCtx)
+		msgCancel()
+		if err != nil {
+			continue // read timeouts are fine here, we just poll for messages
+		}
 		switch m := msg.(type) {
-		case *pgproto3.CopyData:
-			// a keepalive, fine
 		case *pgproto3.ErrorResponse:
-			require.Equal(t, "XX000", m.Code)
-			require.Contains(t, m.Message, "partial")
-			gotError = true
-		default:
-			t.Fatalf("unexpected message %T", msg)
+			t.Fatalf("the stream must wait for the next timeline instead of failing: %s", m.Message)
+		case *pgproto3.CopyData:
+			if m.Data[0] == pglogrepl.PrimaryKeepaliveMessageByteID {
+				gotKeepalive = true
+			} else {
+				t.Fatalf("unexpected WAL data while no successor timeline exists")
+			}
 		}
 	}
+	assert.True(t, gotKeepalive, "the server must send keepalives while waiting for the next timeline")
+}
+
+// TestWalSendPartialRejectsForeignTimeline checks that a newer timeline which
+// does not descend from the streamed one (a fork of another branch) is not
+// streamed: the server keeps waiting. Once the timeline history file proves
+// the candidate descends from the streamed timeline, the switch happens
+func TestWalSendPartialRejectsForeignTimeline(t *testing.T) {
+	folder := memory.NewFolder("in_memory/", memory.NewKVS())
+	walFolder := folder.GetSubFolder(utility.WalPath)
+
+	// a timeline 5 that forked from timeline 4, not from the streamed timeline 1
+	foreignSegment := makeWalSendSegmentData(3)
+	putPlainObject(t, walFolder, "000000010000000000000001.partial", foreignSegment[:walSendTestSegmentSize/2])
+	putPlainObject(t, walFolder, "000000050000000000000001", foreignSegment)
+	putPlainObject(t, walFolder, "00000005.history",
+		[]byte("4\t0/1000000\tlost master\n"))
+
+	address := startWalSendTestServer(t, folder, 50*time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	conn := dialWalSendTestServer(t, ctx, address)
+	defer func() { _ = conn.Close(context.Background()) }()
+
+	err := pglogrepl.StartReplication(ctx, conn, "test_slot", pglogrepl.LSN(walSendTestSegmentSize),
+		pglogrepl.StartReplicationOptions{Timeline: 1, Mode: pglogrepl.PhysicalReplication})
+	require.NoError(t, err)
+
+	// the foreign timeline must not be streamed for a while
+	gotKeepalive := false
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		msgCtx, msgCancel := context.WithTimeout(ctx, 500*time.Millisecond)
+		msg, err := conn.ReceiveMessage(msgCtx)
+		msgCancel()
+		if err != nil {
+			continue
+		}
+		switch m := msg.(type) {
+		case *pgproto3.ErrorResponse:
+			t.Fatalf("the stream must wait for the next timeline instead of failing: %s", m.Message)
+		case *pgproto3.CopyData:
+			if m.Data[0] == pglogrepl.PrimaryKeepaliveMessageByteID {
+				gotKeepalive = true
+			} else {
+				t.Fatalf("timeline 5 (a fork of timeline 4) must not be streamed")
+			}
+		}
+	}
+	assert.True(t, gotKeepalive)
+
+	// the history file is replaced by one proving that timeline 5
+	// descends from timeline 1: now the switch must happen
+	putPlainObject(t, walFolder, "00000005.history",
+		[]byte("1\t0/1800000\tpromotion\n"))
+
+	received := walSendTestReceive(t, ctx, conn, walSendTestSegmentSize/2)
+	require.True(t, bytes.Equal(foreignSegment[:walSendTestSegmentSize/2], received))
+	walSendTestCopyCompletion(t, ctx, conn, 5, "0/1800000")
+	err = pglogrepl.StartReplication(ctx, conn, "test_slot", pglogrepl.LSN(walSendTestSegmentSize),
+		pglogrepl.StartReplicationOptions{Timeline: 5, Mode: pglogrepl.PhysicalReplication})
+	require.NoError(t, err)
+	received = walSendTestReceive(t, ctx, conn, walSendTestSegmentSize)
+	assert.True(t, bytes.Equal(foreignSegment, received),
+		"the streamed WAL must be the whole segment 1 of timeline 5")
+
+	walSendTestFinishCopy(t, ctx, conn)
 }

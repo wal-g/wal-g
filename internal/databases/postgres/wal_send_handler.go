@@ -41,9 +41,11 @@ The implementation follows the PostgreSQL Streaming Replication Protocol
     the client disconnects or the storage runs out of segments;
   - keepalive messages and standby status updates are handled.
 
-NOTE: timeline switches are not streamed over a single connection: when the
-current timeline is exhausted, wal-send keeps waiting for new segments of the
-same timeline. Clients are expected to reconnect with the next timeline.
+Timeline switches end COPY at the switch LSN from a validated history file.
+After the client acknowledges CopyDone, the server reports the immediate next
+timeline and its switch LSN. The client can request that timeline on the same
+connection. Missing history is retried; unreadable or malformed history never
+authorizes a transition.
 */
 
 const (
@@ -100,7 +102,11 @@ func HandleWALSend(ctx context.Context, folder storage.Folder, options WalSendOp
 
 	// warm up the IDENTIFY_SYSTEM cache, so that the first client
 	// does not pay the storage lookups
-	go server.identifySystem(ctx)
+	go func() {
+		if _, err := server.identifySystem(ctx); err != nil {
+			tracelog.WarningLogger.Printf("wal-send: initialize archive identity: %v", err)
+		}
+	}()
 
 	go func() {
 		<-ctx.Done()
@@ -127,85 +133,14 @@ type walSendServer struct {
 	pollInterval time.Duration
 
 	mu              sync.Mutex
-	segments        map[uint32]map[uint64]struct{} // timeline -> segment numbers present in storage
+	identifyMu      sync.Mutex
+	timelines       map[uint32]walSendTimeline
 	listRefreshedAt time.Time
-	minSegment      uint64 // earliest available segment number, 0 if none
-	maxSegment      uint64 // latest available segment number, 0 if none
-	maxTimeline     uint32
-	anyWals         bool
 
 	identify            walSendIdentify
 	identifyValid       bool
 	identifyRefreshedAt time.Time
 	pgVersionMajor      int
-}
-
-// refreshWalSegments lists the WAL folder and rebuilds the segment index,
-// unless it was refreshed recently (to avoid hammering the storage)
-func (s *walSendServer) refreshWalSegments(ctx context.Context) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if time.Since(s.listRefreshedAt) < s.pollInterval && s.segments != nil {
-		return
-	}
-	objects, _, err := s.walFolder.ListFolder(ctx)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("wal-send: list WAL folder: %v", err)
-		return
-	}
-
-	segments := make(map[uint32]map[uint64]struct{})
-	var minSeg, maxSeg uint64
-	var maxTli uint32
-	present := false
-	for _, obj := range objects {
-		baseName := utility.TrimFileExtension(obj.GetName())
-		tli, segNo, ok := TryFetchTimelineAndLogSegNo(baseName)
-		if !ok {
-			continue
-		}
-		if segments[tli] == nil {
-			segments[tli] = make(map[uint64]struct{})
-		}
-		segments[tli][segNo] = struct{}{}
-		if tli > maxTli {
-			maxTli = tli
-		}
-		if !present || segNo < minSeg {
-			minSeg = segNo
-		}
-		if !present || segNo > maxSeg {
-			maxSeg = segNo
-		}
-		present = true
-	}
-
-	s.segments = segments
-	s.listRefreshedAt = time.Now()
-	s.minSegment = minSeg
-	s.maxSegment = maxSeg
-	s.maxTimeline = maxTli
-	s.anyWals = present
-}
-
-// walSendRange describes the currently known WAL boundaries in the storage
-type walSendRange struct {
-	Timeline   uint32
-	MinSegment uint64
-	MaxSegment uint64
-	AnyWals    bool
-}
-
-func (s *walSendServer) walRange() walSendRange {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return walSendRange{
-		Timeline:   s.maxTimeline,
-		MinSegment: s.minSegment,
-		MaxSegment: s.maxSegment,
-		AnyWals:    s.anyWals,
-	}
 }
 
 // walSendIdentify is the reply for the IDENTIFY_SYSTEM command
@@ -215,35 +150,67 @@ type walSendIdentify struct {
 	xlogpos          LSN
 }
 
-// identifySystem builds the reply for the IDENTIFY_SYSTEM command.
-// The values are derived from the latest backup sentinel, which requires
-// no WAL folder listing (listing can be very slow on large archives).
-// If there are no usable backups, it falls back to listing the WAL folder.
-// The result is cached for one poll interval.
-func (s *walSendServer) identifySystem(ctx context.Context) walSendIdentify {
+// identifySystem combines cluster identity from a backup with the current
+// archived timeline and its own end position. A backup is not the archive head.
+func (s *walSendServer) identifySystem(ctx context.Context) (walSendIdentify, error) {
+	s.identifyMu.Lock()
+	defer s.identifyMu.Unlock()
 	s.mu.Lock()
 	if s.identifyValid && time.Since(s.identifyRefreshedAt) < s.pollInterval {
-		defer s.mu.Unlock()
-		return s.identify
+		identify := s.identify
+		s.mu.Unlock()
+		return identify, nil
 	}
 	s.mu.Unlock()
-
-	identify, ok := s.identifyFromBackupSentinel(ctx)
-	if !ok {
-		identify = s.identifyFromWalListing(ctx)
+	identify, haveBackup := s.identifyFromBackupSentinel(ctx)
+	if !haveBackup {
+		identify = walSendIdentify{timeline: 1, systemIdentifier: "0"}
 	}
-
+	if err := s.refreshWalSegments(ctx); err != nil {
+		return walSendIdentify{}, err
+	}
+	// Prefer the newest branch that can contain the selected base backup.
+	for _, timeline := range s.newerTimelines(0) {
+		if haveBackup && timeline < identify.timeline {
+			continue
+		}
+		var history []walSendHistoryEntry
+		if timeline > 1 {
+			var err error
+			history, err = s.readTimelineHistory(ctx, timeline)
+			if _, missing := err.(internal.ArchiveNonExistenceError); missing {
+				continue // history may be uploaded after the segment
+			}
+			if err != nil {
+				return walSendIdentify{}, err
+			}
+		}
+		if haveBackup && timeline != identify.timeline {
+			next := walSendHistorySwitch(history, timeline, identify.timeline)
+			if next == nil || next.lsn < identify.xlogpos {
+				continue
+			}
+		}
+		s.mu.Lock()
+		end := s.timelines[timeline].end
+		s.mu.Unlock()
+		if len(history) > 0 {
+			end = max(end, history[len(history)-1].end)
+		}
+		if haveBackup && timeline == identify.timeline {
+			end = max(end, identify.xlogpos)
+		}
+		identify.timeline, identify.xlogpos = timeline, end
+		break
+	}
 	s.mu.Lock()
-	s.identify = identify
-	s.identifyValid = true
-	s.identifyRefreshedAt = time.Now()
+	s.identify, s.identifyValid, s.identifyRefreshedAt = identify, true, time.Now()
 	s.mu.Unlock()
-	return identify
+	return identify, nil
 }
 
-// identifyFromBackupSentinel derives the IDENTIFY_SYSTEM values from
-// the latest backup sentinel, without listing the WAL folder.
-// Returns false if there is no usable backup.
+// identifyFromBackupSentinel provides cluster identity and the minimum branch
+// position compatible with the latest completed backup.
 func (s *walSendServer) identifyFromBackupSentinel(ctx context.Context) (walSendIdentify, bool) {
 	backup, err := internal.GetLatestBackup(ctx, s.rootFolder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
@@ -266,7 +233,7 @@ func (s *walSendServer) identifyFromBackupSentinel(ctx context.Context) (walSend
 		identify.timeline = timeline
 	}
 
-	// report the backup end position as the current position
+	// Require a successor branch to include the completed backup.
 	switch {
 	case sentinel.BackupFinishLSN != nil:
 		identify.xlogpos = *sentinel.BackupFinishLSN
@@ -290,29 +257,11 @@ func (s *walSendServer) pgVersion() int {
 	return s.pgVersionMajor
 }
 
-// identifyFromWalListing is the fallback IDENTIFY_SYSTEM implementation
-// for storage without backups: it derives the timeline and the position
-// from the latest WAL segment present in the storage
-func (s *walSendServer) identifyFromWalListing(ctx context.Context) walSendIdentify {
-	tracelog.InfoLogger.Printf("wal-send: no usable backups found, " +
-		"IDENTIFY_SYSTEM will be built from a WAL folder listing")
-
-	s.refreshWalSegments(ctx)
-	rang := s.walRange()
-
-	identify := walSendIdentify{timeline: 1, systemIdentifier: "0"}
-	if rang.Timeline > 0 {
-		identify.timeline = rang.Timeline
-	}
-	if rang.AnyWals {
-		identify.xlogpos = LSN((rang.MaxSegment + 1) * WalSegmentSize)
-	}
-	return identify
-}
-
 // handleConnection serves a single replication client
 func (s *walSendServer) handleConnection(ctx context.Context, conn net.Conn) {
 	start := time.Now()
+	stopClose := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stopClose()
 	tracelog.InfoLogger.Printf("wal-send: %s connected to %s", conn.RemoteAddr(), conn.LocalAddr())
 	defer func() {
 		utility.LoggedClose(conn, fmt.Sprintf("wal-send: close connection with %s", conn.RemoteAddr()))
@@ -439,6 +388,8 @@ func (c *walSendClient) handleQuery(ctx context.Context, payload []byte) {
 	}
 
 	switch strings.ToUpper(fields[0]) {
+	case "SHOW":
+		c.handleShow(fields)
 	case "IDENTIFY_SYSTEM":
 		c.handleIdentifySystem(ctx)
 	case "TIMELINE_HISTORY":
@@ -451,7 +402,7 @@ func (c *walSendClient) handleQuery(ctx context.Context, payload []byte) {
 		// accepted and ignored: slot state is not tracked, the WAL is served from the storage as-is
 		_ = c.writeMessages(
 			pgRowDescription("slot_name", "consistent_point", "snapshot_name", "output_plugin"),
-			pgDataRow(slotName, "0/0", "", ""),
+			pgDataRow(slotName, "0/0", nil, nil),
 			pgMessage('C', "CREATE_REPLICATION_SLOT"),
 			pgMessage('Z', byte('I')))
 	case "DROP_REPLICATION_SLOT":
@@ -466,15 +417,37 @@ func (c *walSendClient) handleQuery(ctx context.Context, payload []byte) {
 	}
 }
 
-// handleIdentifySystem replies with the system identifier, current timeline
-// and the position reported by the latest backup sentinel
-// (or the end of the archived WAL when there are no backups)
+func (c *walSendClient) handleShow(fields []string) {
+	if len(fields) != 2 {
+		_ = c.writeQueryError("42601", "SHOW requires one parameter")
+		return
+	}
+	name := strings.ToLower(fields[1])
+	var value string
+	switch name {
+	case "data_directory_mode":
+		value = "0700"
+	case "wal_segment_size":
+		value = fmt.Sprintf("%dMB", WalSegmentSize/(1024*1024))
+	default:
+		_ = c.writeQueryError("42704", fmt.Sprintf("unrecognized configuration parameter %q", name))
+		return
+	}
+	_ = c.writeMessages(pgRowDescription(name), pgDataRow(value),
+		pgMessage('C', "SHOW"), pgMessage('Z', byte('I')))
+}
+
+// handleIdentifySystem reports the cluster identity and the archive head.
 func (c *walSendClient) handleIdentifySystem(ctx context.Context) {
-	identify := c.server.identifySystem(ctx)
+	identify, err := c.server.identifySystem(ctx)
+	if err != nil {
+		_ = c.writeQueryError("XX000", err.Error())
+		return
+	}
 	_ = c.writeMessages(
 		pgRowDescription("systemid", "timeline", "xlogpos", "dbname"),
 		pgDataRow(identify.systemIdentifier, strconv.FormatUint(uint64(identify.timeline), 10),
-			identify.xlogpos.String(), ""),
+			identify.xlogpos.String(), nil),
 		pgMessage('C', "IDENTIFY_SYSTEM"),
 		pgMessage('Z', byte('I')))
 }
@@ -565,89 +538,99 @@ func parseStartReplication(fields []string) (startReplicationArgs, error) {
 	return args, nil
 }
 
-// handleStartReplication enters copy-both mode and streams WAL from the storage.
-// It returns only when the copy is over: gracefully, when the client sends
-// CopyDone and completes the COPY exchange, handing the connection back to the
-// query loop. Every other outcome (client disconnect, Terminate, CopyFail, a
-// fatal storage error or server shutdown) cannot be recovered safely in the
-// middle of a copy, so the connection is closed instead - which also unblocks
-// the copy-mode reader goroutine, the owner of the connection while streaming.
+// handleStartReplication owns the connection until both sides finish COPY.
+// End-of-timeline leaves the connection available for a new START_REPLICATION.
 func (c *walSendClient) handleStartReplication(ctx context.Context, fields []string) {
 	args, err := parseStartReplication(fields)
 	if err != nil {
 		_ = c.writeQueryError("XX000", err.Error())
 		return
 	}
-
-	streamCtx, cancelStream := context.WithCancel(ctx)
-	defer cancelStream()
-
 	stream := newWalSendStream(c, args)
-
-	// enter copy-both mode
-	err = c.writeMessages(pgMessage('W', byte(0), int16(0)))
-	if err != nil {
+	if err := stream.prepare(ctx); err != nil {
+		_ = c.writeQueryError("XX000", err.Error())
 		return
 	}
-
-	// the copy-mode reader owns the connection until the copy is over;
-	// it also stops the stream when the client goes away
+	if stream.nextTimeline != nil && stream.pos() == stream.nextTimeline.lsn {
+		_ = c.completeReplication(stream.nextTimeline)
+		return // exactly at an old timeline's end: do not enter COPY
+	}
+	streamCtx, cancelStream := context.WithCancel(ctx)
+	defer cancelStream()
+	if err := c.writeMessages(pgMessage('W', byte(0), int16(0))); err != nil {
+		return
+	}
 	readerDone := make(chan struct{})
-	clientCopyDone := make(chan struct{}, 1) // graceful CopyDone from the client
+	clientCopyDone := make(chan struct{}, 1)
 	go func() {
 		defer close(readerDone)
 		defer cancelStream()
 		stream.serveClientMessages(streamCtx, clientCopyDone)
 	}()
-
-	// send keepalives while the stream is idle
-	keepaliveDone := stream.startKeepaliveLoop(streamCtx)
-
-	streamErr := stream.run(streamCtx)
-
-	// was the stream stopped by a cancellation (client going away,
-	// server shutdown) rather than a storage failure? Capture this
-	// before stopping the keepalive goroutine below
-	streamCanceled := streamCtx.Err() != nil || errors.Is(streamErr, context.Canceled)
-
-	// distinguish the graceful COPY completion from any other termination
-	graceful := false
+	keepaliveCtx, cancelKeepalive := context.WithCancel(streamCtx)
+	keepaliveDone := stream.startKeepaliveLoop(keepaliveCtx)
+	next, streamErr := stream.run(streamCtx)
+	cancelKeepalive()
+	<-keepaliveDone
+	if next != nil && streamErr == nil {
+		// No CopyData may follow CopyDone, including status-request replies.
+		if err := stream.finishSending(); err != nil {
+			_ = c.conn.Close()
+		}
+		select {
+		case <-readerDone:
+		case <-ctx.Done():
+			_ = c.conn.Close()
+			<-readerDone
+		}
+	}
 	select {
 	case <-clientCopyDone:
-		graceful = true
+		<-readerDone
+		if stream.finishSending() == nil {
+			_ = c.completeReplication(next)
+		}
+		return
 	default:
 	}
-
-	// stop the keepalive goroutine first, then join it:
-	// no one must write to the client by the time the result is reported
-	cancelStream()
-	<-keepaliveDone
-
-	if graceful {
-		// the client ended the copy: the reader has already returned on the
-		// first CopyDone, so the connection can be handed back to the query
-		// loop. Finish the COPY-both exchange as the protocol requires.
-		<-readerDone
-		_ = c.writeMessages(
-			pgMessageFromBytes('c', nil),
-			pgMessage('C', "START_REPLICATION"),
-			pgMessage('Z', byte('I')))
-		return
-	}
-
-	if streamErr != nil && !streamCanceled && ctx.Err() == nil {
-		// a fatal stream error with a live client: report it.
-		// A truncated or unreadable segment must surface as an
-		// ErrorResponse, never as a successful CommandComplete.
-		tracelog.ErrorLogger.Printf("wal-send: %s: the replication stream failed: %v",
-			c.conn.RemoteAddr(), streamErr)
+	if streamErr != nil && streamCtx.Err() == nil && !errors.Is(streamErr, context.Canceled) {
+		tracelog.ErrorLogger.Printf("wal-send: %s: the replication stream failed: %v", c.conn.RemoteAddr(), streamErr)
 		_ = c.writeQueryError("XX000", streamErr.Error())
 	}
-
-	// end the connection; this also unblocks the reader goroutine,
-	// so it can be joined before this handler returns
 	_ = c.conn.Close()
 	<-readerDone
+}
+
+func (c *walSendClient) completeReplication(next *walSendTimelineSwitch) error {
+	var msgs [][]byte
+	if next != nil {
+		msgs = append(msgs, pgRowDescription("next_tli", "next_tli_startpos"),
+			pgDataRow(strconv.FormatUint(uint64(next.timeline), 10), next.lsn.String()))
+	}
+	// PostgreSQL sends a completion for streaming and for the command itself.
+	return c.writeMessages(append(msgs, pgMessage('C', "START_STREAMING"),
+		pgMessage('C', "START_REPLICATION"), pgMessage('Z', byte('I')))...)
+}
+
+func (st *walSendStream) finishSending() error {
+	c := st.client
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	if st.sendingDone {
+		return nil
+	}
+	st.sendingDone = true
+	return c.writeMessagesLocked(pgMessageFromBytes('c', nil))
+}
+
+func (st *walSendStream) sendKeepalive(replyRequested bool) error {
+	c := st.client
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	if st.sendingDone {
+		return nil
+	}
+	return c.writeMessagesLocked(pgKeepaliveMsg(st.pos(), replyRequested))
 }
 
 // pos returns the current streaming position
@@ -670,9 +653,12 @@ func walSendPageSize() uint64 {
 
 // walSendStream streams WAL to a single client over an established copy-both mode
 type walSendStream struct {
-	client   *walSendClient
-	args     startReplicationArgs
-	pageSize uint64
+	client       *walSendClient
+	args         startReplicationArgs
+	pageSize     uint64
+	timelineID   uint32
+	nextTimeline *walSendTimelineSwitch
+	sendingDone  bool // protected by client.writeMu
 
 	// writePos is shared by the streaming and keepalive goroutines
 	mu       sync.Mutex
@@ -691,97 +677,116 @@ func newWalSendStream(c *walSendClient, args startReplicationArgs) *walSendStrea
 	return &walSendStream{client: c, args: args, pageSize: pageSize}
 }
 
-// timeline returns the timeline to stream: the one requested explicitly
-// or the one reported by the latest backup sentinel (no WAL folder listing)
-func (st *walSendStream) timeline(ctx context.Context) uint32 {
-	if st.args.explicitTimeli {
-		return st.args.timeline
+func (st *walSendStream) prepare(ctx context.Context) error {
+	identify, err := st.client.server.identifySystem(ctx)
+	if err != nil {
+		return err
 	}
-	return st.client.server.identifySystem(ctx).timeline
+	st.timelineID = identify.timeline
+	if st.args.explicitTimeli && st.args.timeline != 0 {
+		st.timelineID = st.args.timeline
+	}
+	pos := st.args.startLSN
+	if pos == 0 {
+		pos = identify.xlogpos
+	}
+	st.nextTimeline, err = st.findSuccessorTimeline(ctx, st.timelineID, pos)
+	if err != nil {
+		return err
+	}
+	if st.nextTimeline == nil || st.nextTimeline.lsn != pos {
+		pos = LSN(uint64(pos) / st.pageSize * st.pageSize)
+	}
+	st.setPos(pos)
+	return nil
 }
 
-// run streams WAL segments from the storage until the context is canceled
-// or a fatal error occurs. Segments are opened in the storage directly, one
-// after another, without listing the WAL folder. When the next segment is
-// not in the storage yet, it is retried with the configured poll interval.
-// The error, if any, is handled by the caller: reporting it mid-stream is
-// racy, as the keepalive goroutine may still be writing to the client.
-func (st *walSendStream) run(ctx context.Context) error {
-	c := st.client
-	server := c.server
-	timeline := st.timeline(ctx)
-
-	if st.args.startLSN == 0 {
-		// the client asked to start at the current position, i.e.
-		// the position reported by the latest backup sentinel
-		st.setPos(st.client.server.identifySystem(ctx).xlogpos)
-	} else {
-		// align the start position to the page boundary
-		st.setPos(LSN(uint64(st.args.startLSN) / st.pageSize * st.pageSize))
-	}
-
-	tracelog.InfoLogger.Printf("wal-send: %s started replication at %s, timeline %d",
-		c.conn.RemoteAddr(), st.pos(), timeline)
-
-	// download segments ahead of the streaming position in the background,
-	// so that the stream reads from the local disk. The prefetch directory
-	// is removed when this context is canceled, i.e. when the copy ends
-	prefetcher, err := startWalSendPrefetcher(ctx, st, timeline)
+// run keeps one timeline throughout COPY. It reads the old timeline only up to
+// the validated fork point, then lets the handler perform timeline negotiation.
+func (st *walSendStream) run(ctx context.Context) (*walSendTimelineSwitch, error) {
+	c, server, timeline := st.client, st.client.server, st.timelineID
+	prefetcher, cancelPrefetch, err := startWalSendPrefetcher(ctx, st, timeline)
 	if err != nil {
-		tracelog.WarningLogger.Printf("wal-send: failed to start WAL prefetching (%v), "+
-			"will read the segments from the storage directly", err)
+		tracelog.WarningLogger.Printf("wal-send: start prefetching: %v; reading directly", err)
 	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
+	defer func() {
+		if cancelPrefetch != nil {
+			cancelPrefetch()
 		}
-
+	}()
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		pos := st.pos()
+		if st.nextTimeline != nil && pos == st.nextTimeline.lsn {
+			return st.nextTimeline, nil
+		}
 		segNo := uint64(pos) / WalSegmentSize
-		segmentFileName := formatWALFileName(timeline, segNo)
-
-		segment, fromPrefetch := st.fetchPrefetched(prefetcher, segmentFileName)
+		name := formatWALFileName(timeline, segNo)
+		segment, fromPrefetch := st.fetchPrefetched(prefetcher, name)
 		if segment == nil {
-			segment, err = internal.DownloadAndDecompressStorageFile(ctx, server.reader, segmentFileName)
-			if err != nil {
-				if _, notExist := err.(internal.ArchiveNonExistenceError); notExist {
-					// a segment archived as .partial never becomes complete:
-					// the timeline ended before the segment was finished.
-					// Fail immediately instead of polling forever
-					partialExists, partialErr := internal.StorageFileExists(ctx, server.reader,
-						segmentFileName+".partial")
-					if partialErr == nil && partialExists {
-						return fmt.Errorf("WAL segment %s exists in the storage only as a partial file: "+
-							"the timeline ended, reconnect with the next timeline", segmentFileName)
+			segment, err = internal.DownloadAndDecompressStorageFile(ctx, server.reader, name)
+			if _, missing := err.(internal.ArchiveNonExistenceError); missing {
+				if st.nextTimeline == nil {
+					partial, probeErr := internal.StorageFileExists(ctx, server.reader, name+".partial")
+					if probeErr != nil {
+						return nil, probeErr
 					}
-					// the segment is not in the storage yet,
-					// retry the direct download after the poll interval
-					st.waitOnePoll(ctx, segmentFileName)
+					if !partial {
+						// Ordinary archive-head polling must remain direct object
+						// access, without repeatedly listing the entire archive.
+						st.waitOnePoll(ctx, name)
+						continue
+					}
+					st.nextTimeline, err = st.findSuccessorTimeline(ctx, timeline, pos)
+					if err != nil {
+						return nil, err
+					}
+				}
+				if st.nextTimeline != nil {
+					if pos == st.nextTimeline.lsn {
+						return st.nextTimeline, nil
+					}
+					// Both the partial file and the descendant's complete segment
+					// contain the ancestor's bytes before the validated fork.
+					segment, err = internal.DownloadAndDecompressStorageFile(ctx, server.reader, name+".partial")
+					if _, missing := err.(internal.ArchiveNonExistenceError); missing {
+						segment, err = internal.DownloadAndDecompressStorageFile(ctx, server.reader,
+							formatWALFileName(st.nextTimeline.sourceTimeline, segNo))
+					}
+				} else {
+					st.waitOnePoll(ctx, name)
 					continue
 				}
-				return fmt.Errorf("read the WAL segment %s from the storage: %w", segmentFileName, err)
+			}
+			if _, missing := err.(internal.ArchiveNonExistenceError); missing {
+				st.waitOnePoll(ctx, name)
+				continue
+			}
+			if err != nil {
+				return nil, fmt.Errorf("read WAL segment %s: %w", name, err)
 			}
 		}
-
-		tracelog.InfoLogger.Printf("wal-send: %s: streaming WAL segment %s (segment #%d, position %s, timeline %d)%s",
-			c.conn.RemoteAddr(), segmentFileName, segNo, pos, timeline, prefetchSource(fromPrefetch))
-
+		tracelog.InfoLogger.Printf("wal-send: %s: streaming WAL segment %s at %s%s",
+			c.conn.RemoteAddr(), name, pos, prefetchSource(fromPrefetch))
 		offset := uint64(pos) % WalSegmentSize
-		err = st.streamSegment(ctx, segment, offset)
-		utility.LoggedClose(segment, "wal-send: close segment "+segmentFileName)
+		end := WalSegmentSize
+		if st.nextTimeline != nil {
+			end = min(end, uint64(st.nextTimeline.lsn)-segNo*WalSegmentSize)
+		}
+		err = st.streamSegment(ctx, segment, offset, end)
+		closeErr := segment.Close()
+		if err == nil {
+			err = closeErr
+		}
 		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			return fmt.Errorf("stream the WAL segment %s: %w", segmentFileName, err)
+			return nil, fmt.Errorf("stream WAL segment %s: %w", name, err)
 		}
+		st.setPos(LSN(segNo*WalSegmentSize + end))
 		if prefetcher != nil {
-			prefetcher.remove(segmentFileName)
+			prefetcher.remove(name)
 		}
-		st.setPos(LSN((segNo + 1) * WalSegmentSize))
 	}
 }
 
@@ -820,42 +825,55 @@ func (st *walSendStream) waitOnePoll(ctx context.Context, segmentFileName string
 	}
 }
 
-// streamSegment sends the contents of one WAL segment to the client
-// in messages that contain whole pages and never cross the segment boundary
-func (st *walSendStream) streamSegment(ctx context.Context, segment io.Reader, offset uint64) error {
-	if offset > 0 {
-		if _, err := io.CopyN(io.Discard, segment, int64(offset)); err != nil {
-			return fmt.Errorf("skip %d bytes of the segment: %w", offset, err)
-		}
+// walSendErrorReader preserves errors returned together with a full chunk;
+// io.ReadFull otherwise drops such errors once its requested size is satisfied.
+type walSendErrorReader struct {
+	io.Reader
+	err error
+}
+
+func (r *walSendErrorReader) Read(p []byte) (int, error) {
+	n, err := r.Reader.Read(p)
+	if err != nil && err != io.EOF {
+		r.err = err
 	}
+	return n, err
+}
 
-	// offset is page-aligned, so remaining is a whole number of pages
-	remaining := WalSegmentSize - offset
+// Validate the decoder's EOF/checksum before releasing the last chunk, so a
+// corrupt download cannot become a complete segment on the receiving side.
+func (st *walSendStream) streamSegment(ctx context.Context, segment io.Reader, offset, end uint64) error {
+	r := &walSendErrorReader{Reader: segment}
+	if _, err := io.CopyN(io.Discard, r, int64(offset)); err != nil || r.err != nil {
+		return fmt.Errorf("skip segment prefix: %w", errors.Join(err, r.err))
+	}
+	remaining := end - offset
 	buf := make([]byte, MaxWalSendChunkSize)
-	pos := st.pos()
 	for remaining > 0 {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
+		if err := ctx.Err(); err != nil {
+			return err
 		}
-
-		// both remaining and the buffer size are multiples of the page size,
-		// so every chunk contains whole pages
 		chunk := buf[:min(remaining, uint64(len(buf)))]
-
-		_, err := io.ReadFull(segment, chunk)
-		if err != nil {
-			return fmt.Errorf("read segment data: %w", err)
+		if _, err := io.ReadFull(r, chunk); err != nil || r.err != nil {
+			return fmt.Errorf("read segment data: %w", errors.Join(err, r.err))
 		}
-
+		if remaining == uint64(len(chunk)) {
+			// Reading beyond the requested range is necessary for a compressed
+			// partial segment too: its checksum covers the entire stored file.
+			n, err := io.Copy(io.Discard, io.LimitReader(r, int64(WalSegmentSize-end)+1))
+			if err != nil || r.err != nil {
+				return fmt.Errorf("finalize segment: %w", errors.Join(err, r.err))
+			}
+			if uint64(n) > WalSegmentSize-end {
+				return fmt.Errorf("WAL segment exceeds %d bytes", WalSegmentSize)
+			}
+		}
+		pos := st.pos()
 		walEnd := pos + LSN(len(chunk))
-		err = st.client.writeMessages(pgXLogDataMsg(pos, walEnd, chunk))
-		if err != nil {
+		if err := st.client.writeMessages(pgXLogDataMsg(pos, walEnd, chunk)); err != nil {
 			return err
 		}
 		st.setPos(walEnd)
-		pos = walEnd
 		remaining -= uint64(len(chunk))
 	}
 	return nil
@@ -872,7 +890,7 @@ func (st *walSendStream) startKeepaliveLoop(ctx context.Context) <-chan struct{}
 			case <-ctx.Done():
 				return
 			case <-time.After(st.client.server.pollInterval):
-				_ = st.client.writeMessages(pgKeepaliveMsg(st.pos(), true))
+				_ = st.sendKeepalive(true)
 			}
 		}
 	}()
@@ -938,7 +956,7 @@ func (st *walSendStream) handleCopyData(payload []byte) {
 		c.conn.RemoteAddr(), walFlushPos, replyRequested)
 
 	if replyRequested {
-		_ = c.writeMessages(pgKeepaliveMsg(st.pos(), false))
+		_ = st.sendKeepalive(false)
 	}
 }
 
@@ -1000,11 +1018,16 @@ func pgColumnDescription(name string) []byte {
 	return body
 }
 
-func pgDataRow(values ...string) []byte {
+func pgDataRow(values ...any) []byte {
 	var body []byte
 	body = binary.BigEndian.AppendUint16(body, uint16(len(values)))
 	for _, value := range values {
-		body = append(binary.BigEndian.AppendUint32(body, uint32(len(value))), value...)
+		if value == nil {
+			body = binary.BigEndian.AppendUint32(body, 0xFFFFFFFF)
+			continue
+		}
+		text := value.(string)
+		body = append(binary.BigEndian.AppendUint32(body, uint32(len(text))), text...)
 	}
 	return pgMessageFromBytes('D', body)
 }
@@ -1068,6 +1091,10 @@ func currentPgTime() uint64 {
 func (c *walSendClient) writeMessages(msgs ...[]byte) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+	return c.writeMessagesLocked(msgs...)
+}
+
+func (c *walSendClient) writeMessagesLocked(msgs ...[]byte) error {
 	for _, msg := range msgs {
 		_, err := c.writer.Write(msg)
 		if err != nil {
