@@ -2,6 +2,8 @@
 
 WAL-G can store backups in S3, Google Cloud Storage, Azure, Alicloud, Swift, remote host (via SSH) or local file system. 
 
+Binaries include every storage by default. To build WAL-G with only some storages, see [Selecting storages](README.md#selecting-storages).
+
 S3
 -----------
 
