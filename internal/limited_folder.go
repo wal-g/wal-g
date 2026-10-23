@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bytes"
 	"context"
 	"io"
 
@@ -38,6 +39,20 @@ func (lf *LimitedFolder) ReadObject(ctx context.Context, objectRelativePath stri
 func (lf *LimitedFolder) PutObject(ctx context.Context, name string, content io.Reader) error {
 	limitedReader := limiters.NewReader(ctx, content, lf.limiter)
 	return lf.Folder.PutObject(ctx, name, limitedReader)
+}
+
+func (lf *LimitedFolder) SupportsCreateObject() bool {
+	return storage.SupportsCreateObject(lf.Folder)
+}
+
+func (lf *LimitedFolder) CreateObject(ctx context.Context, name string, content []byte) error {
+	// Reservations are small buffered objects. Account for their bytes before
+	// delegating the indivisible conditional write to the underlying storage.
+	_, err := io.Copy(io.Discard, limiters.NewReader(ctx, bytes.NewReader(content), lf.limiter))
+	if err != nil {
+		return err
+	}
+	return storage.CreateObject(ctx, lf.Folder, name, content)
 }
 
 // SetShowAllVersions delegates the "show all versions" toggle to the underlying folder (if supported).

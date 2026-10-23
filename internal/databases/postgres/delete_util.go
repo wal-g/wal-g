@@ -70,6 +70,11 @@ func GetPermanentBackupsAndWals(ctx context.Context, folder storage.Folder) (map
 }
 
 func IsPermanent(objectName, storageName string, permanentBackups, permanentWals map[PermanentObject]bool) bool {
+	// Recursive listings of filesystem subfolders can prepend a slash to
+	// relative names, including when deleting a Greenplum segment's backups.
+	if strings.HasPrefix(strings.TrimLeft(objectName, "/"), backupReservationsPath+"/") {
+		return true
+	}
 	if strings.HasPrefix(objectName, utility.WalPath) && len(objectName) >= len(utility.WalPath)+24 {
 		wal := PermanentObject{
 			Name:        objectName[len(utility.WalPath) : len(utility.WalPath)+24],

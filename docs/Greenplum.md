@@ -68,6 +68,10 @@ Usage
 
 ### ``backup-push``
 
+On S3 and filesystem storage, segment backups automatically use
+[backup name reservations](PostgreSQL.md#backup-name-reservation).
+Names are reserved separately for each segment.
+
 After the successful configuration, use the `backup-push` command from the coordinator host to create a new backup.  
 
 ```bash
