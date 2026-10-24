@@ -101,6 +101,39 @@ Removing a sentinel also does not protect a restore that has already read it.
 
 ## WAL pipelines
 
+- Keep one `pgproto3.Backend` per `wal-send` connection, including startup and
+  COPY: it can buffer the next query while reading CopyDone. Hand reading back
+  to the command loop only after the COPY reader exits, and serialize each
+  `Send`/`Flush` batch with `writeMu`. Preserve `SetMaxBodyLen` when constructing
+  the backend. See `wal_send_protocol_test.go`.
+- Validate `wal-send` with stock PostgreSQL clients as well as `pglogrepl`.
+  `pg_receivewal` requests `SHOW data_directory_mode` and `SHOW wal_segment_size`,
+  and physical `IDENTIFY_SYSTEM` needs a SQL NULL `dbname`, not an empty string.
+  See `wal_send_handler.go:handleQuery`, `handleIdentifySystem` and the opt-in
+  stock-client/standby tests in `wal_send_postgres_test.go`.
+- Physical `XLogData` has no timeline field. A timeline transition requires
+  ending COPY and reporting the successor timeline and switch LSN; changing the
+  storage filename cannot notify the receiver. Validate history and the fork
+  position before selecting a successor (`wal_send_handler.go:run`).
+- Live timeline discovery cannot require an old-timeline `.partial`: promotion
+  at a segment boundary creates none. While waiting for missing WAL, refresh
+  archive identity through the shared cache every 12 polling intervals; keep
+  this slower than individual WAL polls. See `wal_send_regression_test.go`
+  (`TestWalSendLiveTimelineSwitchWithoutPartial`,
+  `TestWalSendIdleTimelineDiscoverySharesRefresh`).
+- A WAL-sized decoded payload can still end with a checksum/read error. Drain
+  the decoder to EOF before releasing the final streaming chunk. Serialize late
+  prefetch publication with foreground cleanup so consumed files cannot reappear;
+  see `wal_send_regression_test.go`.
+- `pg_walfile_name()` maps an exact segment boundary to the preceding file.
+  Archive fixtures that exclude the active WAL must use the insertion LSN + 1
+  and omit future/preallocated files, or they may drop the just-switched segment.
+  Perform that addition in Go: PostgreSQL 10 lacks SQL `pg_lsn + integer`.
+  See `wal_send_cli_test.go` and `wal_send_postgres_test.go`.
+- Promotion may finish before its checkpoint recycles old WAL. In standby test
+  fixtures, finish that checkpoint before generating the new WAL to archive;
+  otherwise `pg_wal` entries can disappear between `ReadDir` and `ReadFile`.
+  See `wal_send_postgres_test.go:TestWalSendRealPostgresStandby`.
 - Distinguish foreground WAL completion, background work, metadata flushes and
   acknowledgment to PostgreSQL. Trace standalone and daemon paths separately;
   a client timeout is not evidence that all server-side work was cancelled.
@@ -123,6 +156,15 @@ Removing a sentinel also does not protect a restore that has already read it.
   race tests for concurrency changes. Use the current Makefile/CI recipes for
   native dependencies and integration tests. Include Greenplum where shared
   PostgreSQL behavior changes.
+- PostgreSQL package test initializers export Viper defaults to the environment.
+  CLI integration tests must isolate inherited configuration variables; otherwise
+  defaults such as `WALG_PG_WAL_SIZE=16` override an explicit 64 MiB config file.
+  See `wal_send_cli_test.go:walSendCLIStandby`.
+- A compiled Go test binary still runs all package initializers with `-test.run`.
+  PostgreSQL's pagefile fixtures load `../../../test/testdata` before any test;
+  ship those files with the binary and preserve its package-relative working
+  directory. `docker/pg_tests/Dockerfile_prefix` checks that runtime layout with
+  `postgres.test -test.run='^$'` during the image build.
 - Check Windows behavior rather than assuming Unix error identities. Cross-
   compilation does not execute Windows tests.
 - Report what actually ran: mocked SDK calls, a real storage service, a real
