@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/mongodb/mongo-tools/common/util"
@@ -38,18 +39,24 @@ func (pmc *PartialMetadataCollector) EnrichWithTarPaths(tarPaths map[string][]st
 
 	for dbName, dbInfo := range pmc.routes.Databases {
 		for colName, colInfo := range dbInfo {
-			colTarPath, ok := getFromTarFilesSet(colInfo.DBPath, tarFilesSet, visited)
+			colTarPaths, ok := getFromTarFilesSet(colInfo.DBPath, tarFilesSet, visited)
 			if !ok {
 				return errors.Errorf("file %s not found in tar directory", colInfo.DBPath)
 			}
-			colInfo.TarPath = colTarPath
+			colInfo.TarPath = colTarPaths[0]
+			if len(colTarPaths) > 1 {
+				colInfo.TarPaths = colTarPaths
+			}
 
 			for indexName, indexInfo := range colInfo.IndexInfo {
-				indTarPath, ok := getFromTarFilesSet(indexInfo.DBPath, tarFilesSet, visited)
+				indTarPaths, ok := getFromTarFilesSet(indexInfo.DBPath, tarFilesSet, visited)
 				if !ok {
 					return errors.Errorf("file %s not found in tar directory", indexInfo.DBPath)
 				}
-				indexInfo.TarPath = indTarPath
+				indexInfo.TarPath = indTarPaths[0]
+				if len(indTarPaths) > 1 {
+					indexInfo.TarPaths = indTarPaths
+				}
 				colInfo.IndexInfo[indexName] = indexInfo
 			}
 
@@ -57,15 +64,29 @@ func (pmc *PartialMetadataCollector) EnrichWithTarPaths(tarPaths map[string][]st
 		}
 	}
 
+	pmc.enrichServiceTarPaths(tarFilesSet, visited)
+	return nil
+}
+
+func (pmc *PartialMetadataCollector) enrichServiceTarPaths(tarFilesSet SetMap, visited map[string]struct{}) {
+	serviceTarPaths := make(map[string][]string)
 	for tarFile, tarFileSet := range tarFilesSet {
 		if _, ok := visited[tarFile]; !ok {
 			for dbFile := range tarFileSet {
-				pmc.routes.Service[dbFile] = tarFile
+				serviceTarPaths[dbFile] = append(serviceTarPaths[dbFile], tarFile)
 			}
 		}
 	}
-
-	return nil
+	for dbFile, tarPaths := range serviceTarPaths {
+		sort.Strings(tarPaths)
+		pmc.routes.Service[dbFile] = tarPaths[0]
+		if len(tarPaths) > 1 {
+			if pmc.routes.ServiceTarPaths == nil {
+				pmc.routes.ServiceTarPaths = make(map[string][]string)
+			}
+			pmc.routes.ServiceTarPaths[dbFile] = tarPaths
+		}
+	}
 }
 
 func (pmc *PartialMetadataCollector) HandleNsInfo(nsInfo *models.NsInfo) {
@@ -95,14 +116,16 @@ func getFromTarFilesSet(
 	key string,
 	tarFilesSet SetMap,
 	visited map[string]struct{},
-) (string, bool) {
+) ([]string, bool) {
+	var tarPaths []string
 	for tarFile, tarFileSet := range tarFilesSet {
 		if _, ok := tarFileSet[key]; ok {
 			visited[tarFile] = struct{}{}
-			return tarFile, ok
+			tarPaths = append(tarPaths, tarFile)
 		}
 	}
-	return "", false
+	sort.Strings(tarPaths)
+	return tarPaths, len(tarPaths) > 0
 }
 
 func GetTarFilesFilter(
@@ -122,9 +145,15 @@ func GetTarFilesFilter(
 		for col, colInfo := range dbInfo {
 			if shouldDownload(db, col, whitelistFilter, blacklistFilter, whitelistSpecified) {
 				tarFilter[colInfo.TarPath] = struct{}{}
+				for _, tarPath := range colInfo.TarPaths {
+					tarFilter[tarPath] = struct{}{}
+				}
 				pathFilter[colInfo.DBPath] = struct{}{}
 				for _, indexPaths := range colInfo.IndexInfo {
 					tarFilter[indexPaths.TarPath] = struct{}{}
+					for _, tarPath := range indexPaths.TarPaths {
+						tarFilter[tarPath] = struct{}{}
+					}
 					pathFilter[indexPaths.DBPath] = struct{}{}
 				}
 			}
@@ -135,8 +164,27 @@ func GetTarFilesFilter(
 		tarFilter[tarFile] = struct{}{}
 		pathFilter[dbFile] = struct{}{}
 	}
+	for dbFile, tarPaths := range routes.ServiceTarPaths {
+		for _, tarPath := range tarPaths {
+			tarFilter[tarPath] = struct{}{}
+		}
+		pathFilter[dbFile] = struct{}{}
+	}
 
 	return pathFilter, tarFilter
+}
+
+func filterFileParts(parts *models.FilePartsInfo, paths map[string]struct{}) *models.FilePartsInfo {
+	if parts == nil {
+		return nil
+	}
+	filtered := &models.FilePartsInfo{PartSize: parts.PartSize, Files: make(map[string]int64)}
+	for name, size := range parts.Files {
+		if _, selected := paths[name]; selected {
+			filtered.Files[name] = size
+		}
+	}
+	return filtered
 }
 
 func convertToFile(ident string) string {

@@ -14,18 +14,19 @@ import (
 // Backup represents backup sentinel data
 // todo: use `internal.GenericMetadata` as base
 type Backup struct {
-	BackupName       string      `json:"BackupName,omitempty"`
-	BackupType       string      `json:"BackupType,omitempty"`
-	Hostname         string      `json:"Hostname,omitempty"`
-	StartLocalTime   time.Time   `json:"StartLocalTime,omitempty"`
-	FinishLocalTime  time.Time   `json:"FinishLocalTime,omitempty"`
-	UserData         interface{} `json:"UserData,omitempty"`
-	MongoMeta        MongoMeta   `json:"MongoMeta,omitempty"`
-	Permanent        bool        `json:"Permanent"`
-	UncompressedSize int64       `json:"UncompressedSize,omitempty"`
-	CompressedSize   int64       `json:"DataSize,omitempty"`
-	Top100Namespaces []string    `json:"Top100Namespaces,omitempty"`
-	NamespacesCount  int64       `json:"NamespacesCount,omitempty"`
+	BackupName       string         `json:"BackupName,omitempty"`
+	BackupType       string         `json:"BackupType,omitempty"`
+	Hostname         string         `json:"Hostname,omitempty"`
+	StartLocalTime   time.Time      `json:"StartLocalTime,omitempty"`
+	FinishLocalTime  time.Time      `json:"FinishLocalTime,omitempty"`
+	UserData         interface{}    `json:"UserData,omitempty"`
+	MongoMeta        MongoMeta      `json:"MongoMeta,omitempty"`
+	Permanent        bool           `json:"Permanent"`
+	UncompressedSize int64          `json:"UncompressedSize,omitempty"`
+	CompressedSize   int64          `json:"DataSize,omitempty"`
+	Top100Namespaces []string       `json:"Top100Namespaces,omitempty"`
+	NamespacesCount  int64          `json:"NamespacesCount,omitempty"`
+	FileParts        *FilePartsInfo `json:"FileParts,omitempty"`
 }
 
 func (b *Backup) Name() string {

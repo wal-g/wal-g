@@ -10,6 +10,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/fileparts"
 )
 
 var (
@@ -69,7 +70,11 @@ func (restoreService *RestoreService) DoRestore(
 	}
 
 	if !args.SkipBackupDownload {
-		if err = restoreService.downloadBackup(ctx, args.BackupName, tarFilesFilter); err != nil {
+		expectedParts := sentinel.FileParts
+		if args.IsPartial() {
+			expectedParts = filterFileParts(expectedParts, onHostFilesFilter)
+		}
+		if err = restoreService.downloadBackup(ctx, args.BackupName, tarFilesFilter, expectedParts); err != nil {
 			return err
 		}
 	} else {
@@ -96,14 +101,14 @@ func (restoreService *RestoreService) DoRestore(
 }
 
 func (restoreService *RestoreService) downloadBackup(ctx context.Context,
-	backupName string, tarFilter map[string]struct{}) error {
+	backupName string, tarFilter map[string]struct{}, expectedParts *models.FilePartsInfo) error {
 	err := restoreService.LocalStorage.CleanupMongodDBPath()
 	if err != nil {
 		return err
 	}
 
 	tracelog.InfoLogger.Println("Download backup files to dbPath")
-	return restoreService.downloadFromTarArchives(ctx, backupName, tarFilter)
+	return restoreService.downloadFromTarArchives(ctx, backupName, tarFilter, expectedParts)
 }
 
 func (restoreService *RestoreService) doChecks(mongoVersion, restoreVersion string) error {
@@ -137,9 +142,11 @@ func (restoreService *RestoreService) reconfigMongo(
 }
 
 func (restoreService *RestoreService) downloadFromTarArchives(ctx context.Context,
-	backupName string, filter map[string]struct{}) error {
+	backupName string, filter map[string]struct{}, expectedParts *models.FilePartsInfo) error {
+	directory := restoreService.LocalStorage.MongodDBPath
+	interpreter := fileparts.NewTarInterpreter(directory, internal.NewFileTarInterpreter(directory), expectedParts)
 	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader, restoreService.LocalStorage.whitelist)
-	return downloader.Download(ctx, backupName, restoreService.LocalStorage.MongodDBPath, filter)
+	return downloader.DownloadWithTarInterpreter(ctx, backupName, directory, filter, interpreter)
 }
 
 func (restoreService *RestoreService) fixSystemData(
