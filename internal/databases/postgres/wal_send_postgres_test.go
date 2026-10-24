@@ -203,6 +203,10 @@ func TestWalSendRealPostgresStandby(t *testing.T) {
 	// Promote the recovered standby and archive timeline 2, keeping the original
 	// timeline-1 sentinel. A fresh copy of that same backup must follow the fork.
 	walSendPostgresCommand(t, ctx, bin, "pg_ctl", "-D", standby, "-w", "promote")
+	// Promotion can return while its checkpoint is still recycling old WAL.
+	// Finish that checkpoint before generating the WAL we need to archive, so
+	// the subsequent directory snapshot cannot race with promotion cleanup.
+	walSendPostgresSQL(t, ctx, standbyAddress, "CHECKPOINT")
 	walSendPostgresSQL(t, ctx, standbyAddress, "INSERT INTO wal_send_probe VALUES (84)")
 	walSendPostgresSQL(t, ctx, standbyAddress, "SELECT pg_switch_wal()")
 	walSendArchivePostgresWAL(t, ctx, standby, standbyAddress, folder)

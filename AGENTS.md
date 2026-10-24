@@ -118,6 +118,10 @@ Removing a sentinel also does not protect a restore that has already read it.
   Archive fixtures that exclude the active WAL must use the insertion LSN + 1
   and omit future/preallocated files, or they may drop the just-switched segment.
   See `wal_send_cli_test.go` and `wal_send_postgres_test.go`.
+- Promotion may finish before its checkpoint recycles old WAL. In standby test
+  fixtures, finish that checkpoint before generating the new WAL to archive;
+  otherwise `pg_wal` entries can disappear between `ReadDir` and `ReadFile`.
+  See `wal_send_postgres_test.go:TestWalSendRealPostgresStandby`.
 - Distinguish foreground WAL completion, background work, metadata flushes and
   acknowledgment to PostgreSQL. Trace standalone and daemon paths separately;
   a client timeout is not evidence that all server-side work was cancelled.
