@@ -101,6 +101,11 @@ Removing a sentinel also does not protect a restore that has already read it.
 
 ## WAL pipelines
 
+- Keep one `pgproto3.Backend` per `wal-send` connection, including startup and
+  COPY: it can buffer the next query while reading CopyDone. Hand reading back
+  to the command loop only after the COPY reader exits, and serialize each
+  `Send`/`Flush` batch with `writeMu`. Preserve `SetMaxBodyLen` when constructing
+  the backend. See `wal_send_protocol_test.go`.
 - Validate `wal-send` with stock PostgreSQL clients as well as `pglogrepl`.
   `pg_receivewal` requests `SHOW data_directory_mode` and `SHOW wal_segment_size`,
   and physical `IDENTIFY_SYSTEM` needs a SQL NULL `dbname`, not an empty string.

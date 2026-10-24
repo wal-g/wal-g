@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -36,7 +35,7 @@ func (*walSendRecordingConn) RemoteAddr() net.Addr          { return &net.TCPAdd
 
 func walSendRegressionClient(s *walSendServer) (*walSendClient, *walSendRecordingConn) {
 	conn := &walSendRecordingConn{}
-	return &walSendClient{server: s, conn: conn, writer: bufio.NewWriter(conn)}, conn
+	return newWalSendClient(s, conn), conn
 }
 
 func walSendRegressionServer(t *testing.T) *walSendServer {
@@ -62,7 +61,7 @@ func TestWalSendPhysicalClientSetup(t *testing.T) {
 	} {
 		t.Run(tc.query, func(t *testing.T) {
 			c, conn := walSendRegressionClient(s)
-			c.handleQuery(t.Context(), []byte(tc.query))
+			c.handleQuery(t.Context(), tc.query)
 			frontend := pgproto3.NewFrontend(&conn.Buffer, io.Discard)
 			msg, err := frontend.Receive()
 			require.NoError(t, err)
@@ -73,7 +72,7 @@ func TestWalSendPhysicalClientSetup(t *testing.T) {
 		})
 	}
 	c, conn := walSendRegressionClient(s)
-	c.handleQuery(t.Context(), []byte("IDENTIFY_SYSTEM"))
+	c.handleQuery(t.Context(), "IDENTIFY_SYSTEM")
 	frontend := pgproto3.NewFrontend(&conn.Buffer, io.Discard)
 	_, err := frontend.Receive()
 	require.NoError(t, err)

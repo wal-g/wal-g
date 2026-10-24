@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/binary"
@@ -15,6 +14,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pglogrepl"
+	"github.com/jackc/pgx/v5/pgproto3"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -60,9 +62,6 @@ const (
 	// before allocating from an untrusted length. The largest expected
 	// message is a standby status update (34 bytes).
 	walSendMaxMessageLen = 1 << 20
-
-	sslRequestCode    = 80877103
-	cancelRequestCode = 80877102
 )
 
 // pgUnixEpoch is the PostgreSQL epoch used in protocol timestamps (2000-01-01)
@@ -283,12 +282,7 @@ func (s *walSendServer) handleConnection(ctx context.Context, conn net.Conn) {
 			conn.RemoteAddr(), time.Since(start).Round(time.Millisecond))
 	}()
 
-	client := &walSendClient{
-		server: s,
-		conn:   conn,
-		reader: bufio.NewReader(conn),
-		writer: bufio.NewWriter(conn),
-	}
+	client := newWalSendClient(s, conn)
 	client.Serve(ctx)
 }
 
@@ -296,66 +290,71 @@ func (s *walSendServer) handleConnection(ctx context.Context, conn net.Conn) {
 type walSendClient struct {
 	server  *walSendServer
 	conn    net.Conn
-	reader  *bufio.Reader
-	writer  *bufio.Writer
+	backend *pgproto3.Backend
 	writeMu sync.Mutex
 }
 
+func newWalSendClient(server *walSendServer, conn net.Conn) *walSendClient {
+	backend := pgproto3.NewBackend(conn, conn)
+	backend.SetMaxBodyLen(walSendMaxMessageLen)
+	return &walSendClient{server: server, conn: conn, backend: backend}
+}
+
 func (c *walSendClient) Serve(ctx context.Context) {
-	err := c.handshake()
+	ready, err := c.handshake()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("wal-send: handshake with %s failed: %v", c.conn.RemoteAddr(), err)
 		return
 	}
+	if !ready {
+		return
+	}
 
 	for {
-		msgType, payload, err := readBackendMessage(c.reader)
+		msg, err := c.backend.Receive()
 		if err != nil {
-			if ctx.Err() == nil && err != io.EOF {
+			if ctx.Err() == nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 				tracelog.ErrorLogger.Printf("wal-send: read message from %s: %v", c.conn.RemoteAddr(), err)
 			}
 			return
 		}
 
-		switch msgType {
-		case 'Q': // simple query
-			c.handleQuery(ctx, payload)
-		case 'X': // terminate
+		switch msg := msg.(type) {
+		case *pgproto3.Query:
+			c.handleQuery(ctx, msg.String)
+		case *pgproto3.Terminate:
 			tracelog.DebugLogger.Printf("wal-send: client %s terminated the connection", c.conn.RemoteAddr())
 			return
 		default:
-			tracelog.ErrorLogger.Printf("wal-send: unexpected message type '%c' from %s",
-				msgType, c.conn.RemoteAddr())
+			tracelog.ErrorLogger.Printf("wal-send: unexpected message type %T from %s",
+				msg, c.conn.RemoteAddr())
 			return
 		}
 	}
 }
 
 // handshake reads the startup packet and performs trust authentication
-func (c *walSendClient) handshake() error {
+func (c *walSendClient) handshake() (bool, error) {
 	for {
-		params, version, err := readStartupMessage(c.reader)
+		msg, err := c.backend.ReceiveStartupMessage()
 		if err != nil {
-			return err
+			return false, err
 		}
-		switch version {
-		case sslRequestCode:
-			// we do not support TLS, clients fall back to plain connections
+		switch msg := msg.(type) {
+		case *pgproto3.SSLRequest, *pgproto3.GSSEncRequest:
+			// Encryption negotiation uses a single unframed response byte.
 			_, err := c.conn.Write([]byte{'N'})
 			if err != nil {
-				return fmt.Errorf("respond to SSL request: %w", err)
+				return false, fmt.Errorf("decline encryption request: %w", err)
 			}
-			continue
-		case cancelRequestCode:
-			// nothing to cancel
-			return nil
+		case *pgproto3.CancelRequest:
+			return false, nil // no tracked query to cancel; close without a reply
+		case *pgproto3.StartupMessage:
+			if replication, ok := msg.Parameters["replication"]; !ok || replication == "false" {
+				return false, fmt.Errorf("client did not request replication mode")
+			}
+			return true, c.sendPostStartupMessages()
 		}
-
-		if replication, ok := params["replication"]; !ok || replication == "false" {
-			return fmt.Errorf("client did not request replication mode")
-		}
-
-		return c.sendPostStartupMessages()
 	}
 }
 
@@ -367,32 +366,27 @@ func (c *walSendClient) pgVersionString() string {
 }
 
 func (c *walSendClient) sendPostStartupMessages() error {
-	var msgs [][]byte
-	msgs = append(msgs,
-		pgMessage('R', int32(0)), // AuthenticationOk
-		pgParameterStatus("server_version", c.pgVersionString()),
-		pgParameterStatus("integer_datetimes", "on"),
-		pgParameterStatus("server_encoding", "UTF8"),
-		pgParameterStatus("client_encoding", "UTF8"),
-		pgParameterStatus("DateStyle", "ISO, MDY"),
-		pgParameterStatus("TimeZone", "UTC"),
-		pgParameterStatus("standard_conforming_strings", "on"),
-		pgParameterStatus("in_hot_standby", "off"))
-
 	// BackendKeyData: pid and secret key, both are unused by us
 	key := make([]byte, 4)
 	_, _ = rand.Read(key)
-	msgs = append(msgs,
-		pgMessage('K', int32(os.Getpid()), int32(binary.BigEndian.Uint32(key))),
-		pgMessage('Z', byte('I'))) // ReadyForQuery(idle)
-
-	return c.writeMessages(msgs...)
+	return c.writeMessages(
+		&pgproto3.AuthenticationOk{},
+		&pgproto3.ParameterStatus{Name: "server_version", Value: c.pgVersionString()},
+		&pgproto3.ParameterStatus{Name: "integer_datetimes", Value: "on"},
+		&pgproto3.ParameterStatus{Name: "server_encoding", Value: "UTF8"},
+		&pgproto3.ParameterStatus{Name: "client_encoding", Value: "UTF8"},
+		&pgproto3.ParameterStatus{Name: "DateStyle", Value: "ISO, MDY"},
+		&pgproto3.ParameterStatus{Name: "TimeZone", Value: "UTC"},
+		&pgproto3.ParameterStatus{Name: "standard_conforming_strings", Value: "on"},
+		&pgproto3.ParameterStatus{Name: "in_hot_standby", Value: "off"},
+		&pgproto3.BackendKeyData{ProcessID: uint32(os.Getpid()), SecretKey: key},
+		&pgproto3.ReadyForQuery{TxStatus: 'I'})
 }
 
 // handleQuery dispatches a replication command
-func (c *walSendClient) handleQuery(ctx context.Context, payload []byte) {
+func (c *walSendClient) handleQuery(ctx context.Context, query string) {
 	// real clients often terminate replication commands with a semicolon
-	query := strings.TrimRight(string(payload), "\x00 \t\n\r;")
+	query = strings.TrimRight(query, " \t\n\r;")
 	tracelog.DebugLogger.Printf("wal-send: received command from %s: %s", c.conn.RemoteAddr(), query)
 
 	fields := strings.Fields(query)
@@ -416,13 +410,13 @@ func (c *walSendClient) handleQuery(ctx context.Context, payload []byte) {
 		// accepted and ignored: slot state is not tracked, the WAL is served from the storage as-is
 		_ = c.writeMessages(
 			pgRowDescription("slot_name", "consistent_point", "snapshot_name", "output_plugin"),
-			pgDataRow(slotName, "0/0", nil, nil),
-			pgMessage('C', "CREATE_REPLICATION_SLOT"),
-			pgMessage('Z', byte('I')))
+			&pgproto3.DataRow{Values: [][]byte{[]byte(slotName), []byte("0/0"), nil, nil}},
+			&pgproto3.CommandComplete{CommandTag: []byte("CREATE_REPLICATION_SLOT")},
+			&pgproto3.ReadyForQuery{TxStatus: 'I'})
 	case "DROP_REPLICATION_SLOT":
 		_ = c.writeMessages(
-			pgMessage('C', "DROP_REPLICATION_SLOT"),
-			pgMessage('Z', byte('I')))
+			&pgproto3.CommandComplete{CommandTag: []byte("DROP_REPLICATION_SLOT")},
+			&pgproto3.ReadyForQuery{TxStatus: 'I'})
 	case "START_REPLICATION":
 		c.handleStartReplication(ctx, fields)
 	default:
@@ -447,8 +441,8 @@ func (c *walSendClient) handleShow(fields []string) {
 		_ = c.writeQueryError("42704", fmt.Sprintf("unrecognized configuration parameter %q", name))
 		return
 	}
-	_ = c.writeMessages(pgRowDescription(name), pgDataRow(value),
-		pgMessage('C', "SHOW"), pgMessage('Z', byte('I')))
+	_ = c.writeMessages(pgRowDescription(name), &pgproto3.DataRow{Values: [][]byte{[]byte(value)}},
+		&pgproto3.CommandComplete{CommandTag: []byte("SHOW")}, &pgproto3.ReadyForQuery{TxStatus: 'I'})
 }
 
 // handleIdentifySystem reports the cluster identity and the archive head.
@@ -460,10 +454,10 @@ func (c *walSendClient) handleIdentifySystem(ctx context.Context) {
 	}
 	_ = c.writeMessages(
 		pgRowDescription("systemid", "timeline", "xlogpos", "dbname"),
-		pgDataRow(identify.systemIdentifier, strconv.FormatUint(uint64(identify.timeline), 10),
-			identify.xlogpos.String(), nil),
-		pgMessage('C', "IDENTIFY_SYSTEM"),
-		pgMessage('Z', byte('I')))
+		&pgproto3.DataRow{Values: [][]byte{[]byte(identify.systemIdentifier),
+			[]byte(strconv.FormatUint(uint64(identify.timeline), 10)), []byte(identify.xlogpos.String()), nil}},
+		&pgproto3.CommandComplete{CommandTag: []byte("IDENTIFY_SYSTEM")},
+		&pgproto3.ReadyForQuery{TxStatus: 'I'})
 }
 
 // handleTimelineHistory serves the requested .history file from the storage,
@@ -497,9 +491,9 @@ func (c *walSendClient) handleTimelineHistory(ctx context.Context, fields []stri
 
 	_ = c.writeMessages(
 		pgRowDescription("filename", "content"),
-		pgDataRow(historyName, string(data)),
-		pgMessage('C', "TIMELINE_HISTORY"),
-		pgMessage('Z', byte('I')))
+		&pgproto3.DataRow{Values: [][]byte{[]byte(historyName), data}},
+		&pgproto3.CommandComplete{CommandTag: []byte("TIMELINE_HISTORY")},
+		&pgproto3.ReadyForQuery{TxStatus: 'I'})
 }
 
 type startReplicationArgs struct {
@@ -575,7 +569,7 @@ func (c *walSendClient) handleStartReplication(ctx context.Context, fields []str
 func (c *walSendClient) streamReplication(ctx context.Context, stream *walSendStream) {
 	streamCtx, cancelStream := context.WithCancel(ctx)
 	defer cancelStream()
-	if err := c.writeMessages(pgMessage('W', byte(0), int16(0))); err != nil {
+	if err := c.writeMessages(&pgproto3.CopyBothResponse{}); err != nil {
 		return
 	}
 	readerDone := make(chan struct{})
@@ -620,14 +614,14 @@ func (c *walSendClient) streamReplication(ctx context.Context, stream *walSendSt
 }
 
 func (c *walSendClient) completeReplication(next *walSendTimelineSwitch) error {
-	var msgs [][]byte
+	var msgs []pgproto3.BackendMessage
 	if next != nil {
 		msgs = append(msgs, pgRowDescription("next_tli", "next_tli_startpos"),
-			pgDataRow(strconv.FormatUint(uint64(next.timeline), 10), next.lsn.String()))
+			&pgproto3.DataRow{Values: [][]byte{[]byte(strconv.FormatUint(uint64(next.timeline), 10)), []byte(next.lsn.String())}})
 	}
 	// PostgreSQL sends a completion for streaming and for the command itself.
-	return c.writeMessages(append(msgs, pgMessage('C', "START_STREAMING"),
-		pgMessage('C', "START_REPLICATION"), pgMessage('Z', byte('I')))...)
+	return c.writeMessages(append(msgs, &pgproto3.CommandComplete{CommandTag: []byte("START_STREAMING")},
+		&pgproto3.CommandComplete{CommandTag: []byte("START_REPLICATION")}, &pgproto3.ReadyForQuery{TxStatus: 'I'})...)
 }
 
 func (st *walSendStream) finishSending() error {
@@ -638,7 +632,7 @@ func (st *walSendStream) finishSending() error {
 		return nil
 	}
 	st.sendingDone = true
-	return c.writeMessagesLocked(pgMessageFromBytes('c', nil))
+	return c.writeMessagesLocked(&pgproto3.CopyDone{})
 }
 
 func (st *walSendStream) sendKeepalive(replyRequested bool) error {
@@ -945,35 +939,35 @@ func (st *walSendStream) startKeepaliveLoop(ctx context.Context) <-chan struct{}
 func (st *walSendStream) serveClientMessages(ctx context.Context, copyDone chan<- struct{}) {
 	c := st.client
 	for {
-		msgType, payload, err := readBackendMessage(c.reader)
+		msg, err := c.backend.Receive()
 		if err != nil {
-			if ctx.Err() == nil && err != io.EOF {
+			if ctx.Err() == nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 				tracelog.ErrorLogger.Printf("wal-send: read a copy message from %s: %v", c.conn.RemoteAddr(), err)
 			}
 			return
 		}
-		switch msgType {
-		case 'd': // CopyData
-			if len(payload) < 1 {
+		switch msg := msg.(type) {
+		case *pgproto3.CopyData:
+			if len(msg.Data) < 1 {
 				return
 			}
-			st.handleCopyData(payload)
-		case 'c': // CopyDone
+			st.handleCopyData(msg.Data)
+		case *pgproto3.CopyDone:
 			tracelog.DebugLogger.Printf("wal-send: %s sent CopyDone", c.conn.RemoteAddr())
 			select {
 			case copyDone <- struct{}{}:
 			default:
 			}
 			return
-		case 'f': // CopyFail
+		case *pgproto3.CopyFail:
 			tracelog.DebugLogger.Printf("wal-send: %s sent CopyFail", c.conn.RemoteAddr())
 			return
-		case 'X': // Terminate
+		case *pgproto3.Terminate:
 			tracelog.DebugLogger.Printf("wal-send: %s terminated the connection", c.conn.RemoteAddr())
 			return
 		default:
-			tracelog.WarningLogger.Printf("wal-send: unexpected copy message type '%c' from %s",
-				msgType, c.conn.RemoteAddr())
+			tracelog.WarningLogger.Printf("wal-send: unexpected copy message type %T from %s",
+				msg, c.conn.RemoteAddr())
 		}
 	}
 }
@@ -982,7 +976,7 @@ func (st *walSendStream) serveClientMessages(ctx context.Context, copyDone chan<
 // In physical replication the only expected message is the standby status update.
 func (st *walSendStream) handleCopyData(payload []byte) {
 	c := st.client
-	if payload[0] != 'r' {
+	if payload[0] != pglogrepl.StandbyStatusUpdateByteID {
 		return
 	}
 	if len(payload) < 34 {
@@ -1000,114 +994,40 @@ func (st *walSendStream) handleCopyData(payload []byte) {
 	}
 }
 
-// ---------- low-level protocol helpers ----------
-
-// pgMessage builds a protocol message with typed payload parts
-func pgMessage(typ byte, payload ...any) []byte {
-	var body []byte
-	for _, p := range payload {
-		switch v := p.(type) {
-		case byte:
-			body = append(body, v)
-		case int16:
-			body = binary.BigEndian.AppendUint16(body, uint16(v))
-		case int32:
-			body = binary.BigEndian.AppendUint32(body, uint32(v))
-		case uint64:
-			body = binary.BigEndian.AppendUint64(body, v)
-		case int64:
-			body = binary.BigEndian.AppendUint64(body, uint64(v))
-		case string:
-			body = append(append(body, v...), 0)
-		default:
-			panic(fmt.Sprintf("unsupported pgMessage payload type %T", p))
+// pgRowDescription describes the text columns used by replication commands.
+func pgRowDescription(columnNames ...string) *pgproto3.RowDescription {
+	fields := make([]pgproto3.FieldDescription, len(columnNames))
+	for i, name := range columnNames {
+		fields[i] = pgproto3.FieldDescription{
+			Name: []byte(name), DataTypeOID: pgtype.TextOID, DataTypeSize: -1,
+			TypeModifier: -1, Format: pgproto3.TextFormat,
 		}
 	}
-	return pgMessageFromBytes(typ, body)
+	return &pgproto3.RowDescription{Fields: fields}
 }
 
-func pgMessageFromBytes(typ byte, body []byte) []byte {
-	msg := make([]byte, 0, 5+len(body))
-	msg = append(msg, typ)
-	msg = binary.BigEndian.AppendUint32(msg, uint32(4+len(body)))
-	return append(msg, body...)
-}
-
-func pgParameterStatus(name, value string) []byte {
-	return pgMessage('S', name, value)
-}
-
-func pgRowDescription(columnNames ...string) []byte {
-	var body []byte
-	body = binary.BigEndian.AppendUint16(body, uint16(len(columnNames)))
-	for _, name := range columnNames {
-		body = append(body, pgColumnDescription(name)...)
-	}
-	return pgMessageFromBytes('T', body)
-}
-
-func pgColumnDescription(name string) []byte {
-	var body []byte
-	body = append(append(body, name...), 0)
-	body = binary.BigEndian.AppendUint32(body, 0)          // table OID: unspecified
-	body = binary.BigEndian.AppendUint16(body, 0)          // column number
-	body = binary.BigEndian.AppendUint32(body, 25)         // type OID: text
-	body = binary.BigEndian.AppendUint16(body, 0xFFFF)     // type length: null
-	body = binary.BigEndian.AppendUint32(body, 0xFFFFFFFF) // type modifier: null
-	body = binary.BigEndian.AppendUint16(body, 0)          // format code: text
-	return body
-}
-
-func pgDataRow(values ...any) []byte {
-	var body []byte
-	body = binary.BigEndian.AppendUint16(body, uint16(len(values)))
-	for _, value := range values {
-		if value == nil {
-			body = binary.BigEndian.AppendUint32(body, 0xFFFFFFFF)
-			continue
-		}
-		text := value.(string)
-		body = append(binary.BigEndian.AppendUint32(body, uint32(len(text))), text...)
-	}
-	return pgMessageFromBytes('D', body)
-}
-
-// writeQueryError finishes a failed simple query the way the protocol
-// requires: ErrorResponse followed by ReadyForQuery
+// writeQueryError finishes a failed simple query with ErrorResponse and ReadyForQuery.
 func (c *walSendClient) writeQueryError(code, message string) error {
-	return c.writeMessages(c.queryError(code, message), pgMessage('Z', byte('I')))
+	return c.writeMessages(&pgproto3.ErrorResponse{
+		Severity: "ERROR", SeverityUnlocalized: "ERROR", Code: code, Message: message,
+	}, &pgproto3.ReadyForQuery{TxStatus: 'I'})
 }
 
-func (c *walSendClient) queryError(code, message string) []byte {
-	var body []byte
-	appendField := func(k, v string) {
-		body = append(append(append(body, k[0]), v...), 0)
-	}
-	appendField("S", "ERROR")
-	appendField("V", "ERROR")
-	appendField("C", code)
-	appendField("M", message)
-	body = append(body, 0)
-	return pgMessageFromBytes('E', body)
-}
-
-// pgXLogDataMsg builds an XLogData copy data message.
-// NOTE: physical replication XLogData has no timeline field,
-// unlike the logical replication messages
-func pgXLogDataMsg(walStart, walEnd LSN, data []byte) []byte {
-	var body []byte
-	body = append(body, 'w')
+// pgproto3 frames CopyData; its replication-specific payload is opaque to it.
+// Physical XLogData has no timeline field, unlike logical replication messages.
+func pgXLogDataMsg(walStart, walEnd LSN, data []byte) *pgproto3.CopyData {
+	body := make([]byte, 0, 25+len(data))
+	body = append(body, pglogrepl.XLogDataByteID)
 	body = binary.BigEndian.AppendUint64(body, uint64(walStart))
 	body = binary.BigEndian.AppendUint64(body, uint64(walEnd))
 	body = binary.BigEndian.AppendUint64(body, currentPgTime())
 	body = append(body, data...)
-	return pgCopyData(body)
+	return &pgproto3.CopyData{Data: body}
 }
 
-// pgKeepaliveMsg builds a primary keepalive copy data message
-func pgKeepaliveMsg(walEnd LSN, replyRequested bool) []byte {
-	var body []byte
-	body = append(body, 'k')
+func pgKeepaliveMsg(walEnd LSN, replyRequested bool) *pgproto3.CopyData {
+	body := make([]byte, 0, 18)
+	body = append(body, pglogrepl.PrimaryKeepaliveMessageByteID)
 	body = binary.BigEndian.AppendUint64(body, uint64(walEnd))
 	body = binary.BigEndian.AppendUint64(body, currentPgTime())
 	if replyRequested {
@@ -1115,111 +1035,27 @@ func pgKeepaliveMsg(walEnd LSN, replyRequested bool) []byte {
 	} else {
 		body = append(body, 0)
 	}
-	return pgCopyData(body)
+	return &pgproto3.CopyData{Data: body}
 }
 
-func pgCopyData(body []byte) []byte {
-	return pgMessageFromBytes('d', body)
-}
-
-// currentPgTime returns the number of microseconds since 2000-01-01, as the protocol requires
+// currentPgTime returns microseconds since 2000-01-01, as replication requires.
 func currentPgTime() uint64 {
 	return uint64(time.Since(pgUnixEpoch).Microseconds())
 }
 
-// writeMessages serializes writes to the connection from multiple goroutines
-func (c *walSendClient) writeMessages(msgs ...[]byte) error {
+// writeMessages serializes each Send/Flush batch, including keepalive replies.
+func (c *walSendClient) writeMessages(msgs ...pgproto3.BackendMessage) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	return c.writeMessagesLocked(msgs...)
 }
 
-func (c *walSendClient) writeMessagesLocked(msgs ...[]byte) error {
+func (c *walSendClient) writeMessagesLocked(msgs ...pgproto3.BackendMessage) error {
 	for _, msg := range msgs {
-		_, err := c.writer.Write(msg)
-		if err != nil {
-			return fmt.Errorf("write a protocol message: %w", err)
-		}
+		c.backend.Send(msg)
 	}
-	err := c.writer.Flush()
-	if err != nil {
+	if err := c.backend.Flush(); err != nil {
 		return fmt.Errorf("flush protocol messages: %w", err)
 	}
 	return nil
-}
-
-// readBackendMessage reads a single regular protocol message
-func readBackendMessage(r io.Reader) (msgType byte, payload []byte, err error) {
-	header := make([]byte, 5)
-	_, err = io.ReadFull(r, header)
-	if err != nil {
-		return 0, nil, err
-	}
-	msgType = header[0]
-	msgLen := binary.BigEndian.Uint32(header[1:5])
-	if msgLen < 4 {
-		return 0, nil, fmt.Errorf("invalid message length %d", msgLen)
-	}
-	if msgLen-4 > walSendMaxMessageLen {
-		// do not allocate from an untrusted length
-		return 0, nil, fmt.Errorf("message length %d exceeds the limit %d", msgLen-4, walSendMaxMessageLen)
-	}
-	payload = make([]byte, msgLen-4)
-	_, err = io.ReadFull(r, payload)
-	if err != nil {
-		return 0, nil, err
-	}
-	return msgType, payload, nil
-}
-
-// readStartupMessage reads a startup packet and unpacks its parameters
-func readStartupMessage(r io.Reader) (params map[string]string, version int32, err error) {
-	lenBuf := make([]byte, 4)
-	_, err = io.ReadFull(r, lenBuf)
-	if err != nil {
-		return nil, 0, err
-	}
-	msgLen := binary.BigEndian.Uint32(lenBuf)
-	if msgLen < 8 || msgLen > 65536 {
-		return nil, 0, fmt.Errorf("invalid startup message length %d", msgLen)
-	}
-
-	body := make([]byte, msgLen-4)
-	_, err = io.ReadFull(r, body)
-	if err != nil {
-		return nil, 0, err
-	}
-	version = int32(binary.BigEndian.Uint32(body[:4]))
-
-	params = make(map[string]string)
-	pos := 4
-	for pos < len(body) {
-		key, next, ok := readStartupString(body, pos)
-		if !ok {
-			break
-		}
-		pos = next
-		if key == "" {
-			// end of the parameter list
-			break
-		}
-		value, next, ok := readStartupString(body, pos)
-		if !ok {
-			params[key] = ""
-			break
-		}
-		params[key] = value
-		pos = next
-	}
-	return params, version, nil
-}
-
-func readStartupString(body []byte, pos int) (value string, next int, ok bool) {
-	for i := pos; i < len(body); i++ {
-		if body[i] == 0 {
-			return string(body[pos:i]), i + 1, true
-		}
-	}
-	// unterminated string, take the rest
-	return string(body[pos:]), len(body), false
 }
