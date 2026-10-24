@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       pg_versions:
-        description: 'Space-separated PostgreSQL majors to test; empty = all supported'
+        description: 'Space-separated PostgreSQL majors to test; empty = default matrix'
         type: string
         default: ''
 
@@ -45,7 +45,7 @@ jobs:
           # variable as set, and ?= in the Makefile would not override it.
           INPUT_PG_VERSIONS: ${{ inputs.pg_versions }}
         run: |
-          # the Makefile owns the list of supported versions
+          # the Makefile owns the default CI matrix
           versions="${INPUT_PG_VERSIONS:-$(make -s print_pg_versions)}"
           if [ -z "$versions" ]; then
             echo "empty version list; is print_pg_versions still in the Makefile?" >&2
