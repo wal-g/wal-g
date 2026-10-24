@@ -591,6 +591,8 @@ wal-g catchup-send ${PGDATA_PRIMARY} hostname:1337
 
 ### ``copy``
 
+Use `--output rclone --output-file files.txt` to save the copy plan as an rclone raw file list without copying. `--to` is optional in this mode. See [exporting copy file lists](COPY.md) for details.
+
 This command copies restorable backup closures between storages without decrypting, decompressing, recompressing, or re-encrypting their payload objects. Existing destination objects with the same path and size are skipped. For example, `wal-g copy --from=config_from.json --to=config_to.json` copies all backups and their exact-restore WAL.
 
 `--with-history` synchronizes continuous WAL from the selected backup recovery point through the latest archived WAL visible when the command starts. The command is resumable: run it again later to add newly archived WAL without retransferring existing immutable objects.

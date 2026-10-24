@@ -126,6 +126,8 @@ wal-g backup-fetch LATEST --restore-config=/path/to/restore_cfg.json --config=/p
 
 ### ``copy``
 
+Use `--output rclone --output-file files.txt` to save the copy plan as an rclone raw file list without copying. `--to` is optional in this mode. See [exporting copy file lists](COPY.md) for details.
+
 Copies a cluster backup, every coordinator/segment backup chain, and the WAL required for its cluster restore point without transforming payload objects:
 
 ```bash
