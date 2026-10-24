@@ -28,8 +28,10 @@ var walSendBaseBackupQuery = func() *regexp.Regexp {
 		`(?:` + option + `\s*)*)$`)
 }()
 
-func loadWalSendBaseBackup(ctx context.Context, folder storage.Folder, name string) (*Backup, error) {
-	source, err := internal.GetBackupByName(ctx, name, utility.BaseBackupPath, folder)
+func loadWalSendBaseBackup(ctx context.Context, folder storage.Folder) (*Backup, error) {
+	// List completed backups once per BASE_BACKUP request, so newer backups
+	// become available without restarting wal-send.
+	source, err := internal.GetLatestBackup(ctx, folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return nil, err
 	}
@@ -38,8 +40,8 @@ func loadWalSendBaseBackup(ctx context.Context, folder storage.Folder, name stri
 	if err != nil {
 		return nil, err
 	}
-	if sentinel.IncrementFrom != nil || (sentinel.TablespaceSpec != nil && !sentinel.TablespaceSpec.empty()) {
-		return nil, fmt.Errorf("BASE_BACKUP PoC requires a full backup without external tablespaces")
+	if sentinel.TablespaceSpec != nil && !sentinel.TablespaceSpec.empty() {
+		return nil, fmt.Errorf("BASE_BACKUP PoC does not support external tablespaces")
 	}
 	if sentinel.BackupStartLSN == nil || sentinel.BackupFinishLSN == nil ||
 		*sentinel.BackupStartLSN == 0 || *sentinel.BackupFinishLSN < *sentinel.BackupStartLSN ||
@@ -50,12 +52,13 @@ func loadWalSendBaseBackup(ctx context.Context, folder storage.Folder, name stri
 }
 
 func (c *walSendClient) handleBaseBackup(ctx context.Context, query string) {
-	if c.server.baseBackup == nil {
-		_ = c.writeQueryError("0A000", "enable BASE_BACKUP PoC with wal-send --backup-name LATEST")
-		return
-	}
 	if !walSendBaseBackupQuery.MatchString(query) {
 		_ = c.writeQueryError("0A000", "BASE_BACKUP PoC supports pg_basebackup --no-manifest -X stream (or -X none)")
+		return
+	}
+	backup, err := loadWalSendBaseBackup(ctx, c.server.rootFolder)
+	if err != nil {
+		_ = c.writeQueryError("XX000", err.Error())
 		return
 	}
 	dir, err := os.MkdirTemp("", "walg-basebackup-")
@@ -66,16 +69,15 @@ func (c *walSendClient) handleBaseBackup(ctx context.Context, query string) {
 	defer func() { _ = os.RemoveAll(dir) }()
 	// Use the normal restore path to preserve metadata filtering, compression,
 	// encryption and backup_label/pg_control ordering. Disk usage is a full copy.
-	backup := *c.server.baseBackup
 	files, err := backup.GetFilesToUnwrap(ctx, "")
 	if err == nil {
-		err = backup.unwrapToEmptyDirectory(ctx, dir, files, false, ExtractProviderImpl{})
+		err = deltaFetchRecursionOld(ctx, *backup, c.server.rootFolder, dir, nil, files, ExtractProviderImpl{})
 	}
 	if err == nil {
 		err = os.MkdirAll(filepath.Join(dir, "pg_wal", "archive_status"), 0700)
 	}
 	if err == nil {
-		err = c.sendBaseBackup(ctx, dir, backup)
+		err = c.sendBaseBackup(ctx, dir, *backup)
 	}
 	if err != nil {
 		_ = c.writeQueryError("XX000", err.Error())
