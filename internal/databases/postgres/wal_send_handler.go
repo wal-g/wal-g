@@ -169,6 +169,17 @@ func (s *walSendServer) identifySystem(ctx context.Context) (walSendIdentify, er
 	if err := s.refreshWalSegments(ctx); err != nil {
 		return walSendIdentify{}, err
 	}
+	identify, err := s.identifyArchiveHead(ctx, identify, haveBackup)
+	if err != nil {
+		return walSendIdentify{}, err
+	}
+	s.mu.Lock()
+	s.identify, s.identifyValid, s.identifyRefreshedAt = identify, true, time.Now()
+	s.mu.Unlock()
+	return identify, nil
+}
+
+func (s *walSendServer) identifyArchiveHead(ctx context.Context, identify walSendIdentify, haveBackup bool) (walSendIdentify, error) {
 	// Prefer the newest branch that can contain the selected base backup.
 	for _, timeline := range s.newerTimelines(0) {
 		if haveBackup && timeline < identify.timeline {
@@ -191,22 +202,25 @@ func (s *walSendServer) identifySystem(ctx context.Context) (walSendIdentify, er
 				continue
 			}
 		}
-		s.mu.Lock()
-		end := s.timelines[timeline].end
-		s.mu.Unlock()
-		if len(history) > 0 {
-			end = max(end, history[len(history)-1].end)
-		}
-		if haveBackup && timeline == identify.timeline {
-			end = max(end, identify.xlogpos)
-		}
+		end := s.archiveTimelineEnd(timeline, history, identify, haveBackup)
 		identify.timeline, identify.xlogpos = timeline, end
 		break
 	}
-	s.mu.Lock()
-	s.identify, s.identifyValid, s.identifyRefreshedAt = identify, true, time.Now()
-	s.mu.Unlock()
 	return identify, nil
+}
+
+func (s *walSendServer) archiveTimelineEnd(timeline uint32, history []walSendHistoryEntry,
+	backup walSendIdentify, haveBackup bool) LSN {
+	s.mu.Lock()
+	end := s.timelines[timeline].end
+	s.mu.Unlock()
+	if len(history) > 0 {
+		end = max(end, history[len(history)-1].end)
+	}
+	if haveBackup && timeline == backup.timeline {
+		end = max(end, backup.xlogpos)
+	}
+	return end
 }
 
 // identifyFromBackupSentinel provides cluster identity and the minimum branch
@@ -555,6 +569,10 @@ func (c *walSendClient) handleStartReplication(ctx context.Context, fields []str
 		_ = c.completeReplication(stream.nextTimeline)
 		return // exactly at an old timeline's end: do not enter COPY
 	}
+	c.streamReplication(ctx, stream)
+}
+
+func (c *walSendClient) streamReplication(ctx context.Context, stream *walSendStream) {
 	streamCtx, cancelStream := context.WithCancel(ctx)
 	defer cancelStream()
 	if err := c.writeMessages(pgMessage('W', byte(0), int16(0))); err != nil {
@@ -704,7 +722,7 @@ func (st *walSendStream) prepare(ctx context.Context) error {
 // run keeps one timeline throughout COPY. It reads the old timeline only up to
 // the validated fork point, then lets the handler perform timeline negotiation.
 func (st *walSendStream) run(ctx context.Context) (*walSendTimelineSwitch, error) {
-	c, server, timeline := st.client, st.client.server, st.timelineID
+	c, timeline := st.client, st.timelineID
 	prefetcher, cancelPrefetch, err := startWalSendPrefetcher(ctx, st, timeline)
 	if err != nil {
 		tracelog.WarningLogger.Printf("wal-send: start prefetching: %v; reading directly", err)
@@ -726,68 +744,90 @@ func (st *walSendStream) run(ctx context.Context) (*walSendTimelineSwitch, error
 		name := formatWALFileName(timeline, segNo)
 		segment, fromPrefetch := st.fetchPrefetched(prefetcher, name)
 		if segment == nil {
-			segment, err = internal.DownloadAndDecompressStorageFile(ctx, server.reader, name)
-			if _, missing := err.(internal.ArchiveNonExistenceError); missing {
-				if st.nextTimeline == nil {
-					partial, probeErr := internal.StorageFileExists(ctx, server.reader, name+".partial")
-					if probeErr != nil {
-						return nil, probeErr
-					}
-					if !partial {
-						// Ordinary archive-head polling must remain direct object
-						// access, without repeatedly listing the entire archive.
-						st.waitOnePoll(ctx, name)
-						continue
-					}
-					st.nextTimeline, err = st.findSuccessorTimeline(ctx, timeline, pos)
-					if err != nil {
-						return nil, err
-					}
-				}
-				if st.nextTimeline != nil {
-					if pos == st.nextTimeline.lsn {
-						return st.nextTimeline, nil
-					}
-					// Both the partial file and the descendant's complete segment
-					// contain the ancestor's bytes before the validated fork.
-					segment, err = internal.DownloadAndDecompressStorageFile(ctx, server.reader, name+".partial")
-					if _, missing := err.(internal.ArchiveNonExistenceError); missing {
-						segment, err = internal.DownloadAndDecompressStorageFile(ctx, server.reader,
-							formatWALFileName(st.nextTimeline.sourceTimeline, segNo))
-					}
-				} else {
-					st.waitOnePoll(ctx, name)
-					continue
-				}
-			}
-			if _, missing := err.(internal.ArchiveNonExistenceError); missing {
-				st.waitOnePoll(ctx, name)
-				continue
-			}
+			segment, err = st.openStorageSegment(ctx, name)
 			if err != nil {
 				return nil, fmt.Errorf("read WAL segment %s: %w", name, err)
+			}
+			if segment == nil {
+				if st.nextTimeline != nil && pos == st.nextTimeline.lsn {
+					return st.nextTimeline, nil
+				}
+				st.waitOnePoll(ctx, name)
+				continue
 			}
 		}
 		tracelog.InfoLogger.Printf("wal-send: %s: streaming WAL segment %s at %s%s",
 			c.conn.RemoteAddr(), name, pos, prefetchSource(fromPrefetch))
-		offset := uint64(pos) % WalSegmentSize
-		end := WalSegmentSize
-		if st.nextTimeline != nil {
-			end = min(end, uint64(st.nextTimeline.lsn)-segNo*WalSegmentSize)
-		}
-		err = st.streamSegment(ctx, segment, offset, end)
-		closeErr := segment.Close()
-		if err == nil {
-			err = closeErr
-		}
-		if err != nil {
+		if err := st.streamAndCloseSegment(ctx, segment, pos); err != nil {
 			return nil, fmt.Errorf("stream WAL segment %s: %w", name, err)
 		}
-		st.setPos(LSN(segNo*WalSegmentSize + end))
 		if prefetcher != nil {
 			prefetcher.remove(name)
 		}
 	}
+}
+
+// A nil segment means the caller should wait, or finish COPY at a newly found fork.
+func (st *walSendStream) openStorageSegment(ctx context.Context, name string) (io.ReadCloser, error) {
+	segment, err := internal.DownloadAndDecompressStorageFile(ctx, st.client.server.reader, name)
+	if _, missing := err.(internal.ArchiveNonExistenceError); missing {
+		return st.openTimelinePrefix(ctx, name)
+	}
+	return segment, err
+}
+
+func (st *walSendStream) openTimelinePrefix(ctx context.Context, name string) (io.ReadCloser, error) {
+	reader := st.client.server.reader
+	pos := st.pos()
+	if st.nextTimeline == nil {
+		partial, err := internal.StorageFileExists(ctx, reader, name+".partial")
+		if err != nil {
+			return nil, err
+		}
+		if !partial {
+			// Ordinary archive-head polling must remain direct object access,
+			// without repeatedly listing the entire archive.
+			return nil, nil
+		}
+		st.nextTimeline, err = st.findSuccessorTimeline(ctx, st.timelineID, pos)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if st.nextTimeline == nil || pos == st.nextTimeline.lsn {
+		return nil, nil
+	}
+	// Both the partial file and the descendant's complete segment contain
+	// the ancestor's bytes before the validated fork.
+	segment, err := internal.DownloadAndDecompressStorageFile(ctx, reader, name+".partial")
+	if _, missing := err.(internal.ArchiveNonExistenceError); missing {
+		segNo := uint64(pos) / WalSegmentSize
+		segment, err = internal.DownloadAndDecompressStorageFile(ctx, reader,
+			formatWALFileName(st.nextTimeline.sourceTimeline, segNo))
+	}
+	if _, missing := err.(internal.ArchiveNonExistenceError); missing {
+		return nil, nil
+	}
+	return segment, err
+}
+
+func (st *walSendStream) streamAndCloseSegment(ctx context.Context, segment io.ReadCloser, pos LSN) error {
+	segNo := uint64(pos) / WalSegmentSize
+	offset := uint64(pos) % WalSegmentSize
+	end := WalSegmentSize
+	if st.nextTimeline != nil {
+		end = min(end, uint64(st.nextTimeline.lsn)-segNo*WalSegmentSize)
+	}
+	err := st.streamSegment(ctx, segment, offset, end)
+	closeErr := segment.Close()
+	if err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return err
+	}
+	st.setPos(LSN(segNo*WalSegmentSize + end))
+	return nil
 }
 
 // fetchPrefetched returns the prefetched segment file from the local disk,

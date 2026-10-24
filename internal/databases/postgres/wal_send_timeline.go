@@ -19,7 +19,7 @@ type walSendTimeline struct {
 	end LSN
 }
 
-// refreshWalSegments builds a compact timeline catalogue. ListFolder visits all
+// refreshWalSegments builds a compact timeline catalog. ListFolder visits all
 // retained WAL objects (potentially millions), so this is only called for an
 // explicit IDENTIFY_SYSTEM/START_REPLICATION or while negotiating a missing
 // segment, never for each streamed segment. Concurrent callers share one scan
