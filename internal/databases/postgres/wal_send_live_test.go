@@ -18,6 +18,23 @@ import (
 )
 
 func TestWalSendStockReceivewalLiveTimelineSwitch(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		fork    string
+		partial bool
+	}{
+		{"partial", "0/2800000", true},
+		{"boundary_without_partial", "0/2000000", false},
+		{"prefix_without_partial", "0/2800000", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			walSendStockReceivewalLiveTimelineSwitch(t, tc.fork, tc.partial)
+		})
+	}
+}
+
+func walSendStockReceivewalLiveTimelineSwitch(t *testing.T, fork string, partial bool) {
+	t.Helper()
 	bin := walSendPostgresBin(t)
 	folder := memory.NewFolder("archive/", memory.NewKVS())
 	version, err := json.Marshal(postgres.BackupSentinelDto{PgVersion: walSendPostgresMajor(t, bin) * 10000})
@@ -48,9 +65,12 @@ func TestWalSendStockReceivewalLiveTimelineSwitch(t *testing.T) {
 		info, err := os.Stat(filepath.Join(dir, "000000010000000000000001"))
 		return err == nil && info.Size() == walSendTestSegmentSize
 	}, 10*time.Second, 20*time.Millisecond)
-	putPlainObject(t, walFolder, "000000010000000000000002.partial", newSegment[:walSendTestSegmentSize/2])
+	if partial {
+		putPlainObject(t, walFolder, "000000010000000000000002.partial", newSegment[:walSendTestSegmentSize/2])
+	}
 	putPlainObject(t, walFolder, "000000020000000000000002", newSegment)
-	putPlainObject(t, walFolder, "00000002.history", []byte("1\t0/2800000\tpromotion\n"))
+	historyContent := "1\t" + fork + "\tpromotion\n"
+	putPlainObject(t, walFolder, "00000002.history", []byte(historyContent))
 	select {
 	case err = <-done:
 		// Leave the result available for cleanup even on a failed assertion.
@@ -69,5 +89,5 @@ func TestWalSendStockReceivewalLiveTimelineSwitch(t *testing.T) {
 	}
 	history, err := os.ReadFile(filepath.Join(dir, "00000002.history"))
 	require.NoError(t, err)
-	require.Equal(t, "1\t0/2800000\tpromotion\n", string(history))
+	require.Equal(t, historyContent, string(history))
 }
