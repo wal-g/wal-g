@@ -106,6 +106,11 @@ Removing a sentinel also does not protect a restore that has already read it.
   to the command loop only after the COPY reader exits, and serialize each
   `Send`/`Flush` batch with `writeMu`. Preserve `SetMaxBodyLen` when constructing
   the backend. See `wal_send_protocol_test.go`.
+- The `BASE_BACKUP` PoC reuses backup-fetch extraction before producing one tar;
+  concatenating compressed tar partitions loses `backup_label` overrides and
+  restore filtering. PostgreSQL 15+ frames CopyData with archive/data markers;
+  older clients need raw tar, `/` on directory names and no tar trailer. See
+  `wal_send_basebackup.go` and `TestWalSendCLIBaseBackup`.
 - Validate `wal-send` with stock PostgreSQL clients as well as `pglogrepl`.
   `pg_receivewal` requests `SHOW data_directory_mode` and `SHOW wal_segment_size`,
   and physical `IDENTIFY_SYSTEM` needs a SQL NULL `dbname`, not an empty string.

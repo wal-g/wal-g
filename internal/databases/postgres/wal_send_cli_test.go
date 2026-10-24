@@ -24,6 +24,13 @@ func TestWalSendCLIStandby(t *testing.T) { walSendCLIStandby(t, 16) }
 
 func walSendCLIStandby(t *testing.T, walMB int) {
 	t.Helper()
+	walSendCLIRecovery(t, walMB, false)
+}
+
+func TestWalSendCLIBaseBackup(t *testing.T) { walSendCLIRecovery(t, 16, true) }
+
+func walSendCLIRecovery(t *testing.T, walMB int, baseBackup bool) {
+	t.Helper()
 	bin := walSendPostgresBin(t)
 	walg, configPath := os.Getenv("WALG_TEST_WALG_BIN"), os.Getenv("WALG_TEST_CLI_CONFIG")
 	if walg == "" || configPath == "" {
@@ -110,13 +117,19 @@ func walSendCLIStandby(t *testing.T, walMB int) {
 			cli("wal-push", filepath.Join(primary, "pg_wal", entry.Name()))
 		}
 	}
-	cli("backup-fetch", standby, "LATEST")
-	// Streaming must supply every WAL required by the backup. There is no
-	// restore_command and no locally retained segment to hide a streaming gap.
-	require.NoError(t, os.RemoveAll(filepath.Join(standby, "pg_wal")))
-	require.NoError(t, os.MkdirAll(filepath.Join(standby, "pg_wal", "archive_status"), 0700))
+	if !baseBackup {
+		cli("backup-fetch", standby, "LATEST")
+		// Streaming must supply every WAL required by the backup. There is no
+		// restore_command and no locally retained segment to hide a streaming gap.
+		require.NoError(t, os.RemoveAll(filepath.Join(standby, "pg_wal")))
+		require.NoError(t, os.MkdirAll(filepath.Join(standby, "pg_wal", "archive_status"), 0700))
+	}
 	archiveAddress := walSendPostgresAddress(t)
-	cmd := command("wal-send", "--address", archiveAddress, "--poll-interval=50ms")
+	args = []string{"wal-send", "--address", archiveAddress, "--poll-interval=50ms"}
+	if baseBackup {
+		args = append(args, "--backup-name", "LATEST")
+	}
+	cmd := command(args...)
 	var logs bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &logs, &logs
 	require.NoError(t, cmd.Start())
@@ -137,6 +150,10 @@ func walSendCLIStandby(t *testing.T, walMB int) {
 	}, 5*time.Second, 20*time.Millisecond)
 	_, archivePort, err := net.SplitHostPort(archiveAddress)
 	require.NoError(t, err)
+	if baseBackup {
+		walSendPostgresCommand(t, ctx, bin, "pg_basebackup", "-h", "127.0.0.1", "-p", archivePort,
+			"-U", "walg_test", "-D", standby, "--no-manifest", "--no-sync", "--wal-method=stream")
+	}
 	recovery := fmt.Sprintf("primary_conninfo = 'host=127.0.0.1 port=%s user=walg_test sslmode=disable'\nrecovery_target_timeline = 'latest'\n", archivePort)
 	if walSendPostgresMajor(t, bin) >= 12 {
 		require.NoError(t, os.WriteFile(filepath.Join(standby, "postgresql.auto.conf"), []byte(recovery), 0600))

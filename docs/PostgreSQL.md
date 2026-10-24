@@ -590,6 +590,20 @@ Notes:
   64 MiB prefetch and the WAL filename rollover at `1/0`.
 
 
+#### BASE_BACKUP PoC
+
+Serve a completed full WAL-G backup to a stock client:
+
+```sh
+wal-g wal-send --backup-name LATEST
+pg_basebackup -h 127.0.0.1 -p 8000 -D ./standby -R --no-manifest -X stream
+```
+
+The backup is pinned at server startup, restored to temporary disk and sent as
+tar over `BASE_BACKUP`. This PoC supports full backups without external
+tablespaces; manifests, `-X fetch`, incremental backups and server compression
+are unsupported. It needs temporary space for the entire restored backup.
+
 ### ``backup-mark``
 
 Backups can be marked as permanent to prevent them from being removed when running ``delete``. Backup permanence can be altered via this command by passing in the name of the backup (retrievable via `wal-g backup-list --pretty --detail --json`), which will mark the named backup and all previous related backups as permanent. The reverse is also possible by providing the `-i` flag.
