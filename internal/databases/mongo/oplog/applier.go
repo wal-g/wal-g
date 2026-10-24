@@ -126,6 +126,12 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 
 	if err := shouldSkip(&op, ap.catchUp); err != nil {
 		tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
+		// A skipped entry is still consumed from the replay stream, so the
+		// recorded oplog position must advance over it. Otherwise the applied
+		// position and the stream position diverge, and catch-up finalization
+		// writes the synthetic oplog entry with the default term 0 instead of
+		// the primary's term, leaving the replica unable to rejoin the set.
+		ap.recordAppliedOpTime(&op)
 		return nil
 	}
 
