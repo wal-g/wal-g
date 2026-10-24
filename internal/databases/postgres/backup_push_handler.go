@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
@@ -284,22 +285,21 @@ func (bh *BackupHandler) startBackup(ctx context.Context) error {
 }
 
 func (bh *BackupHandler) initQueryRunner(ctx context.Context) error {
-	if bh.Workers.QueryRunner != nil {
-		return nil
+	if bh.Workers.QueryRunner == nil {
+		// Keep supporting handlers constructed without a preinitialized runner.
+		tracelog.DebugLogger.Println("Connecting to Postgres.")
+		conn, err := Connect(ctx)
+		if err != nil {
+			return err
+		}
+		runner, err := NewPgQueryRunner(ctx, conn)
+		if err != nil {
+			utility.LoggedCloseContext(context.Background(), conn, "")
+			return fmt.Errorf("failed to build query runner: %v", err)
+		}
+		bh.Workers.QueryRunner = runner
 	}
-
-	// Keep supporting handlers constructed without a preinitialized runner.
-	tracelog.DebugLogger.Println("Connecting to Postgres.")
-	conn, err := Connect(ctx)
-	if err != nil {
-		return err
-	}
-	runner, err := NewPgQueryRunner(ctx, conn)
-	if err != nil {
-		utility.LoggedCloseContext(context.Background(), conn, "")
-		return fmt.Errorf("failed to build query runner: %v", err)
-	}
-	bh.Workers.QueryRunner = runner
+	bh.Workers.QueryRunner.skipWaitForArchive = bh.Arguments.waitForWALArchive
 	return nil
 }
 
@@ -589,6 +589,16 @@ func (bh *BackupHandler) waitForWALArchive(ctx context.Context, rootFolder stora
 	lastSegment := NewWalSegmentNo(bh.CurBackupInfo.endLSN - 1)
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
 	compressionExtension := bh.Arguments.Uploader.Compression().FileExtension()
+	compressionExtensions := []string{compressionExtension}
+	for _, decompressor := range compression.Decompressors {
+		extension := decompressor.FileExtension()
+		if extension != compressionExtension && extension != "" {
+			compressionExtensions = append(compressionExtensions, extension)
+		}
+	}
+	if compressionExtension != "" {
+		compressionExtensions = append(compressionExtensions, "")
+	}
 	tracelog.InfoLogger.Printf(
 		"Waiting for WAL segments %s through %s to be archived",
 		firstSegment.GetFilename(timeline),
@@ -600,16 +610,24 @@ func (bh *BackupHandler) waitForWALArchive(ctx context.Context, rootFolder stora
 
 	for segment := firstSegment; segment <= lastSegment; {
 		walFilename := segment.GetFilename(timeline)
-		walObjectName := utility.AddFileExtension(walFilename, compressionExtension)
-		_, err := walFolder.StatObject(ctx, walObjectName)
-		if err == nil {
+		found := false
+		for i, extension := range compressionExtensions {
+			_, err := walFolder.StatObject(ctx, utility.AddFileExtension(walFilename, extension))
+			if err == nil {
+				// Try the previous segment's format first, including on subsequent polls.
+				copy(compressionExtensions[1:i+1], compressionExtensions[:i])
+				compressionExtensions[0] = extension
+				found = true
+				break
+			}
+			var notFoundError storage.ObjectNotFoundError
+			if !errors.As(err, &notFoundError) {
+				return fmt.Errorf("failed to stat archived WAL segment %s: %w", walFilename, err)
+			}
+		}
+		if found {
 			segment = segment.Next()
 			continue
-		}
-
-		var notFoundError storage.ObjectNotFoundError
-		if !errors.As(err, &notFoundError) {
-			return fmt.Errorf("failed to stat archived WAL segment %s: %w", walFilename, err)
 		}
 
 		tracelog.DebugLogger.Printf("Waiting for WAL segment %s", walFilename)
@@ -698,6 +716,7 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(conf.TarSizeThresholdSetting), bh.PgInfo.PgVersion, conn)
+	baseBackup.skipWaitForArchive = bh.Arguments.waitForWALArchive
 	var bundleFiles internal.BundleFiles
 	if bh.Arguments.withoutFilesMetadata {
 		bundleFiles = &internal.NopBundleFiles{}

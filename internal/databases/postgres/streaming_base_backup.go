@@ -44,6 +44,8 @@ type StreamingBaseBackup struct {
 	uploader         internal.Uploader
 	fileNo           int
 	pgVersion        int
+
+	skipWaitForArchive bool
 }
 
 // NewStreamingBaseBackup will define a new StreamingBaseBackup object
@@ -65,6 +67,7 @@ func (bb *StreamingBaseBackup) Start(ctx context.Context, verifyChecksum bool, d
 		Label:             "wal-g",
 		NoVerifyChecksums: !verifyChecksum,
 		MaxRate:           diskLimit,
+		NoWait:            bb.skipWaitForArchive,
 	}
 	result, err := pglogrepl.StartBaseBackup(ctx, bb.pgConn, options)
 	if err != nil {

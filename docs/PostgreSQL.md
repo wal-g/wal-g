@@ -232,6 +232,12 @@ If a backup is started from a standby server, WAL-G will monitor the timeline of
 
 Use the ``--wait-for-archive`` flag to wait until every WAL segment required to restore the backup has been uploaded to the selected storage. WAL-G waits before uploading the backup sentinel, so a backup is not reported as complete until its WAL is available. The wait can be interrupted by cancelling the command.
 
+This option requires WAL archiving to be configured with WAL-G and to use the same storage destination as ``backup-push``. For S3, ``wal-push`` and ``backup-push`` must use the same bucket and prefix (``WALG_S3_PREFIX``). If WAL files are archived elsewhere, the wait will not complete.
+
+The archive check accepts every supported WAL compression format and uncompressed files, regardless of the backup's compression setting. It tries the backup's compression extension first initially, then prefers the extension found for the previous WAL segment to reduce storage lookups.
+
+With this flag, WAL-G disables PostgreSQL's own archive wait when stopping a local backup on PostgreSQL 10 or later, and when requesting a remote streaming backup. Local backups on older PostgreSQL versions retain the server-side wait because their stop-backup function does not support disabling it. Without the flag, PostgreSQL's archive-wait behavior is unchanged.
+
 ```bash
 wal-g backup-push $PGDATA --wait-for-archive
 ```
