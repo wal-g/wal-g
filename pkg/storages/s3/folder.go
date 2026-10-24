@@ -497,15 +497,42 @@ func (folder *Folder) DeleteObjects(ctx context.Context, objects []storage.Objec
 			}
 			input.Delete.Objects = append(input.Delete.Objects, objectIdentifier)
 		}
-		_, err := folder.s3API.DeleteObjects(ctx, input, withContentMD5)
+		output, err := folder.s3API.DeleteObjects(ctx, input, withContentMD5)
 		if err != nil {
 			for _, obj := range part {
 				tracelog.DebugLogger.Printf("object %s version %s", obj.GetName(), obj.GetVersionID())
 			}
 			return errors.Wrapf(err, "failed to delete s3 object: '%s'", part)
 		}
+		if err := deleteObjectsOutputError(output); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// maxReportedDeleteErrors caps how many per-object failures are spelled out in
+// the returned error; the rest are only counted.
+const maxReportedDeleteErrors = 10
+
+// deleteObjectsOutputError turns per-object failures of a DeleteObjects batch
+// into an error. S3 answers such a batch with HTTP 200 even when it refused
+// some or all of the keys, and lists the refused ones in Errors, so a nil err
+// from the call alone does not mean anything was deleted.
+func deleteObjectsOutputError(output *s3.DeleteObjectsOutput) error {
+	if output == nil || len(output.Errors) == 0 {
+		return nil
+	}
+	details := make([]string, 0, min(len(output.Errors), maxReportedDeleteErrors))
+	for i, e := range output.Errors {
+		if i == maxReportedDeleteErrors {
+			break
+		}
+		details = append(details, fmt.Sprintf("%s (version %q): %s: %s",
+			aws.ToString(e.Key), aws.ToString(e.VersionId), aws.ToString(e.Code), aws.ToString(e.Message)))
+	}
+	return fmt.Errorf("s3 refused to delete %d object(s): %s",
+		len(output.Errors), strings.Join(details, "; "))
 }
 
 func (folder *Folder) isVersioningEnabled(ctx context.Context) bool {
