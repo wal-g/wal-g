@@ -102,9 +102,7 @@ func walSendCLIStandby(t *testing.T, walMB int) {
 	cli("backup-push", primary)
 	walSendPostgresSQL(t, ctx, primaryAddress, "INSERT INTO wal_send_cli_probe VALUES (42)")
 	walSendPostgresSQL(t, ctx, primaryAddress, "SELECT pg_switch_wal()")
-	// At an exact boundary pg_walfile_name returns the preceding segment.
-	// Use the insertion point + 1 to exclude only the active/future files.
-	current := walSendPostgresSQL(t, ctx, primaryAddress, "SELECT pg_walfile_name(pg_current_wal_insert_lsn() + 1)")
+	current := walSendPostgresCurrentWAL(t, ctx, primaryAddress)
 	entries, err := os.ReadDir(filepath.Join(primary, "pg_wal"))
 	require.NoError(t, err)
 	for _, entry := range entries {

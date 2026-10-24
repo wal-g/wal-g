@@ -136,9 +136,18 @@ func walSendPostgresSQL(t *testing.T, ctx context.Context, address, query string
 	return ""
 }
 
+func walSendPostgresCurrentWAL(t *testing.T, ctx context.Context, address string) string {
+	t.Helper()
+	lsn, err := postgres.ParseLSN(walSendPostgresSQL(t, ctx, address, "SELECT pg_current_wal_insert_lsn()"))
+	require.NoError(t, err)
+	// At a segment boundary pg_walfile_name returns the preceding file.
+	// Add in Go: PostgreSQL 10 has no SQL pg_lsn + integer operator.
+	return walSendPostgresSQL(t, ctx, address, fmt.Sprintf("SELECT pg_walfile_name('%s'::pg_lsn)", (lsn+1).String()))
+}
+
 func walSendArchivePostgresWAL(t *testing.T, ctx context.Context, dir, address string, folder storage.Folder) {
 	t.Helper()
-	current := walSendPostgresSQL(t, ctx, address, "SELECT pg_walfile_name(pg_current_wal_insert_lsn() + 1)")
+	current := walSendPostgresCurrentWAL(t, ctx, address)
 	entries, err := os.ReadDir(filepath.Join(dir, "pg_wal"))
 	require.NoError(t, err)
 	for _, entry := range entries {

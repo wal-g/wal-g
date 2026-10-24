@@ -122,6 +122,7 @@ Removing a sentinel also does not protect a restore that has already read it.
 - `pg_walfile_name()` maps an exact segment boundary to the preceding file.
   Archive fixtures that exclude the active WAL must use the insertion LSN + 1
   and omit future/preallocated files, or they may drop the just-switched segment.
+  Perform that addition in Go: PostgreSQL 10 lacks SQL `pg_lsn + integer`.
   See `wal_send_cli_test.go` and `wal_send_postgres_test.go`.
 - Promotion may finish before its checkpoint recycles old WAL. In standby test
   fixtures, finish that checkpoint before generating the new WAL to archive;
