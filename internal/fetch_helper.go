@@ -70,6 +70,27 @@ func TryDownloadFile(ctx context.Context, reader StorageFolderReader, path strin
 	return
 }
 
+// StorageFileExists checks if the file exists in the storage, probing the
+// name with every known compression extension and without one. Only the
+// object is opened, its contents are not read.
+func StorageFileExists(ctx context.Context, reader StorageFolderReader, fileName string) (bool, error) {
+	for _, decompressor := range compression.Decompressors {
+		exists, err := objectExists(ctx, reader, fileName+"."+decompressor.FileExtension())
+		if err != nil || exists {
+			return exists, err
+		}
+	}
+	return objectExists(ctx, reader, fileName)
+}
+
+func objectExists(ctx context.Context, reader StorageFolderReader, path string) (bool, error) {
+	fileReader, exists, err := TryDownloadFile(ctx, reader, path)
+	if exists {
+		utility.LoggedClose(fileReader, "close the existence probe of "+path)
+	}
+	return exists, err
+}
+
 func DecompressDecryptBytes(ctx context.Context, archiveReader io.Reader,
 	decompressor compression.Decompressor) (io.ReadCloser, error) {
 	decryptReader, err := DecryptBytes(ctx, archiveReader)
