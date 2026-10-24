@@ -78,6 +78,9 @@ func walSendCLIRecovery(t *testing.T, walMB int, baseBackup bool) {
 	} {
 		config[key] = value
 	}
+	if baseBackup {
+		config["WALG_DELTA_MAX_STEPS"], config["WALG_DELTA_ORIGIN"] = "3", "LATEST"
+	}
 	require.NotEmpty(t, config["WALG_PGP_KEY_PATH"], "CLI test must exercise encryption as well as LZ4")
 	data, err = json.Marshal(config)
 	require.NoError(t, err)
@@ -107,28 +110,8 @@ func walSendCLIRecovery(t *testing.T, walMB int, baseBackup bool) {
 	}
 	walSendPostgresSQL(t, ctx, primaryAddress, "CREATE TABLE wal_send_cli_probe(id integer); INSERT INTO wal_send_cli_probe VALUES (1)")
 	cli("backup-push", primary)
-	walSendPostgresSQL(t, ctx, primaryAddress, "INSERT INTO wal_send_cli_probe VALUES (42)")
-	walSendPostgresSQL(t, ctx, primaryAddress, "SELECT pg_switch_wal()")
-	current := walSendPostgresCurrentWAL(t, ctx, primaryAddress)
-	entries, err := os.ReadDir(filepath.Join(primary, "pg_wal"))
-	require.NoError(t, err)
-	for _, entry := range entries {
-		if len(entry.Name()) == 24 && entry.Name() < current {
-			cli("wal-push", filepath.Join(primary, "pg_wal", entry.Name()))
-		}
-	}
-	if !baseBackup {
-		cli("backup-fetch", standby, "LATEST")
-		// Streaming must supply every WAL required by the backup. There is no
-		// restore_command and no locally retained segment to hide a streaming gap.
-		require.NoError(t, os.RemoveAll(filepath.Join(standby, "pg_wal")))
-		require.NoError(t, os.MkdirAll(filepath.Join(standby, "pg_wal", "archive_status"), 0700))
-	}
 	archiveAddress := walSendPostgresAddress(t)
 	args = []string{"wal-send", "--address", archiveAddress, "--poll-interval=50ms"}
-	if baseBackup {
-		args = append(args, "--backup-name", "LATEST")
-	}
 	cmd := command(args...)
 	var logs bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &logs, &logs
@@ -150,9 +133,46 @@ func walSendCLIRecovery(t *testing.T, walMB int, baseBackup bool) {
 	}, 5*time.Second, 20*time.Millisecond)
 	_, archivePort, err := net.SplitHostPort(archiveAddress)
 	require.NoError(t, err)
+	wantRows, latestWAL := "1,42", ""
+	if baseBackup {
+		for _, id := range []int{2, 3} {
+			walSendPostgresSQL(t, ctx, primaryAddress, fmt.Sprintf("INSERT INTO wal_send_cli_probe VALUES (%d)", id))
+			cli("backup-push", primary)
+		}
+		listing, err := command("backup-list", "--json").Output()
+		require.NoError(t, err)
+		require.Equal(t, 2, strings.Count(string(listing), "_D_"), "fixture must contain two incremental backups")
+		var backups []struct {
+			Name string `json:"backup_name"`
+		}
+		require.NoError(t, json.Unmarshal(listing, &backups))
+		require.Len(t, backups, 3)
+		latestWAL = strings.Split(backups[len(backups)-1].Name, "_")[1]
+		wantRows = "1,2,3,42"
+	}
+	walSendPostgresSQL(t, ctx, primaryAddress, "INSERT INTO wal_send_cli_probe VALUES (42)")
+	walSendPostgresSQL(t, ctx, primaryAddress, "SELECT pg_switch_wal()")
+	current := walSendPostgresCurrentWAL(t, ctx, primaryAddress)
+	entries, err := os.ReadDir(filepath.Join(primary, "pg_wal"))
+	require.NoError(t, err)
+	for _, entry := range entries {
+		if len(entry.Name()) == 24 && entry.Name() < current {
+			cli("wal-push", filepath.Join(primary, "pg_wal", entry.Name()))
+		}
+	}
+	if !baseBackup {
+		cli("backup-fetch", standby, "LATEST")
+		// Streaming must supply every WAL required by the backup. There is no
+		// restore_command and no locally retained segment to hide a streaming gap.
+		require.NoError(t, os.RemoveAll(filepath.Join(standby, "pg_wal")))
+		require.NoError(t, os.MkdirAll(filepath.Join(standby, "pg_wal", "archive_status"), 0700))
+	}
 	if baseBackup {
 		walSendPostgresCommand(t, ctx, bin, "pg_basebackup", "-h", "127.0.0.1", "-p", archivePort,
 			"-U", "walg_test", "-D", standby, "--no-manifest", "--no-sync", "--wal-method=stream")
+		label, err := os.ReadFile(filepath.Join(standby, "backup_label"))
+		require.NoError(t, err)
+		require.Contains(t, string(label), latestWAL, "BASE_BACKUP must select the newest delta, not the startup backup")
 	}
 	recovery := fmt.Sprintf("primary_conninfo = 'host=127.0.0.1 port=%s user=walg_test sslmode=disable'\nrecovery_target_timeline = 'latest'\n", archivePort)
 	if walSendPostgresMajor(t, bin) >= 12 {
@@ -165,6 +185,6 @@ func walSendCLIRecovery(t *testing.T, walMB int, baseBackup bool) {
 	walSendPostgresStart(t, ctx, bin, standby, standbyAddress)
 	require.Eventually(t, func() bool {
 		return walSendPostgresSQL(t, ctx, standbyAddress,
-			"SELECT string_agg(id::text, ',' ORDER BY id) FROM wal_send_cli_probe") == "1,42"
+			"SELECT string_agg(id::text, ',' ORDER BY id) FROM wal_send_cli_probe") == wantRows
 	}, 10*time.Second, 50*time.Millisecond, "standby must replay encrypted LZ4 WAL from the CLI archive")
 }

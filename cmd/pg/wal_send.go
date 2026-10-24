@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	walSendShortDescription = "Serve WAL from the storage to connecting standbys " +
+	walSendShortDescription = "Serve archived WAL and the latest backup to clients " +
 		"via the postgres Streaming Replication Protocol"
 
 	walSendAddressFlag      = "address"
@@ -27,7 +27,6 @@ const (
 var (
 	walSendAddress      string
 	walSendPollInterval time.Duration
-	walSendBackupName   string
 )
 
 // walSendCmd represents the wal-send command
@@ -47,7 +46,6 @@ var walSendCmd = &cobra.Command{
 		err = postgres.HandleWALSend(cmd.Context(), rootFolder, postgres.WalSendOptions{
 			Address:      walSendAddress,
 			PollInterval: walSendPollInterval,
-			BackupName:   walSendBackupName,
 		})
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
@@ -57,8 +55,6 @@ func init() {
 	walSendCmd.Flags().StringVar(&walSendAddress, walSendAddressFlag, "127.0.0.1:8000", walSendAddressHelp)
 	walSendCmd.Flags().DurationVar(&walSendPollInterval, walSendPollIntervalFlag, 5*time.Second,
 		walSendPollIntervalHelp)
-	walSendCmd.Flags().StringVar(&walSendBackupName, "backup-name", "",
-		"Enable BASE_BACKUP PoC for a completed full backup (name or LATEST)")
 
 	Cmd.AddCommand(walSendCmd)
 }

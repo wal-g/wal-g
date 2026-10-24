@@ -592,17 +592,17 @@ Notes:
 
 #### BASE_BACKUP PoC
 
-Serve a completed full WAL-G backup to a stock client:
+Serve the latest completed WAL-G backup to a stock client:
 
 ```sh
-wal-g wal-send --backup-name LATEST
+wal-g wal-send
 pg_basebackup -h 127.0.0.1 -p 8000 -D ./standby -R --no-manifest -X stream
 ```
 
-The backup is pinned at server startup, restored to temporary disk and sent as
-tar over `BASE_BACKUP`. This PoC supports full backups without external
-tablespaces; manifests, `-X fetch`, incremental backups and server compression
-are unsupported. It needs temporary space for the entire restored backup.
+Each `BASE_BACKUP` request selects the latest completed backup, restores its
+full/incremental chain to temporary disk and sends the result as a full tar.
+External tablespaces, manifests, `-X fetch` and server compression are unsupported.
+It needs temporary space for the entire restored backup.
 
 ### ``backup-mark``
 

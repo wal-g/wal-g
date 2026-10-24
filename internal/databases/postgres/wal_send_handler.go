@@ -74,8 +74,6 @@ type WalSendOptions struct {
 	// PollInterval is how often the storage is re-checked for new WAL segments
 	// and how often keepalive messages are sent to idle clients
 	PollInterval time.Duration
-	// BackupName enables the BASE_BACKUP PoC for this completed full backup.
-	BackupName string
 }
 
 // HandleWALSend starts a Streaming Replication Protocol server
@@ -93,14 +91,6 @@ func HandleWALSend(ctx context.Context, folder storage.Folder, options WalSendOp
 		walFolder:    folder.GetSubFolder(utility.WalPath),
 		reader:       internal.NewFolderReader(folder.GetSubFolder(utility.WalPath)),
 		pollInterval: options.PollInterval,
-	}
-	if options.BackupName != "" {
-		var err error
-		server.baseBackup, err = loadWalSendBaseBackup(ctx, folder, options.BackupName)
-		if err != nil {
-			return err
-		}
-		server.pgVersionMajor = server.baseBackup.SentinelDto.PgVersion / 10000
 	}
 
 	listener, err := net.Listen("tcp", options.Address)
@@ -140,7 +130,6 @@ type walSendServer struct {
 	walFolder    storage.Folder
 	reader       internal.StorageFolderReader
 	pollInterval time.Duration
-	baseBackup   *Backup
 
 	mu              sync.Mutex
 	identifyMu      sync.Mutex
@@ -240,9 +229,6 @@ func (s *walSendServer) archiveTimelineEnd(timeline uint32, history []walSendHis
 // identifyFromBackupSentinel provides cluster identity and the minimum branch
 // position compatible with the latest completed backup.
 func (s *walSendServer) identifyFromBackupSentinel(ctx context.Context) (walSendIdentify, bool) {
-	if s.baseBackup != nil {
-		return s.identifyFromSentinel(s.baseBackup.Name, *s.baseBackup.SentinelDto), true
-	}
 	backup, err := internal.GetLatestBackup(ctx, s.rootFolder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		tracelog.WarningLogger.Printf("wal-send: failed to find the latest backup: %v", err)
@@ -254,16 +240,13 @@ func (s *walSendServer) identifyFromBackupSentinel(ctx context.Context) (walSend
 		tracelog.WarningLogger.Printf("wal-send: failed to read the latest backup sentinel: %v", err)
 		return walSendIdentify{}, false
 	}
-	return s.identifyFromSentinel(backup.Name, sentinel), true
-}
 
-func (s *walSendServer) identifyFromSentinel(name string, sentinel BackupSentinelDto) walSendIdentify {
 	identify := walSendIdentify{timeline: 1}
 	if sentinel.SystemIdentifier != nil {
 		identify.systemIdentifier = strconv.FormatUint(*sentinel.SystemIdentifier, 10)
 	}
 
-	if timeline, err := ParseTimelineFromBackupName(name); err == nil {
+	if timeline, err := ParseTimelineFromBackupName(backup.Name); err == nil {
 		identify.timeline = timeline
 	}
 
@@ -281,7 +264,7 @@ func (s *walSendServer) identifyFromSentinel(name string, sentinel BackupSentine
 	}
 	s.mu.Unlock()
 
-	return identify
+	return identify, true
 }
 
 // pgVersion returns the major PostgreSQL version of the latest backup
@@ -303,6 +286,12 @@ func (s *walSendServer) handleConnection(ctx context.Context, conn net.Conn) {
 			conn.RemoteAddr(), time.Since(start).Round(time.Millisecond))
 	}()
 
+	// Advertise the archive's PostgreSQL version even on the first connection,
+	// before the asynchronous warmup has finished. Callers share the identity cache.
+	if _, err := s.identifySystem(ctx); err != nil {
+		tracelog.WarningLogger.Printf("wal-send: initialize client identity: %v", err)
+		return
+	}
 	client := newWalSendClient(s, conn)
 	client.Serve(ctx)
 }
