@@ -22,6 +22,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/sync/errgroup"
 )
 
 type walSendRecordingConn struct {
@@ -248,4 +249,57 @@ func TestWalSendMissingSegmentDoesNotRescanArchive(t *testing.T) {
 	_, err := st.run(ctx)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Equal(t, before, folder.lists.Load(), "ordinary missing-WAL polls must not list the archive")
+}
+
+func TestWalSendLiveTimelineSwitchWithoutPartial(t *testing.T) {
+	for _, fork := range []LSN{LSN(2 * WalSegmentSize), LSN(2*WalSegmentSize + WalSegmentSize/2)} {
+		t.Run(fork.String(), func(t *testing.T) {
+			s := walSendRegressionServer(t)
+			walSendRegressionPut(t, s.walFolder, formatWALFileName(1, 1), make([]byte, WalSegmentSize))
+			c, _ := walSendRegressionClient(s)
+			st := newWalSendStream(c, startReplicationArgs{startLSN: LSN(2 * WalSegmentSize), timeline: 1, explicitTimeli: true})
+			require.NoError(t, st.prepare(t.Context()))
+			require.Nil(t, st.nextTimeline)
+			// Promotion happens after START_REPLICATION was prepared. Timeline
+			// numbers can have gaps; no old-timeline .partial is ever archived.
+			walSendRegressionPut(t, s.walFolder, "00000007.history", []byte(fmt.Sprintf("1\t%s\tpromotion\n", fork)))
+			walSendRegressionPut(t, s.walFolder, formatWALFileName(7, 2), make([]byte, WalSegmentSize))
+			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+			defer cancel()
+			next, err := st.run(ctx)
+			require.NoError(t, err)
+			require.Equal(t, &walSendTimelineSwitch{timeline: 7, lsn: fork, sourceTimeline: 7}, next)
+			require.Equal(t, fork, st.pos(), "COPY must stop exactly at the validated fork")
+		})
+	}
+}
+
+func TestWalSendIdleTimelineDiscoverySharesRefresh(t *testing.T) {
+	s := walSendRegressionServer(t)
+	s.pollInterval = time.Hour
+	folder := &walSendCountedFolder{Folder: s.walFolder}
+	s.walFolder = folder
+	_, err := s.identifySystem(t.Context())
+	require.NoError(t, err)
+	before := folder.lists.Load()
+	for cycle := range 2 {
+		// No promotion appears in the first refresh, so a later refresh
+		// must remain possible. Age the caches without sleeping; expiring
+		// the ordinary polling interval alone must not trigger an idle scan.
+		for _, age := range []time.Duration{(walSendTimelineDiscoveryPolls + 1) * s.pollInterval, 2 * s.pollInterval} {
+			s.mu.Lock()
+			s.identifyRefreshedAt, s.listRefreshedAt = time.Now().Add(-age), time.Now().Add(-age)
+			s.mu.Unlock()
+			var clients errgroup.Group
+			for range 16 {
+				clients.Go(func() error {
+					c, _ := walSendRegressionClient(s)
+					_, err := newWalSendStream(c, startReplicationArgs{}).findSuccessorTimeline(t.Context(), 1, LSN(WalSegmentSize))
+					return err
+				})
+			}
+			require.NoError(t, clients.Wait())
+			require.Equal(t, before+int32(cycle)+1, folder.lists.Load(), "idle clients must share each archive refresh")
+		}
+	}
 }

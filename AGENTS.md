@@ -115,6 +115,12 @@ Removing a sentinel also does not protect a restore that has already read it.
   ending COPY and reporting the successor timeline and switch LSN; changing the
   storage filename cannot notify the receiver. Validate history and the fork
   position before selecting a successor (`wal_send_handler.go:run`).
+- Live timeline discovery cannot require an old-timeline `.partial`: promotion
+  at a segment boundary creates none. While waiting for missing WAL, refresh
+  archive identity through the shared cache every 12 polling intervals; keep
+  this slower than individual WAL polls. See `wal_send_regression_test.go`
+  (`TestWalSendLiveTimelineSwitchWithoutPartial`,
+  `TestWalSendIdleTimelineDiscoverySharesRefresh`).
 - A WAL-sized decoded payload can still end with a checksum/read error. Drain
   the decoder to EOF before releasing the final streaming chunk. Serialize late
   prefetch publication with foreground cleanup so consumed files cannot reappear;

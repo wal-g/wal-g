@@ -19,11 +19,17 @@ type walSendTimeline struct {
 	end LSN
 }
 
+// Idle discovery scans the WAL archive at most once per 12 polling intervals
+// (one minute by default), shared across all streams. It cannot depend on a
+// .partial marker: PostgreSQL omits it when promotion is at a segment boundary.
+const walSendTimelineDiscoveryPolls = 12
+
 // refreshWalSegments builds a compact timeline catalog. ListFolder visits all
 // retained WAL objects (potentially millions), so this is only called for an
-// explicit IDENTIFY_SYSTEM/START_REPLICATION or while negotiating a missing
-// segment, never for each streamed segment. Concurrent callers share one scan
-// per poll interval; the retained index contains one entry per timeline.
+// explicit IDENTIFY_SYSTEM/START_REPLICATION or throttled idle discovery,
+// never for each streamed segment. Explicit requests share one scan per poll
+// interval; idle discovery uses walSendTimelineDiscoveryPolls intervals. The
+// retained index contains one entry per timeline.
 func (s *walSendServer) refreshWalSegments(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -158,7 +164,7 @@ func walSendHistorySwitch(history []walSendHistoryEntry, candidate, ancestor uin
 // parse error is returned; neither case authorizes a timeline transition.
 func (st *walSendStream) findSuccessorTimeline(ctx context.Context, timeline uint32, pos LSN) (*walSendTimelineSwitch, error) {
 	s := st.client.server
-	identify, err := s.identifySystem(ctx)
+	identify, err := s.identifySystemCached(ctx, walSendTimelineDiscoveryPolls*s.pollInterval)
 	if err != nil {
 		return nil, err
 	}

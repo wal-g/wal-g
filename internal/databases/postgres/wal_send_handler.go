@@ -152,10 +152,14 @@ type walSendIdentify struct {
 // identifySystem combines cluster identity from a backup with the current
 // archived timeline and its own end position. A backup is not the archive head.
 func (s *walSendServer) identifySystem(ctx context.Context) (walSendIdentify, error) {
+	return s.identifySystemCached(ctx, s.pollInterval)
+}
+
+func (s *walSendServer) identifySystemCached(ctx context.Context, refreshInterval time.Duration) (walSendIdentify, error) {
 	s.identifyMu.Lock()
 	defer s.identifyMu.Unlock()
 	s.mu.Lock()
-	if s.identifyValid && time.Since(s.identifyRefreshedAt) < s.pollInterval {
+	if s.identifyValid && time.Since(s.identifyRefreshedAt) < refreshInterval {
 		identify := s.identify
 		s.mu.Unlock()
 		return identify, nil
@@ -774,19 +778,13 @@ func (st *walSendStream) openTimelinePrefix(ctx context.Context, name string) (i
 	reader := st.client.server.reader
 	pos := st.pos()
 	if st.nextTimeline == nil {
-		partial, err := internal.StorageFileExists(ctx, reader, name+".partial")
+		// A boundary promotion has no .partial marker. Keep discovering later
+		// timelines through the server's shared, slower archive-identity cache.
+		next, err := st.findSuccessorTimeline(ctx, st.timelineID, pos)
 		if err != nil {
 			return nil, err
 		}
-		if !partial {
-			// Ordinary archive-head polling must remain direct object access,
-			// without repeatedly listing the entire archive.
-			return nil, nil
-		}
-		st.nextTimeline, err = st.findSuccessorTimeline(ctx, st.timelineID, pos)
-		if err != nil {
-			return nil, err
-		}
+		st.nextTimeline = next
 	}
 	if st.nextTimeline == nil || pos == st.nextTimeline.lsn {
 		return nil, nil

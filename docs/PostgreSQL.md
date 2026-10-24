@@ -547,11 +547,13 @@ Notes:
   the WAL is served from the storage as-is;
 * `IDENTIFY_SYSTEM` takes the system identifier from the latest backup sentinel
   and reports the newest compatible archived timeline and that timeline's WAL end;
-* WAL segments and ordinary missing-segment polls use direct object access.
-  Identifying the archive head and negotiating a timeline after finding a
-  `.partial` segment list the WAL folder, which can contain all retained WAL
-  objects. Listings are shared across connections and cached for the poll
-  interval; the retained catalogue contains one entry per timeline;
+* WAL segments use direct object access. Identifying the archive head lists
+  the WAL folder, which can contain millions of retained WAL objects. Explicit
+  `IDENTIFY_SYSTEM`/`START_REPLICATION` requests share a cache for the poll
+  interval. While waiting for missing WAL, streams also refresh the archive
+  identity every 12 poll intervals (one minute by default), shared across all
+  connections, so live promotion discovery does not require a `.partial` file.
+  The retained catalog contains one entry per timeline;
 * timeline transitions require a readable, valid history file and a fork point
   compatible with the requested LSN. The server ends COPY at that point and
   reports the immediate successor timeline and switch LSN. Standard clients can
