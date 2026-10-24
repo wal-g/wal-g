@@ -13,6 +13,7 @@ Feature: MongoDB catch up stale replica with oplog replay
 
     And we stop mongo on mongodb02
     And we fill oplog on mongodb01
+    And we schedule an oplog write on mongodb01 during replay
 
     When we run oplog-replay on mongodb02
     Then we got same mongodb data at mongodb01 mongodb02

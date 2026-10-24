@@ -2,6 +2,7 @@ package archive
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -12,6 +13,127 @@ import (
 
 // Sequence represents serial archive route
 type Sequence []models.Archive
+
+func LongestOplogSequenceFrom(
+	archives []models.Archive,
+	from models.Timestamp,
+	resumeAfter bool,
+) (Sequence, error) {
+	index, err := newOplogSequenceIndex(archives)
+	if err != nil {
+		return nil, err
+	}
+	memo := make(map[models.Timestamp]Sequence)
+	var best Sequence
+	for _, arch := range index.oplogs {
+		if !archiveCanStartReplay(arch, from, resumeAfter) {
+			continue
+		}
+		candidate := append(Sequence{arch}, index.sequenceAfter(arch.End, memo)...)
+		if sequenceEndsLater(candidate, best) {
+			best = candidate
+		}
+	}
+
+	if resumeAfter {
+		best = trimSequenceThrough(best, from)
+	}
+	return best, nil
+}
+
+type oplogSequenceIndex struct {
+	oplogs  []models.Archive
+	byStart map[models.Timestamp][]models.Archive
+}
+
+func newOplogSequenceIndex(archives []models.Archive) (oplogSequenceIndex, error) {
+	byEnd := make(map[models.Timestamp]models.Archive)
+	for _, arch := range archives {
+		if arch.Type != models.ArchiveTypeOplog {
+			continue
+		}
+		if previous, ok := byEnd[arch.End]; ok {
+			if models.Equal(previous.Start, previous.End) {
+				byEnd[arch.End] = arch
+				continue
+			}
+			if models.Equal(arch.Start, arch.End) {
+				continue
+			}
+			return oplogSequenceIndex{}, fmt.Errorf("duplicate oplog archives with end timestamp %s", arch.End)
+		}
+		byEnd[arch.End] = arch
+	}
+
+	index := oplogSequenceIndex{
+		oplogs:  make([]models.Archive, 0, len(byEnd)),
+		byStart: make(map[models.Timestamp][]models.Archive),
+	}
+	for _, arch := range byEnd {
+		index.oplogs = append(index.oplogs, arch)
+		index.byStart[arch.Start] = append(index.byStart[arch.Start], arch)
+	}
+	slices.SortFunc(index.oplogs, compareArchives)
+	for start := range index.byStart {
+		slices.SortFunc(index.byStart[start], compareArchives)
+	}
+	return index, nil
+}
+
+func (i oplogSequenceIndex) sequenceAfter(
+	ts models.Timestamp,
+	memo map[models.Timestamp]Sequence,
+) Sequence {
+	if seq, ok := memo[ts]; ok {
+		return seq
+	}
+	var best Sequence
+	for _, arch := range i.byStart[ts] {
+		if !models.LessTS(ts, arch.End) {
+			continue
+		}
+		candidate := append(Sequence{arch}, i.sequenceAfter(arch.End, memo)...)
+		if sequenceEndsLater(candidate, best) {
+			best = candidate
+		}
+	}
+	memo[ts] = best
+	return best
+}
+
+func archiveCanStartReplay(arch models.Archive, from models.Timestamp, resumeAfter bool) bool {
+	if arch.In(from) {
+		return true
+	}
+	return resumeAfter && models.Equal(arch.Start, from)
+}
+
+func trimSequenceThrough(sequence Sequence, through models.Timestamp) Sequence {
+	for len(sequence) > 0 && !models.LessTS(through, sequence[0].End) {
+		sequence = sequence[1:]
+	}
+	return sequence
+}
+
+func compareArchives(left, right models.Archive) int {
+	if models.LessTS(left.End, right.End) {
+		return -1
+	}
+	if models.LessTS(right.End, left.End) {
+		return 1
+	}
+	return 0
+}
+
+func sequenceEndsLater(candidate, current Sequence) bool {
+	if len(candidate) == 0 {
+		return false
+	}
+	if len(current) == 0 {
+		return true
+	}
+	return models.LessTS(current[len(current)-1].End, candidate[len(candidate)-1].End)
+}
 
 // Reverse sorts Sequence
 func (p Sequence) Reverse() {

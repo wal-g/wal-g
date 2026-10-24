@@ -528,8 +528,9 @@ type RsConfig struct {
 }
 
 type ReplyOplogConfig struct {
-	Since models.Timestamp
-	Until models.Timestamp
+	Since        models.Timestamp
+	Until        models.Timestamp
+	FollowLatest *FollowLatestConfig
 
 	IgnoreErrCodes map[string][]int32
 
@@ -547,6 +548,14 @@ type ReplyOplogConfig struct {
 	FsyncInterval     time.Duration
 	ApplyBatchSize    int
 	MaxMongodRestarts int
+}
+
+type FollowLatestConfig struct {
+	PollInterval      time.Duration
+	ObservationWindow time.Duration
+	CatchUpTimeout    time.Duration
+	StallTimeout      time.Duration
+	MaxLag            time.Duration
 }
 
 type ShConfig struct {
@@ -580,53 +589,62 @@ func NewShConfig(shardName string, connectionString string) ShConfig {
 }
 
 func NewReplyOplogConfig(
-	ctx context.Context,
-	sincePitrStr, untilPitrStr string, partial, withCatchUpReconfig bool, minimalConfigPath string,
+	ctx context.Context, sincePitrStr, untilPitrStr string, partial, withCatchUpReconfig, followLatest bool,
+	minimalConfigPath string,
 ) (ReplyOplogConfig, error) {
 	var roConfig ReplyOplogConfig
-	var err error
+	if followLatest && untilPitrStr != internal.LatestString {
+		return roConfig, fmt.Errorf("follow-latest requires until to be %s", internal.LatestString)
+	}
 	roConfig.HasPitr = true
-	roConfig.FsyncInterval, err = conf.GetDurationSettingDefault(conf.OplogReplayFsyncInterval, 10*time.Minute)
+	if err := loadOplogReplaySettings(&roConfig); err != nil {
+		return roConfig, err
+	}
+
+	downloader, err := archive.NewStorageDownloader(ctx, archive.NewDefaultStorageSettings())
 	if err != nil {
 		return roConfig, err
 	}
+	if err := configureOplogReplayTarget(
+		ctx, &roConfig, sincePitrStr, untilPitrStr, followLatest, downloader); err != nil {
+		return roConfig, err
+	}
+
+	roConfig.Partial = partial
+	roConfig.WithCatchUpReconfig = withCatchUpReconfig
+	roConfig.MinimalConfigPath = minimalConfigPath
+	return roConfig, nil
+}
+
+func loadOplogReplaySettings(roConfig *ReplyOplogConfig) error {
+	var err error
+	roConfig.FsyncInterval, err = conf.GetDurationSettingDefault(conf.OplogReplayFsyncInterval, 10*time.Minute)
+	if err != nil {
+		return err
+	}
 	if roConfig.FsyncInterval <= 0 {
-		return roConfig, fmt.Errorf("%s must be positive", conf.OplogReplayFsyncInterval)
+		return fmt.Errorf("%s must be positive", conf.OplogReplayFsyncInterval)
 	}
 	roConfig.ApplyBatchSize, err = getOplogReplayApplyBatchSize()
 	if err != nil {
-		return roConfig, err
+		return err
 	}
 	roConfig.MaxMongodRestarts = 5
 	if value, ok := conf.GetSetting(conf.OplogReplayMaxMongodRestarts); ok {
 		roConfig.MaxMongodRestarts, err = strconv.Atoi(value)
 		if err != nil || roConfig.MaxMongodRestarts < 0 {
-			return roConfig, fmt.Errorf("%s must be a non-negative integer", conf.OplogReplayMaxMongodRestarts)
+			return fmt.Errorf("%s must be a non-negative integer", conf.OplogReplayMaxMongodRestarts)
 		}
-	}
-
-	// resolve archiving settings
-	downloader, err := archive.NewStorageDownloader(ctx, archive.NewDefaultStorageSettings())
-	if err != nil {
-		return roConfig, err
-	}
-	roConfig.Since, err = processTimestamp(ctx, sincePitrStr, downloader)
-	if err != nil {
-		return roConfig, err
-	}
-	roConfig.Until, err = processTimestamp(ctx, untilPitrStr, downloader)
-	if err != nil {
-		return roConfig, err
 	}
 	if ignoreErrCodesStr, ok := conf.GetSetting(conf.OplogReplayIgnoreErrorCodes); ok {
 		if err = json.Unmarshal([]byte(ignoreErrCodesStr), &roConfig.IgnoreErrCodes); err != nil {
-			return roConfig, err
+			return err
 		}
 	}
 
 	oplogAlwaysUpsert, hasOplogAlwaysUpsert, err := conf.GetBoolSetting(conf.OplogReplayOplogAlwaysUpsert)
 	if err != nil {
-		return roConfig, err
+		return err
 	}
 	if hasOplogAlwaysUpsert {
 		roConfig.OplogAlwaysUpsert = &oplogAlwaysUpsert
@@ -636,12 +654,75 @@ func NewReplyOplogConfig(
 		conf.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
 		roConfig.OplogApplicationMode = &oplogApplicationMode
 	}
+	return nil
+}
 
-	roConfig.Partial = partial
-	roConfig.WithCatchUpReconfig = withCatchUpReconfig
-	roConfig.MinimalConfigPath = minimalConfigPath
+func configureOplogReplayTarget(
+	ctx context.Context,
+	roConfig *ReplyOplogConfig,
+	sincePitrStr, untilPitrStr string,
+	followLatest bool,
+	downloader *archive.StorageDownloader,
+) error {
+	var err error
+	roConfig.Since, err = processTimestamp(ctx, sincePitrStr, downloader)
+	if err != nil {
+		return err
+	}
+	if followLatest {
+		followConfig, err := newFollowLatestConfig()
+		if err != nil {
+			return err
+		}
+		roConfig.FollowLatest = &followConfig
+		return nil
+	}
+	roConfig.Until, err = processTimestamp(ctx, untilPitrStr, downloader)
+	return err
+}
 
-	return roConfig, err
+func newFollowLatestConfig() (FollowLatestConfig, error) {
+	var cfg FollowLatestConfig
+	var err error
+
+	cfg.PollInterval, err = conf.GetDurationSettingDefault(conf.OplogReplayFollowPollInterval, 5*time.Second)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.ObservationWindow, err = conf.GetDurationSettingDefault(
+		conf.OplogReplayCatchUpObservationWindow, 5*time.Minute)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.CatchUpTimeout, err = conf.GetDurationSettingDefault(conf.OplogReplayCatchUpTimeout, 15*time.Minute)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.StallTimeout, err = conf.GetDurationSettingDefault(conf.OplogReplayStallTimeout, 5*time.Minute)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.MaxLag, err = conf.GetDurationSettingDefault(conf.OplogReplayCatchUpMaxLag, 0)
+	if err != nil {
+		return cfg, err
+	}
+
+	if cfg.PollInterval <= 0 {
+		return cfg, fmt.Errorf("%s must be positive", conf.OplogReplayFollowPollInterval)
+	}
+	if cfg.ObservationWindow <= 0 {
+		return cfg, fmt.Errorf("%s must be positive", conf.OplogReplayCatchUpObservationWindow)
+	}
+	if cfg.CatchUpTimeout <= 0 {
+		return cfg, fmt.Errorf("%s must be positive", conf.OplogReplayCatchUpTimeout)
+	}
+	if cfg.StallTimeout <= 0 {
+		return cfg, fmt.Errorf("%s must be positive", conf.OplogReplayStallTimeout)
+	}
+	if cfg.MaxLag < 0 {
+		return cfg, fmt.Errorf("%s must be non-negative", conf.OplogReplayCatchUpMaxLag)
+	}
+	return cfg, nil
 }
 
 func parseOplogReplayApplyBatchSize(value string) (int, error) {

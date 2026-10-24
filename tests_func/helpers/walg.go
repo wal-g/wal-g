@@ -322,7 +322,7 @@ func (w *WalgUtil) OplogPush() error {
 	return nil
 }
 
-func (w *WalgUtil) OplogReplay(from, until string, partial, reconfig bool, config string) error {
+func (w *WalgUtil) OplogReplay(from, until string, partial, reconfig, followLatest bool, config string) error {
 	args := []string{"oplog-replay", from, until}
 
 	if reconfig {
@@ -331,6 +331,10 @@ func (w *WalgUtil) OplogReplay(from, until string, partial, reconfig bool, confi
 
 	if partial {
 		args = append(args, "--partial")
+	}
+
+	if followLatest {
+		args = append(args, "--follow-latest")
 	}
 
 	if config != "" {

@@ -262,3 +262,18 @@ func TestCheckpointingApplierDoesNotCheckpointFailedBatch(t *testing.T) {
 	require.Equal(t, models.Timestamp{TS: 100}, progress.Snapshot().OpTime.TS)
 	require.Zero(t, progress.Snapshot().Generation)
 }
+
+func TestReplayProgressResetsLiveStateToDurableCheckpoint(t *testing.T) {
+	durable := models.OpTime{TS: models.Timestamp{TS: 101, Inc: 2}, Term: 7}
+	progress := NewReplayProgress(models.Timestamp{TS: 100})
+	progress.MarkProcessed(models.Timestamp{TS: 101}, false)
+	progress.MarkDurable(durable)
+	progress.MarkProcessed(models.Timestamp{TS: 105}, true)
+
+	progress.BeginAttempt()
+	status := progress.Status()
+
+	require.Equal(t, durable.TS, status.ProcessedTS)
+	require.Equal(t, durable, status.Checkpoint.OpTime)
+	require.False(t, status.PendingTransactions)
+}

@@ -154,6 +154,11 @@ const (
 	OplogReplayApplyBatchSize           = "OPLOG_REPLAY_APPLY_BATCH_SIZE"
 	OplogReplayFsyncInterval            = "OPLOG_REPLAY_FSYNC_INTERVAL"
 	OplogReplayMaxMongodRestarts        = "OPLOG_REPLAY_MAX_MONGOD_RESTARTS"
+	OplogReplayFollowPollInterval       = "OPLOG_REPLAY_FOLLOW_POLL_INTERVAL"
+	OplogReplayCatchUpObservationWindow = "OPLOG_REPLAY_CATCHUP_OBSERVATION_WINDOW"
+	OplogReplayCatchUpTimeout           = "OPLOG_REPLAY_CATCHUP_TIMEOUT"
+	OplogReplayStallTimeout             = "OPLOG_REPLAY_STALL_TIMEOUT"
+	OplogReplayCatchUpMaxLag            = "OPLOG_REPLAY_CATCHUP_MAX_LAG"
 	OplogRecoverTimeout                 = "OPLOG_RECOVER_TIMEOUT"
 
 	MysqlDatasourceNameSetting        = "WALG_MYSQL_DATASOURCE_NAME"
@@ -571,24 +576,35 @@ var (
 
 	MongoAllowedSettings = map[string]bool{
 		// MongoDB
-		MongoDBUriSetting:                  true,
-		MongoDBLastWriteUpdateInterval:     true,
-		MongoDBExtendBackupCursor:          true,
-		MongoDBBackupCursorFastRetry:       true,
-		MongoDBDeletionProtectionWhitelist: true,
-		MongoDBExtraInternalDatabases:      true,
-		OplogArchiveTimeoutInterval:        true,
-		OplogArchiveAfterSize:              true,
-		OplogPushStatsEnabled:              true,
-		OplogPushStatsLoggingInterval:      true,
-		OplogPushStatsUpdateInterval:       true,
-		OplogPushStatsExposeHTTP:           true,
-		OplogPushWaitForBecomePrimary:      true,
-		OplogPushPrimaryCheckInterval:      true,
-		OplogPITRDiscoveryInterval:         true,
-		OplogReplayApplyBatchSize:          true,
-		StreamSplitterBlockSize:            true,
-		StreamSplitterPartitions:           true,
+		MongoDBUriSetting:                   true,
+		MongoDBLastWriteUpdateInterval:      true,
+		MongoDBExtendBackupCursor:           true,
+		MongoDBBackupCursorFastRetry:        true,
+		MongoDBDeletionProtectionWhitelist:  true,
+		MongoDBExtraInternalDatabases:       true,
+		OplogArchiveTimeoutInterval:         true,
+		OplogArchiveAfterSize:               true,
+		OplogPushStatsEnabled:               true,
+		OplogPushStatsLoggingInterval:       true,
+		OplogPushStatsUpdateInterval:        true,
+		OplogPushStatsExposeHTTP:            true,
+		OplogPushWaitForBecomePrimary:       true,
+		OplogPushPrimaryCheckInterval:       true,
+		OplogPITRDiscoveryInterval:          true,
+		OplogReplayOplogAlwaysUpsert:        true,
+		OplogReplayOplogApplicationMode:     true,
+		OplogReplayIgnoreErrorCodes:         true,
+		OplogReplayApplyBatchSize:           true,
+		OplogReplayFsyncInterval:            true,
+		OplogReplayMaxMongodRestarts:        true,
+		OplogReplayFollowPollInterval:       true,
+		OplogReplayCatchUpObservationWindow: true,
+		OplogReplayCatchUpTimeout:           true,
+		OplogReplayStallTimeout:             true,
+		OplogReplayCatchUpMaxLag:            true,
+		OplogRecoverTimeout:                 true,
+		StreamSplitterBlockSize:             true,
+		StreamSplitterPartitions:            true,
 	}
 
 	SQLServerAllowedSettings = map[string]bool{
