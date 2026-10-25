@@ -114,7 +114,9 @@ Removing a sentinel also does not protect a restore that has already read it.
 - For an incremental `BASE_BACKUP`, restore the full chain and keep the latest
   delta's `backup_label` and sentinel LSNs. Replaying WAL from that start point
   cannot reconstruct changes made before it. `TestWalSendCLIBaseBackup` creates
-  two deltas after wal-send starts and checks the delivered label and data.
+  two deltas after wal-send starts and checks the delivered label and data,
+  including a row archived after standby startup. Docker's `wal_send_cli_test.sh`
+  runs it in the PostgreSQL matrix; `pg_wal_send_cli_test` runs it separately.
 - Validate `wal-send` with stock PostgreSQL clients as well as `pglogrepl`.
   `pg_receivewal` requests `SHOW data_directory_mode` and `SHOW wal_segment_size`,
   and physical `IDENTIFY_SYSTEM` needs a SQL NULL `dbname`, not an empty string.
