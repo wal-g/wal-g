@@ -1,6 +1,6 @@
 # WAL-G storage configuration
 
-WAL-G can store backups in S3, Google Cloud Storage, Azure, Alicloud, Swift, remote host (via SSH) or local file system. 
+WAL-G can store backups in S3, Google Cloud Storage, Azure, Alicloud, Swift, Rclone (any provider Rclone supports), remote host (via SSH) or local file system. 
 
 S3
 -----------
@@ -262,6 +262,51 @@ To store backups via ssh, WAL-G requires that these variables be set:
 * `SSH_USERNAME` connect with username
 * `SSH_PASSWORD` connect with password
 * `SSH_PRIVATE_KEY_PATH` or connect with a SSH KEY by specifying its full path
+
+Rclone
+-----------
+To store backups using [Rclone](https://rclone.org/) (which supports many storage providers), the `rclone` binary
+must be available on the host running WAL-G, and these variables must be set:
+
+* `WALG_RCLONE_PREFIX`
+(e.g. `rclone://bucket/path/to/folder`). The part after `://` is used as `<RCLONE_REMOTE>:bucket/path/to/folder`; the scheme itself is ignored.
+
+* `RCLONE_REMOTE`
+Name of an Rclone remote, defined in the Rclone config file or through `RCLONE_CONFIG_<REMOTE>_*` environment variables.
+
+**Optional variables**
+
+* `RCLONE_CONFIG_PATH`
+Path to the Rclone config file. Rclone's default location is used if not set.
+
+* `RCLONE_BINARY_PATH`
+Path to the Rclone binary. Defaults to `rclone`.
+
+* `RCLONE_TRANSFERS`
+Number of parallel file transfers. Defaults to `4`.
+
+* `RCLONE_BUFFER_SIZE`
+Buffer size in bytes. Defaults to `16777216` (16 MiB).
+
+* `RCLONE_TIMEOUT`
+Timeout in seconds for Rclone operations. Defaults to `300`.
+
+* `RCLONE_RETRIES`
+Number of retries for failed operations. Defaults to `3`.
+
+* `RCLONE_LOW_LEVEL_RETRIES`
+Number of low-level retries. Defaults to `10`.
+
+* `RCLONE_S3_CHUNK_SIZE`
+Chunk size in bytes for S3 multipart uploads (only affects S3-type remotes). Defaults to `67108864` (64 MiB).
+
+* `RCLONE_UPLOAD_CONCURRENCY`
+Number of concurrent S3 upload parts (only affects S3-type remotes). Defaults to `4`.
+
+* `RCLONE_EXTRA_ARGS`
+Additional arguments passed to every Rclone command, separated by spaces (e.g. `--fast-list --checkers 16`).
+
+See [RCLONE.md](RCLONE.md) for examples.
 
 Examples
 -----------
