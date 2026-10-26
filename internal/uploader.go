@@ -12,6 +12,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/progress"
 	"github.com/wal-g/wal-g/internal/statistics"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -196,7 +197,7 @@ func (uploader *RegularUploader) Upload(ctx context.Context, path string, conten
 	if uploader.tarSize != nil {
 		content = utility.NewWithSizeReader(content, uploader.tarSize)
 	}
-	err := uploader.UploadingFolder.PutObject(ctx, path, content)
+	err := uploader.UploadingFolder.PutObject(ctx, path, progress.TrackReader(ctx, content))
 	if err != nil {
 		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
 		uploader.failed.Store(true)

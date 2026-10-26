@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/wal-g/wal-g/internal/progress"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -29,7 +30,11 @@ func (readerMaker *StorageReaderMaker) StoragePath() string { return readerMaker
 func (readerMaker *StorageReaderMaker) LocalPath() string { return readerMaker.localPath }
 
 func (readerMaker *StorageReaderMaker) Reader(ctx context.Context) (io.ReadCloser, error) {
-	return readerMaker.Folder.ReadObject(ctx, readerMaker.storagePath)
+	reader, err := readerMaker.Folder.ReadObject(ctx, readerMaker.storagePath)
+	if err != nil {
+		return nil, err
+	}
+	return progress.TrackReadCloser(ctx, reader), nil
 }
 
 func (readerMaker *StorageReaderMaker) FileType() FileType { return readerMaker.StorageFileType }

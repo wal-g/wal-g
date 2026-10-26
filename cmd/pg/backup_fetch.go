@@ -11,6 +11,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/internal/progress"
 )
 
 const (
@@ -39,6 +40,8 @@ var backupFetchCmd = &cobra.Command{
 	Short: backupFetchShortDescription, // TODO : improve description
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
+		stopProgress := startProgress(cmd)
+		defer stopProgress()
 		internal.ConfigureLimiters()
 
 		if fetchTargetUserData == "" {
@@ -81,6 +84,7 @@ var backupFetchCmd = &cobra.Command{
 			pgFetcher = postgres.GetFetcherOld(args[0], fileMask, restoreSpec, extractProv)
 		}
 
+		progress.SetStage(cmd.Context(), "selecting backup")
 		internal.HandleBackupFetch(cmd.Context(), rootFolder, targetBackupSelector, pgFetcher)
 	},
 }
@@ -102,6 +106,7 @@ func createTargetFetchBackupSelector(cmd *cobra.Command,
 }
 
 func init() {
+	addProgressFlag(backupFetchCmd)
 	backupFetchCmd.Flags().StringVar(&fileMask, "mask", "", maskFlagDescription)
 	backupFetchCmd.Flags().StringVar(&restoreSpec, "restore-spec", "", restoreSpecDescription)
 	backupFetchCmd.Flags().BoolVar(&reverseDeltaUnpack, "reverse-unpack",

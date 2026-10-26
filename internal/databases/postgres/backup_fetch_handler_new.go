@@ -6,6 +6,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/progress"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -14,6 +15,7 @@ func GetFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedund
 	extractProv ExtractProvider,
 ) internal.Fetcher {
 	return func(ctx context.Context, rootFolder storage.Folder, backup internal.Backup) {
+		progress.SetStage(ctx, "reading backup metadata: "+backup.Name)
 		pgBackup := ToPgBackup(backup)
 		filesToUnwrap, err := pgBackup.GetFilesToUnwrap(ctx, fileMask)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
@@ -52,6 +54,7 @@ func GetFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedund
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
 func deltaFetchRecursionNew(ctx context.Context, cfg *FetchConfig) error {
+	progress.SetStage(ctx, "reading backup metadata: "+cfg.backup.Name)
 	backup, err := NewBackupInStorage(
 		ctx,
 		cfg.rootFolder.GetSubFolder(utility.BaseBackupPath),

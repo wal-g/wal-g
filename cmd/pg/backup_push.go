@@ -43,6 +43,8 @@ var (
 		Short: backupPushShortDescription, // TODO : improve description
 		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			stopProgress := startProgress(cmd)
+			defer stopProgress()
 			internal.ConfigureLimiters()
 
 			storage, err := internal.ConfigureMultiStorage(cmd.Context(), true)
@@ -153,6 +155,7 @@ func chooseTarBallComposer() postgres.TarBallComposerType {
 
 func init() {
 	Cmd.AddCommand(backupPushCmd)
+	addProgressFlag(backupPushCmd)
 
 	backupPushCmd.Flags().BoolVar(&pretty, PrettyFlag, false,
 		"Prints more readable output in table format")

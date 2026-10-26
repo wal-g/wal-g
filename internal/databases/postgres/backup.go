@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/progress"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -270,6 +271,7 @@ func (backup *Backup) unwrapOld(
 	dbDataDirectory string, filesToUnwrap map[string]bool, createIncrementalFiles bool,
 	extractProv ExtractProvider,
 ) error {
+	backup.setRestoreProgress(ctx)
 	tarInterpreter, concurrentTarsToExtract, sequentialTarsToExtract, err := extractProv.Get(
 		ctx, *backup, filesToUnwrap, false, dbDataDirectory, createIncrementalFiles)
 	if err != nil {
@@ -297,6 +299,14 @@ func (backup *Backup) unwrapOld(
 
 	tracelog.InfoLogger.Print("\nBackup extraction complete.\n")
 	return nil
+}
+
+func (backup *Backup) setRestoreProgress(ctx context.Context) {
+	backupType := "full"
+	if backup.SentinelDto.IsIncremental() {
+		backupType = "delta"
+	}
+	progress.SetStage(ctx, "restoring "+backupType+" "+backup.Name)
 }
 
 func IsPgControlRequired(backup Backup) bool {

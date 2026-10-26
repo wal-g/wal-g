@@ -22,6 +22,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/printlist"
+	"github.com/wal-g/wal-g/internal/progress"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -219,7 +220,7 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 
 	createdBackup := BackupInfo{Name: bh.CurBackupInfo.Name, Storage: storageNames[0]}
 
-	err = printlist.OneElement(createdBackup, os.Stdout, bh.Arguments.pretty, bh.Arguments.json)
+	err = printlist.OneElement(createdBackup, progress.Output(ctx, os.Stdout), bh.Arguments.pretty, bh.Arguments.json)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	// logging backup set Name
@@ -227,6 +228,7 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 }
 
 func (bh *BackupHandler) startBackup(ctx context.Context) error {
+	progress.SetStage(ctx, "starting backup/checkpoint")
 	// Connect to postgres and start/finish a nonexclusive backup.
 	tracelog.DebugLogger.Println("Connecting to Postgres.")
 	conn, err := Connect(ctx)
@@ -299,6 +301,7 @@ func (bh *BackupHandler) handleDeltaBackup(ctx context.Context, folder storage.F
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		if useWalDelta {
+			progress.SetStage(ctx, "loading delta map")
 			ForceWalDetal, _ := conf.GetBoolSettingDefault(conf.ForceWalDetal, false)
 			err := bh.Workers.Bundle.DownloadDeltaMap(ctx, internal.NewFolderReader(folder.GetSubFolder(utility.WalPath)), bh.CurBackupInfo.startLSN)
 			if err == nil {
@@ -319,6 +322,7 @@ func (bh *BackupHandler) handleDeltaBackup(ctx context.Context, folder storage.F
 
 func (bh *BackupHandler) setupDTO(ctx context.Context, tarFileSets internal.TarFileSets) (sentinelDto BackupSentinelDto,
 	filesMeta FilesMetadataDto, err error) {
+	progress.SetStage(ctx, "collecting metadata")
 	var tablespaceSpec *TablespaceSpec
 	if !bh.Workers.Bundle.TablespaceSpec.empty() {
 		tablespaceSpec = &bh.Workers.Bundle.TablespaceSpec
@@ -358,6 +362,7 @@ func configureTarBallComposer(ctx context.Context, bh *BackupHandler, tarBallCom
 }
 
 func (bh *BackupHandler) uploadBackup(ctx context.Context) internal.TarFileSets {
+	progress.SetStage(ctx, "packing/uploading")
 	bundle := bh.Workers.Bundle
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
@@ -384,6 +389,7 @@ func (bh *BackupHandler) uploadBackup(ctx context.Context) internal.TarFileSets 
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
+	progress.SetStage(ctx, "stopping backup/waiting for WAL")
 	tracelog.DebugLogger.Println("Stop backup and upload backup_label and tablespace_map")
 	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(
 		ctx, bh.Workers.QueryRunner,
@@ -403,6 +409,7 @@ func (bh *BackupHandler) uploadBackup(ctx context.Context) internal.TarFileSets 
 	tracelog.DebugLogger.Printf("Compressed size: %d", bh.CurBackupInfo.compressedSize)
 
 	// Wait for all uploads to finish.
+	progress.SetStage(ctx, "finishing uploads")
 	tracelog.DebugLogger.Println("Waiting for all uploads to finish")
 	bh.Arguments.Uploader.Finish()
 	if bh.Arguments.Uploader.Failed() {
@@ -442,6 +449,7 @@ func (bh *BackupHandler) handleJournalInfo(ctx context.Context, rootFolder stora
 		tracelog.InfoLogger.Printf("WAL journal counting mode is disabled: the backup is permanent")
 		return
 	}
+	progress.SetStage(ctx, "counting WAL journals")
 
 	finishTime := utility.TimeNowCrossPlatformUTC()
 
@@ -542,6 +550,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup(ctx context.Context) {
 }
 
 func (bh *BackupHandler) uploadMetadata(ctx context.Context, sentinelDto BackupSentinelDto, filesMetaDto FilesMetadataDto) {
+	progress.SetStage(ctx, "uploading metadata")
 	curBackupName := bh.CurBackupInfo.Name
 	meta := NewExtendedMetadataDto(bh.Arguments.isPermanent, bh.PgInfo.PgDataDirectory,
 		bh.CurBackupInfo.StartTime, sentinelDto)
@@ -621,14 +630,17 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 		bundleFiles = &internal.RegularBundleFiles{}
 	}
 	tracelog.InfoLogger.Println("Starting remote backup")
+	progress.SetStage(ctx, "starting backup/checkpoint")
 	err = baseBackup.Start(ctx, bh.Arguments.verifyPageChecksums, diskLimit)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Streaming remote backup")
+	progress.SetStage(ctx, "streaming/uploading")
 	err = baseBackup.Upload(ctx, bh.Arguments.Uploader, bundleFiles)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Finishing backup")
+	progress.SetStage(ctx, "stopping backup/waiting for WAL")
 	tracelog.InfoLogger.Println("If wal-g hangs during this step, please Postgres log file for details.")
 	err = baseBackup.Finish(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)

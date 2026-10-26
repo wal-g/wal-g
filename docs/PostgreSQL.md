@@ -121,6 +121,27 @@ Examples:
 Usage
 -----
 
+`backup-push` and `backup-fetch` show live transfer progress when stderr is an
+interactive terminal. Use `--progress=false` to disable it. Animation is disabled
+when stderr is redirected or `TERM=dumb`; stdout, including `--json` output,
+is unchanged.
+
+The moving bar shows bytes consumed from the compressed upload/download streams,
+current throughput, elapsed time, and the current stage. After five seconds
+without additional bytes, the stage is followed by `(idle <duration>)`, for example
+`stopping backup/waiting for WAL (idle 10s)`. The stage and idle time appear before
+transfer statistics so they remain visible in a narrow terminal; long backup names
+may be shortened. Idle time measures the absence of transferred bytes, which can
+also occur during local processing or while waiting for PostgreSQL.
+
+Restore stages distinguish backup selection, reading metadata, and restoring each
+full or delta backup in the chain, including reverse unpack. Backup creation also
+reports loading the delta map (when used) and collecting metadata before upload.
+
+Counts include repeated reads on retries and are not an acknowledgement that storage has committed the
+data. A complete total is not known for every backup mode, so this indicator
+does not show a percentage or ETA and does not require an extra directory scan.
+
 ### ``backup-fetch``
 
 When fetching base backups, the user should pass in the name of the backup and a path to a directory to extract to. If this directory does not exist, WAL-G will create it and any intermediate subdirectories.
