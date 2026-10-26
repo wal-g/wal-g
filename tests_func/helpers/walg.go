@@ -150,6 +150,17 @@ func (w *WalgUtil) PushBinaryBackup(skipMetadata bool) error {
 	return nil
 }
 
+func (w *WalgUtil) PushBinaryBackupWithFileParts(partSize int) error {
+	_, err := RunCommandStrict(w.ctx, w.host, []string{
+		"env",
+		"WALG_MONGO_BACKUP_FILE_PART_SIZE=" + strconv.Itoa(partSize),
+		"WALG_COMPRESSION_METHOD=lz4",
+		"WALG_UPLOAD_CONCURRENCY=4",
+		w.cliPath, "--config", w.confPath, "binary-backup-push", "--count-journals",
+	})
+	return err
+}
+
 func (w *WalgUtil) GetBackupByNumber(backupNumber int) (string, error) {
 	backups, err := w.Backups()
 	if err != nil {

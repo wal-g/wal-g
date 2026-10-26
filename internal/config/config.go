@@ -135,6 +135,7 @@ const (
 	MongoDBLastWriteUpdateInterval      = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
 	MongoDBExtendBackupCursor           = "MONGODB_EXTEND_BACKUP_CURSOR"
 	MongoDBBackupCursorFastRetry        = "MONGODB_BACKUP_CURSOR_FAST_RETRY"
+	MongoDBBackupFilePartSize           = "WALG_MONGO_BACKUP_FILE_PART_SIZE"
 	MongoDBDeletionProtectionWhitelist  = "MONGODB_DELETION_PROTECTION_WHITELIST"
 	MongoDBExtraInternalDatabases       = "MONGODB_EXTRA_INTERNAL_DATABASES"
 	OplogArchiveAfterSize               = "OPLOG_ARCHIVE_AFTER_SIZE"
@@ -572,6 +573,7 @@ var (
 		MongoDBLastWriteUpdateInterval:     true,
 		MongoDBExtendBackupCursor:          true,
 		MongoDBBackupCursorFastRetry:       true,
+		MongoDBBackupFilePartSize:          true,
 		MongoDBDeletionProtectionWhitelist: true,
 		MongoDBExtraInternalDatabases:      true,
 		OplogArchiveTimeoutInterval:        true,

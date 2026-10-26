@@ -13,6 +13,7 @@ import (
 )
 
 func SetupMongodbBinaryBackupSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
+	setupMongodbBinaryBackupPartsSteps(ctx, tctx)
 	ctx.Step(`^we create binary mongo-backup on ([^\s]*)$`, tctx.createMongoBinaryBackup)
 	ctx.Step(`^we create binary mongo-backup on ([^\s]*) with metadata$`, tctx.createMongoBinaryBackupWithMetadata)
 	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]+)$`, tctx.restoreMongoBinaryBackupAsNonInitialized)
