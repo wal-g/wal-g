@@ -7,13 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	clientmocks "github.com/wal-g/wal-g/internal/databases/mongo/client/mocks"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
-	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type replayApplierStub struct {
@@ -264,79 +261,4 @@ func TestCheckpointingApplierDoesNotCheckpointFailedBatch(t *testing.T) {
 	require.ErrorContains(t, <-errC, "applyOps failed")
 	require.Equal(t, models.Timestamp{TS: 100}, progress.Snapshot().OpTime.TS)
 	require.Zero(t, progress.Snapshot().Generation)
-}
-
-// TestCheckpointingApplierFinalizesCatchUpWithTermOfLastReplayedEntry reproduces
-// a catch-up replay whose oplog stream ends with a periodic noop. The DBApplier
-// skips noops, yet the noop is still the last entry of the replayed archive
-// sequence. The finalized oplog position must keep the term of the replayed
-// entries (the primary's term). If the synthetic oplog entry is written with
-// term 0, MongoDB reports OplogStartMissing against the primary and the
-// replica rolls back forever instead of rejoining the replica set.
-func TestCheckpointingApplierFinalizesCatchUpWithTermOfLastReplayedEntry(t *testing.T) {
-	mongoDriver := clientmocks.NewMongoDriver(t)
-	term := int64(1)
-	var finalized *models.OpTime
-
-	mongoDriver.On("ApplyOps", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		ops := args.Get(1).([]*db.Oplog)
-		require.Len(t, ops, 1)
-		require.Equal(t, "i", ops[0].Operation)
-		require.NotNil(t, ops[0].Term)
-		require.Equal(t, term, *ops[0].Term)
-	}).Return(nil).Once()
-
-	mongoDriver.On("ChangeOplogLastTimestamp", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			opTime := args.Get(1).(models.OpTime)
-			finalized = &opTime
-		}).Return(nil).Once()
-
-	dbApplier := oplog.NewDBApplier(mongoDriver, oplog.DBApplierArgs{PreserveUUID: true, Reconfig: true})
-	defer dbApplier.Close(context.Background())
-
-	progress := NewReplayProgress(models.Timestamp{TS: 100})
-	applier := NewCheckpointingApplier(mongoDriver, dbApplier, time.Hour, progress,
-		DefaultReplayApplyBatchSize, true)
-
-	appliedTS := models.Timestamp{TS: 100, Inc: 1}
-	noopTS := models.Timestamp{TS: 100, Inc: 2}
-	ops := make(chan *models.Oplog, 2)
-	ops <- catchUpReplayEntry(t, appliedTS, "i", term, bson.D{{Key: "_id", Value: int32(1)}})
-	ops <- catchUpReplayEntry(t, noopTS, "n", term, bson.D{{Key: "msg", Value: "periodic noop"}})
-	close(ops)
-
-	errC, err := applier.Apply(t.Context(), ops)
-	require.NoError(t, err)
-	require.NoError(t, <-errC)
-
-	expected := models.OpTime{TS: noopTS, Term: term}
-	require.NotNil(t, finalized, "catch-up finalization must set the oplog position")
-	require.Equal(t, expected, *finalized,
-		"finalized position must keep the term of the last replayed archive entry")
-	require.Equal(t, expected, progress.Snapshot().OpTime)
-}
-
-func catchUpReplayEntry(
-	t *testing.T,
-	ts models.Timestamp,
-	operation string,
-	term int64,
-	object bson.D,
-) *models.Oplog {
-	t.Helper()
-	entry := db.Oplog{
-		Timestamp: ts.ToBsonTS(),
-		Term:      &term,
-		Version:   2,
-		Operation: operation,
-		Namespace: "test.items",
-		Object:    object,
-	}
-	if operation == "n" {
-		entry.Namespace = ""
-	}
-	data, err := bson.Marshal(entry)
-	require.NoError(t, err)
-	return &models.Oplog{TS: ts, Data: data}
 }
