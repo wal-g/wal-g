@@ -229,20 +229,13 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 
 func (bh *BackupHandler) startBackup(ctx context.Context) error {
 	progress.SetStage(ctx, "starting backup/checkpoint")
-	// Connect to postgres and start/finish a nonexclusive backup.
-	tracelog.DebugLogger.Println("Connecting to Postgres.")
-	conn, err := Connect(ctx)
-	if err != nil {
+	if err := bh.initQueryRunner(ctx); err != nil {
 		return err
-	}
-	bh.Workers.QueryRunner, err = NewPgQueryRunner(ctx, conn)
-	if err != nil {
-		return fmt.Errorf("failed to build query runner: %v", err)
 	}
 
 	// If preventConcurrentBackups is set to true, we need to ensure that no backups are in progress
 	if bh.Arguments.preventConcurrentBackups {
-		err = bh.Workers.QueryRunner.TryGetLock(ctx)
+		err := bh.Workers.QueryRunner.TryGetLock(ctx)
 		if err != nil {
 			tracelog.WarningLogger.Println("Failed to get advisory lock")
 			if strings.Contains(err.Error(), "Lock is already taken") {
@@ -280,6 +273,26 @@ func (bh *BackupHandler) startBackup(ctx context.Context) error {
 	bh.CurBackupInfo.Name = backupName
 	tracelog.InfoLogger.Printf("Started backup with name %s at LSN %s", backupName, backupStartLSN)
 	bh.initBackupTerminator(ctx)
+	return nil
+}
+
+func (bh *BackupHandler) initQueryRunner(ctx context.Context) error {
+	if bh.Workers.QueryRunner != nil {
+		return nil
+	}
+
+	// Keep supporting handlers constructed without a preinitialized runner.
+	tracelog.DebugLogger.Println("Connecting to Postgres.")
+	conn, err := Connect(ctx)
+	if err != nil {
+		return err
+	}
+	runner, err := NewPgQueryRunner(ctx, conn)
+	if err != nil {
+		utility.LoggedCloseContext(context.Background(), conn, "")
+		return fmt.Errorf("failed to build query runner: %v", err)
+	}
+	bh.Workers.QueryRunner = runner
 	return nil
 }
 
@@ -424,6 +437,16 @@ func (bh *BackupHandler) uploadBackup(ctx context.Context) internal.TarFileSets 
 // HandleBackupPush handles the backup being read from Postgres or filesystem and being pushed to the repository
 // TODO : unit tests
 func (bh *BackupHandler) HandleBackupPush(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer func() {
+		cancel()
+		if bh.Workers.QueryRunner != nil {
+			bh.Workers.QueryRunner.Mu.Lock()
+			defer bh.Workers.QueryRunner.Mu.Unlock()
+			utility.LoggedCloseContext(context.Background(), bh.Workers.QueryRunner.Connection, "")
+		}
+	}()
+
 	bh.CurBackupInfo.StartTime = utility.TimeNowCrossPlatformUTC()
 	// Must capture before dispatch: handleBackupPushLocal/Remote call uploader.ChangeDirectory(...),
 	// which mutates bh.Arguments.Uploader's stored folder in place.
@@ -590,11 +613,11 @@ func (bh *BackupHandler) collectDatabaseNamesMetadata(ctx context.Context) (Data
 
 // NewBackupHandler returns a backup handler object, which can handle the backup
 func NewBackupHandler(ctx context.Context, arguments BackupArguments) (bh *BackupHandler, err error) {
-	// RemoteBackup is triggered by not passing PGDATA to wal-g,
-	// and version cannot be read easily using replication connection.
-	// Retrieve both with this helper function which uses a temp connection to postgres.
-
-	pgInfo, _, err := GetPgServerInfo(ctx, false)
+	// Local backups reuse the connection that loaded the server information.
+	// Remote backups still need a temporary SQL connection before opening their
+	// separate replication connection.
+	keepRunner := arguments.pgDataDirectory != ""
+	pgInfo, runner, err := GetPgServerInfo(ctx, keepRunner)
 	if err != nil {
 		return nil, err
 	}
@@ -602,6 +625,7 @@ func NewBackupHandler(ctx context.Context, arguments BackupArguments) (bh *Backu
 	bh = &BackupHandler{
 		Arguments: arguments,
 		PgInfo:    pgInfo,
+		Workers:   BackupWorkers{QueryRunner: runner},
 	}
 
 	return bh, nil
@@ -658,6 +682,12 @@ func GetPgServerInfo(ctx context.Context, keepRunner bool) (pgInfo BackupPgInfo,
 	if err != nil {
 		return pgInfo, nil, err
 	}
+	defer func() {
+		// Ownership is transferred only when a runner is returned successfully.
+		if runner == nil {
+			utility.LoggedCloseContext(context.Background(), tmpConn, "")
+		}
+	}()
 
 	queryRunner, err := NewPgQueryRunner(ctx, tmpConn)
 	if err != nil {
@@ -671,16 +701,15 @@ func GetPgServerInfo(ctx context.Context, keepRunner bool) (pgInfo BackupPgInfo,
 	pgInfo.PgDataDirectory = utility.ResolveSymlink(pgInfo.PgDataDirectory)
 	tracelog.DebugLogger.Printf("Datadir: %s", pgInfo.PgDataDirectory)
 
-	err = queryRunner.getVersion(ctx)
-	if err != nil {
-		return pgInfo, nil, err
-	}
+	// NewPgQueryRunner already loads the cluster-wide version and identifier.
 	pgInfo.PgVersion = queryRunner.Version
 	tracelog.DebugLogger.Printf("Postgres version: %d", queryRunner.Version)
 
-	err = queryRunner.getSystemIdentifier(ctx)
-	if err != nil {
-		return pgInfo, nil, err
+	if queryRunner.SystemIdentifier == nil {
+		// Preserve the retry for servers where the first read failed transiently.
+		if err = queryRunner.getSystemIdentifier(ctx); err != nil {
+			return pgInfo, nil, err
+		}
 	}
 	pgInfo.systemIdentifier = queryRunner.SystemIdentifier
 	tracelog.DebugLogger.Printf("Postgres SystemIdentifier: %d", queryRunner.Version)
@@ -692,7 +721,6 @@ func GetPgServerInfo(ctx context.Context, keepRunner bool) (pgInfo BackupPgInfo,
 	tracelog.DebugLogger.Printf("Timeline: %d", pgInfo.Timeline)
 
 	if !keepRunner {
-		utility.LoggedCloseContext(ctx, tmpConn, "")
 		return pgInfo, nil, err
 	}
 
@@ -839,7 +867,12 @@ func addPgIsAliveChecker(ctx context.Context, queryRunner *PgQueryRunner, errCh 
 	pgWatcher := NewPgWatcher(ctx, queryRunner, stateUpdateInterval)
 
 	go func() {
-		err := <-pgWatcher.Err
+		err, ok := <-pgWatcher.Err
+		// Normal backup completion cancels the watcher before closing the
+		// connection; do not report that cleanup as a failed backup.
+		if !ok || ctx.Err() != nil {
+			return
+		}
 		errCh <- fmt.Errorf("PG alive check failed: %v", err)
 	}()
 }

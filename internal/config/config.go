@@ -98,6 +98,7 @@ const (
 	PgWalPageSize           = "WALG_PG_WAL_PAGE_SIZE"
 	PgBlockSize             = "WALG_PG_BLOCK_SIZE"
 	TotalBgUploadedLimit    = "TOTAL_BG_UPLOADED_LIMIT"
+	PgWalFullScanInterval   = "WALG_PG_WAL_FULL_SCAN_INTERVAL"
 	NameStreamCreateCmd     = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd    = "WALG_STREAM_RESTORE_COMMAND"
 	MaxDelayedSegmentsCount = "WALG_INTEGRITY_MAX_DELAYED_WALS"
@@ -281,6 +282,7 @@ var (
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TarDisableFsyncSetting:       "false",
 		TotalBgUploadedLimit:         "32",
+		PgWalFullScanInterval:        "5s",
 		UseReverseUnpackSetting:      "false",
 		SkipRedundantTarsSetting:     "false",
 		VerifyPageChecksumsSetting:   "false",
@@ -410,6 +412,7 @@ var (
 		LibsodiumKeyPathSetting:       true,
 		LibsodiumKeyTransform:         true,
 		TotalBgUploadedLimit:          true,
+		PgWalFullScanInterval:         true,
 		NameStreamCreateCmd:           true,
 		NameStreamRestoreCmd:          true,
 		UseReverseUnpackSetting:       true,
@@ -784,19 +787,22 @@ func GetWaleCompatibleSettingFrom(key string, config *viper.Viper) (value string
 func ConfigureLogging() error {
 	var logFile *os.File
 	logLevel := CommonDefaultConfigValues[LogLevelSetting]
-	var err error
 
 	if viper.IsSet(LogLevelSetting) {
 		logLevel = viper.GetString(LogLevelSetting)
 	}
 
-	if viper.IsSet(LogDestinationSetting) && viper.GetString(LogDestinationSetting) != "stderr" {
-		logFileName := viper.GetString(LogDestinationSetting)
-		logFile, err = os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	logDestination := viper.GetString(LogDestinationSetting)
+	switch {
+	case logDestination == "stdout":
+		logFile = os.Stdout
+	case logDestination != "" && logDestination != "stderr":
+		var err error
+		logFile, err = os.OpenFile(logDestination, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		if err != nil {
 			return fmt.Errorf("could not open log file: %s", err)
 		}
-	} else {
+	default:
 		logFile = os.Stderr
 	}
 
@@ -807,7 +813,7 @@ func ConfigureLogging() error {
 	if logging.LogFile != nil {
 		_ = logging.LogFile.Close()
 	}
-	if logFile != os.Stderr {
+	if logFile != os.Stderr && logFile != os.Stdout {
 		logging.LogFile = logFile
 	}
 	return nil
