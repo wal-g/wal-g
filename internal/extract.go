@@ -53,6 +53,10 @@ type TarInterpreter interface {
 	Interpret(reader io.Reader, header *tar.Header) error
 }
 
+type finalizingTarInterpreter interface {
+	Finalize() error
+}
+
 // FailedFilesRecoverer can recover selected files after ExtractAll exhausted
 // its configured retries. It must return the files that it could not recover.
 type FailedFilesRecoverer interface {
