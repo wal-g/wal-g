@@ -126,6 +126,7 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 
 	if err := shouldSkip(&op, ap.catchUp); err != nil {
 		tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
+		ap.recordAppliedOpTime(&op)
 		return nil
 	}
 
