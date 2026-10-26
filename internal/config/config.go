@@ -47,6 +47,7 @@ const (
 	DiskRateLimitSetting          = "WALG_DISK_RATE_LIMIT"
 	NetworkRateLimitSetting       = "WALG_NETWORK_RATE_LIMIT"
 	UseWalDeltaSetting            = "WALG_USE_WAL_DELTA"
+	UseWalSummarySetting          = "WALG_USE_WAL_SUMMARY"
 	UseReverseUnpackSetting       = "WALG_USE_REVERSE_UNPACK"
 	SkipRedundantTarsSetting      = "WALG_SKIP_REDUNDANT_TARS"
 	VerifyPageChecksumsSetting    = "WALG_VERIFY_PAGE_CHECKSUMS"
@@ -279,6 +280,7 @@ var (
 		DeltaMaxStepsSetting:         "0",
 		CompressionMethodSetting:     "lz4",
 		UseWalDeltaSetting:           "false",
+		UseWalSummarySetting:         "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TarDisableFsyncSetting:       "false",
 		TotalBgUploadedLimit:         "32",
@@ -391,6 +393,7 @@ var (
 		DiskRateLimitSetting:          true,
 		NetworkRateLimitSetting:       true,
 		UseWalDeltaSetting:            true,
+		UseWalSummarySetting:          true,
 		LogLevelSetting:               true,
 		LogDestinationSetting:         true,
 		TarSizeThresholdSetting:       true,
