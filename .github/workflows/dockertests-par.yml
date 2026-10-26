@@ -90,6 +90,7 @@ jobs:
         "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"7.0.15\" redis_features",
         "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
         "make mariadb_test",
+        "make rclone_test USE_BROTLI= USE_LZO= USE_LIBSODIUM=",
         "make gp_test",
         "make cloudberry_test",
         "make st_test",

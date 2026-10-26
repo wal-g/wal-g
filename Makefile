@@ -344,6 +344,12 @@ st_integration_test: load_docker_common
 	docker compose build st_tests
 	docker compose up --exit-code-from st_tests st_tests
 
+rclone_test: go_deps unlink_brotli rclone_integration_test
+
+rclone_integration_test: load_docker_common
+	docker compose build rclone_tests
+	docker compose up --exit-code-from rclone_tests rclone_tests
+
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
 	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/...

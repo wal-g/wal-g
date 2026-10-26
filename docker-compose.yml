@@ -699,3 +699,13 @@ services:
     env_file:
       - docker/common/common_walg.env
     <<: *s3_common_depends
+
+  rclone_tests:
+    build:
+      dockerfile: docker/rclone_tests/Dockerfile
+      context: .
+    image: wal-g/rclone_tests
+    container_name: wal-g_rclone_tests
+    env_file:
+      - docker/common/common_walg.env
+    <<: *s3_common_depends
