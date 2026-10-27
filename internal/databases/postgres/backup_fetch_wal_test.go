@@ -1,4 +1,4 @@
-package postgres_test
+package postgres
 
 import (
 	"bytes"
@@ -9,8 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -19,18 +18,18 @@ func TestBackupFetchWAL(t *testing.T) {
 		t.Run(walDir, func(t *testing.T) {
 			dir := t.TempDir()
 			require.NoError(t, os.Mkdir(filepath.Join(dir, walDir), 0700))
-			start := postgres.WalSegmentNo(255).GetFilename(1)
-			require.NoError(t, os.WriteFile(filepath.Join(dir, postgres.BackupLabelFilename), []byte(fmt.Sprintf("START WAL LOCATION: 0/FF000028 (file %s)\n", start)), 0600))
-			end := postgres.LSN(257 * postgres.WalSegmentSize) // exclusive: do not request segment 257
-			backup := postgres.Backup{SentinelDto: &postgres.BackupSentinelDto{BackupFinishLSN: &end}}
-			folder := testtools.MakeDefaultInMemoryStorageFolder()
-			data := bytes.Repeat([]byte{42}, int(postgres.WalSegmentSize))
+			start := WalSegmentNo(255).GetFilename(1)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, BackupLabelFilename), []byte(fmt.Sprintf("START WAL LOCATION: 0/FF000028 (file %s)\n", start)), 0600))
+			end := LSN(257 * WalSegmentSize) // exclusive: do not request segment 257
+			backup := Backup{SentinelDto: &BackupSentinelDto{BackupFinishLSN: &end}}
+			folder := memory.NewFolder("in_memory/", memory.NewKVS())
+			data := bytes.Repeat([]byte{42}, int(WalSegmentSize))
 			for _, seg := range []uint64{255, 256} {
-				require.NoError(t, folder.GetSubFolder(utility.WalPath).PutObject(t.Context(), postgres.WalSegmentNo(seg).GetFilename(1), bytes.NewReader(data)))
+				require.NoError(t, folder.GetSubFolder(utility.WalPath).PutObject(t.Context(), WalSegmentNo(seg).GetFilename(1), bytes.NewReader(data)))
 			}
-			require.NoError(t, postgres.FetchBackupWAL(t.Context(), folder, backup, dir))
+			require.NoError(t, FetchBackupWAL(t.Context(), folder, backup, dir))
 			for _, seg := range []uint64{255, 256} {
-				actual, err := os.ReadFile(filepath.Join(dir, walDir, postgres.WalSegmentNo(seg).GetFilename(1)))
+				actual, err := os.ReadFile(filepath.Join(dir, walDir, WalSegmentNo(seg).GetFilename(1)))
 				require.NoError(t, err)
 				require.Equal(t, data, actual)
 			}
@@ -39,17 +38,17 @@ func TestBackupFetchWAL(t *testing.T) {
 }
 
 func TestBackupFetchWALFailureDoesNotPublish(t *testing.T) {
-	for _, contents := range [][]byte{nil, []byte("truncated WAL"), bytes.Repeat([]byte{42}, int(postgres.WalSegmentSize))} {
+	for _, contents := range [][]byte{nil, []byte("truncated WAL"), bytes.Repeat([]byte{42}, int(WalSegmentSize))} {
 		t.Run(fmt.Sprintf("size_%d", len(contents)), func(t *testing.T) {
 			dir := t.TempDir()
 			require.NoError(t, os.Mkdir(filepath.Join(dir, "pg_wal"), 0700))
-			name := postgres.WalSegmentNo(1).GetFilename(1)
-			require.NoError(t, os.WriteFile(filepath.Join(dir, postgres.BackupLabelFilename), []byte(fmt.Sprintf("START WAL LOCATION: 0/1000028 (file %s)\n", name)), 0600))
-			backup := postgres.Backup{SentinelDto: &postgres.BackupSentinelDto{EndWalFileName: name}}
-			folder := testtools.MakeDefaultInMemoryStorageFolder()
+			name := WalSegmentNo(1).GetFilename(1)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, BackupLabelFilename), []byte(fmt.Sprintf("START WAL LOCATION: 0/1000028 (file %s)\n", name)), 0600))
+			backup := Backup{SentinelDto: &BackupSentinelDto{EndWalFileName: name}}
+			folder := memory.NewFolder("in_memory/", memory.NewKVS())
 			if contents != nil {
 				objectName := name
-				if len(contents) == int(postgres.WalSegmentSize) {
+				if len(contents) == int(WalSegmentSize) {
 					var compressed bytes.Buffer
 					writer := gzip.NewWriter(&compressed)
 					_, err := writer.Write(contents)
@@ -61,7 +60,7 @@ func TestBackupFetchWALFailureDoesNotPublish(t *testing.T) {
 				}
 				require.NoError(t, folder.GetSubFolder(utility.WalPath).PutObject(t.Context(), objectName, bytes.NewReader(contents)))
 			}
-			err := postgres.FetchBackupWAL(t.Context(), folder, backup, dir)
+			err := FetchBackupWAL(t.Context(), folder, backup, dir)
 			require.Error(t, err)
 			_, err = os.Stat(filepath.Join(dir, "pg_wal", name))
 			require.True(t, os.IsNotExist(err))
