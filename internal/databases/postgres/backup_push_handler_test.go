@@ -139,7 +139,8 @@ func TestWaitForWALArchive(t *testing.T) {
 			Folder: memory.NewFolder("", memory.NewKVS()),
 			calls:  &[]string{},
 		}
-		extensions := []string{"gz", "gz", "lzma", "lzma", "", ""}
+		// Use formats registered on both Unix and Windows; gzip is Unix-only.
+		extensions := []string{"lzma", "lzma", "lz4", "lz4", "", ""}
 		walFolder := folder.GetSubFolder(utility.WalPath)
 		for i, extension := range extensions {
 			name := utility.AddFileExtension((firstSegment + WalSegmentNo(i)).GetFilename(timeline), extension)
