@@ -45,7 +45,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	exporter, err := NewExporter(
+	exporter := NewExporter(
 		logger,
 		*walgPath,
 		*backupScrapeInterval,
@@ -53,10 +53,6 @@ func main() {
 		*storageScrapeInterval,
 		*walgConfigPath,
 	)
-	if err != nil {
-		logger.Error("Failed to create exporter", "error", err)
-		os.Exit(1)
-	}
 
 	prometheus.MustRegister(exporter)
 

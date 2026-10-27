@@ -84,7 +84,7 @@ func NewExporter(
 	binlogScrapeInterval time.Duration,
 	storageScrapeInterval time.Duration,
 	walgConfigPath string,
-) (*Exporter, error) {
+) *Exporter {
 	e := &Exporter{
 		logger:                logger,
 		walgPath:              walgPath,
@@ -98,7 +98,7 @@ func NewExporter(
 	e.initBinlogMetrics()
 	e.initStorageMetrics()
 
-	return e, nil
+	return e
 }
 
 // initBackupMetrics creates the metrics of the backup-list scrape.
@@ -278,7 +278,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.errors.Collect(ch)
 }
 
-// Start runs the metric collection loop until ctx is cancelled.
+// Start runs the metric collection loop until ctx is canceled.
 func (e *Exporter) Start(ctx context.Context) {
 	tickerBackup := time.NewTicker(e.backupScrapeInterval)
 	defer tickerBackup.Stop()
@@ -296,7 +296,7 @@ func (e *Exporter) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			e.logger.Info("Context cancelled, stopping collection")
+			e.logger.Info("Context canceled, stopping collection")
 			return
 		case <-tickerBackup.C:
 			e.scrapeBackups()
