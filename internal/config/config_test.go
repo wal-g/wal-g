@@ -123,3 +123,24 @@ func resetToDefaults() {
 	config.InitConfig()
 	config.Configure()
 }
+
+func TestGetMaxChecksumRetries(t *testing.T) {
+	previous := viper.Get(config.MaxChecksumRetriesSetting)
+	t.Cleanup(func() { viper.Set(config.MaxChecksumRetriesSetting, previous) })
+	for _, value := range []string{"0", "3", "-1", "invalid", "1.5", "999999999999999999999999"} {
+		t.Run(value, func(t *testing.T) {
+			viper.Set(config.MaxChecksumRetriesSetting, value)
+			actual, err := config.GetMaxChecksumRetries()
+			switch value {
+			case "0":
+				assert.NoError(t, err)
+				assert.Zero(t, actual)
+			case "3":
+				assert.NoError(t, err)
+				assert.Equal(t, 3, actual)
+			default:
+				assert.Error(t, err)
+			}
+		})
+	}
+}

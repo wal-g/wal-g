@@ -101,6 +101,13 @@ Removing a sentinel also does not protect a restore that has already read it.
 
 ## WAL pipelines
 
+- Checksum retries must replace the bytes entering the archive, not just
+  recheck a page after its original bytes have been copied. Preserve `pd_checksum`
+  during verification; incremental rereads use original relation-file block
+  offsets, including relation segment offsets for checksum calculation. See
+  `checksum_retry_reader_test.go` (retry limits, archive bytes and metadata,
+  incremental offsets, truncation, cancellation and replacement).
+
 - Keep one `pgproto3.Backend` per `wal-send` connection, including startup and
   COPY: it can buffer the next query while reading CopyDone. Hand reading back
   to the command loop only after the COPY reader exits, and serialize each

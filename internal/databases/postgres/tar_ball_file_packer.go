@@ -92,6 +92,17 @@ func (p *TarBallFilePackerImpl) PackFileIntoTar(ctx context.Context, cfi *intern
 			return err
 		}
 	}
+	if p.options.verifyPageChecksums {
+		retries, err := conf.GetMaxChecksumRetries()
+		if err != nil {
+			_ = fileReadCloser.Close()
+			return err
+		}
+		if retries > 0 && isChecksumValidatableFile(cfi.FileInfo, cfi.Path) &&
+			cfi.FileInfo.Size()%DatabasePageSize == 0 && !ignoredFileNames[cfi.FileInfo.Name()] {
+			return p.packFileWithChecksumRetries(ctx, cfi, tarBall, fileReadCloser, retries)
+		}
+	}
 	errorGroup, _ := errgroup.WithContext(ctx)
 
 	if p.options.verifyPageChecksums {
@@ -245,3 +256,23 @@ func newTeeReadCloserDirectIO(readCloser io.ReadCloser) (io.ReadCloser, io.ReadC
 type closerFunc func() error
 
 func (f closerFunc) Close() error { return f() }
+
+func (p *TarBallFilePackerImpl) packFileWithChecksumRetries(ctx context.Context, cfi *internal.ComposeFileInfo,
+	tarBall internal.TarBall, source io.ReadCloser, retries int) error {
+	reader, err := newChecksumRetryReader(ctx, cfi.Path, cfi.FileInfo, source, cfi.IsIncremented, retries)
+	if err != nil {
+		_ = source.Close()
+		return err
+	}
+	defer utility.LoggedClose(reader, "")
+	size, err := internal.PackFileTo(tarBall, cfi.Header, reader)
+	if err != nil {
+		return errors.Wrap(err, "PackFileIntoTar: operation failed")
+	}
+	if size != cfi.Header.Size {
+		return newTarSizeError(size, cfi.Header.Size)
+	}
+	p.files.AddFileWithCorruptBlocks(cfi.Header, cfi.FileInfo, cfi.IsIncremented,
+		reader.corruptBlocks, p.options.storeAllCorruptBlocks)
+	return nil
+}
