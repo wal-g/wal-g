@@ -156,9 +156,26 @@ Restore stages distinguish backup selection, reading metadata, and restoring eac
 full or delta backup in the chain, including reverse unpack. Backup creation also
 reports loading the delta map (when used) and collecting metadata before upload.
 
-Counts include repeated reads on retries and are not an acknowledgement that storage has committed the
-data. A complete total is not known for every backup mode, so this indicator
-does not show a percentage or ETA and does not require an extra directory scan.
+For `backup-fetch`, once archives have been selected, the display shows downloaded
+bytes / total bytes and an approximate download ETA for the current full or delta
+backup. The total includes only archives that will be read, using sizes from the
+existing archive listing without extra LIST or HEAD requests. Each backup in the
+chain starts a new estimate. For example:
+
+```text
+restoring full base_... | 1.0 GiB/4.0 GiB | ETA ~30s
+```
+
+ETA uses a smoothed transfer rate and shows `--` until a rate is available or while
+an incomplete download is idle. `ETA 0s` means the expected bytes have been read;
+it does not mean extraction, validation, or the entire restore chain has finished.
+Stage names may be shortened to keep the total and ETA visible in a narrow terminal.
+
+Unknown archive sizes, a size overrun, or a repeated archive read disable the estimate
+for that backup and restore the moving bar. Counts in that mode include repeated
+reads on retries. `backup-push` also uses the moving bar because the compressed total
+is unknown in advance. Byte counts are not an acknowledgement that storage has
+committed the data. No mode requires an additional directory scan.
 
 ### ``backup-fetch``
 

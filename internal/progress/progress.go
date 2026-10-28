@@ -1,4 +1,4 @@
-// Package progress displays an indeterminate progress bar for streaming backups.
+// Package progress displays live transfer progress for streaming backups.
 // Byte counts describe data consumed by readers, not storage acknowledgements.
 package progress
 
@@ -26,6 +26,7 @@ type contextKey struct{}
 type Tracker struct {
 	bytes         atomic.Int64
 	stage         atomic.Pointer[string]
+	download      *download
 	mu            sync.Mutex
 	out           io.Writer
 	label         string
@@ -173,6 +174,13 @@ func (p *Tracker) formatLine(now time.Time, width int) string {
 	if idle := now.Sub(p.lastProgress).Truncate(time.Second); idle >= idleThreshold {
 		idleSuffix = fmt.Sprintf(" (idle %s)", idle)
 	}
+	// Reserve room for a known download total and ETA before adding optional
+	// throughput/time details. The stage prefix and idle suffix retain priority.
+	if summary := p.downloadSummary(now, current, idleSuffix != ""); summary != "" {
+		stageWidth := max(20, width-len(idleSuffix)-len(summary)-3)
+		status = fitText(status, stageWidth)
+		line = fmt.Sprintf("%s | %s/s | %s", summary, formatBytes(rate), now.Sub(p.started).Truncate(time.Second))
+	}
 	// Keep the stage and its idle suffix visible before transfer statistics.
 	// Long backup names may be shortened, but must not push the idle time off screen.
 	status = fitText(status, width-len(idleSuffix)) + idleSuffix
@@ -219,7 +227,10 @@ func WithTracker(ctx context.Context, p *Tracker) context.Context {
 // SetStage changes the displayed stage; it is a no-op without a tracker.
 func SetStage(ctx context.Context, stage string) {
 	if p, _ := ctx.Value(contextKey{}).(*Tracker); p != nil {
+		p.mu.Lock()
+		defer p.mu.Unlock()
 		p.stage.Store(&stage)
+		p.download = nil
 	}
 }
 

@@ -34,7 +34,7 @@ func (readerMaker *StorageReaderMaker) Reader(ctx context.Context) (io.ReadClose
 	if err != nil {
 		return nil, err
 	}
-	return progress.TrackReadCloser(ctx, reader), nil
+	return progress.TrackDownload(ctx, readerMaker.storagePath, reader), nil
 }
 
 func (readerMaker *StorageReaderMaker) FileType() FileType { return readerMaker.StorageFileType }

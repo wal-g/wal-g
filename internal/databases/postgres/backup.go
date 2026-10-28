@@ -63,11 +63,18 @@ func NewBackupInStorage(ctx context.Context, baseBackupFolder storage.Folder, na
 	return Backup{Backup: backup}, nil
 }
 
-func (backup *Backup) GetTarNames(ctx context.Context) ([]string, error) {
-	tarPartitionFolder := backup.GetTarPartitionFolder()
-	objects, _, err := tarPartitionFolder.ListFolder(ctx)
+func (backup *Backup) getTarObjects(ctx context.Context) ([]storage.Object, error) {
+	objects, _, err := backup.GetTarPartitionFolder().ListFolder(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to list backup '%s' for deletion", backup.Name)
+		return nil, errors.Wrapf(err, "unable to list backup '%s'", backup.Name)
+	}
+	return objects, nil
+}
+
+func (backup *Backup) GetTarNames(ctx context.Context) ([]string, error) {
+	objects, err := backup.getTarObjects(ctx)
+	if err != nil {
+		return nil, err
 	}
 	result := make([]string, len(objects))
 	for id, object := range objects {
