@@ -196,6 +196,11 @@ services:
     container_name: wal-g_pg${PG_MAJOR}_full_backup_test
     command: /tmp/tests/full_backup_test.sh
 
+  pg_backup_fetch_wal_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg${PG_MAJOR}_backup_fetch_wal_test
+    command: /tmp/tests/backup_fetch_wal_test.sh
+
   pg_test_throttling: &pg_test_throttling
     image: wal-g/pg${PG_MAJOR}_tests
     user: postgres
