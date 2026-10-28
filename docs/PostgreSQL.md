@@ -177,6 +177,65 @@ reads on retries. `backup-push` also uses the moving bar because the compressed 
 is unknown in advance. Byte counts are not an acknowledgement that storage has
 committed the data. No mode requires an additional directory scan.
 
+### Progress snapshots for automation
+
+Use `--progress-dir=/run/wal-g/progress` with `backup-push` or `backup-fetch` to
+publish a JSON snapshot independently of terminal output. It also works with
+redirected stderr, `TERM=dumb`, or `--progress=false`:
+
+```bash
+wal-g backup-fetch /var/lib/postgresql/data LATEST --progress=false --progress-dir=/run/wal-g/progress
+wal-g backup-push /var/lib/postgresql/data --progress-dir=/run/wal-g/progress --progress-retention=24h
+```
+
+Each run uses a unique `walg-progress-<run-id>.json` file. The file contains only
+the latest state, normally updated about once per second and on stage changes;
+rapid changes may be coalesced. Multiple commands can share the directory without
+overwriting each other's snapshots. Use a dedicated local directory. New directories
+are created with mode `0700`, and snapshot files with mode `0600` on Unix.
+
+The version 1 JSON fields are:
+
+| Fields | Meaning |
+| --- | --- |
+| `version`, `run_id`, `pid`, `operation` | Schema version and identity of this command invocation. |
+| `status` | `running`, `completed`, `canceled`, or `failed`. |
+| `stage` | Current human-readable stage, including the backup name when available; limited to 1024 characters. |
+| `started_at`, `updated_at`, `finished_at` | UTC timestamps. `updated_at` is the sampling time, so delayed writes do not make an old snapshot appear fresh. `finished_at` is `null` while running. |
+| `last_transfer_at` | Time the sampler last observed an increase in transferred bytes; `null` before any transfer. |
+| `elapsed_seconds`, `stage_elapsed_seconds`, `idle_seconds` | Time since command start, stage change, and last observed byte increase (or command start if none). |
+| `transferred_bytes`, `bytes_per_second` | Command-wide bytes consumed, including retries, and rate over the latest sampling interval. |
+| `downloaded_bytes`, `total_bytes`, `eta_seconds` | Current backup's bounded download estimate. Values are `null` when unknown; ETA is also `null` during an incomplete idle download. |
+
+Snapshots use the same counters and estimates as terminal progress. An ETA of zero
+means the expected archive bytes have been read, not that validation or the whole
+restore has finished. A fresh snapshot with an unchanged counter can indicate local
+processing or a PostgreSQL wait; it does not by itself prove a hang.
+
+Snapshots are written to a temporary file in the same directory and then renamed
+into place. On local filesystems supporting atomic rename, readers see a complete
+old or new snapshot. Each snapshot is smaller than 16 KiB. Files are not appended
+to or synced for crash durability. Filesystem operations run on one separate worker
+with at most one pending snapshot, replaced by newer state. A blocked filesystem
+can stop publication but does not block byte accounting or stage changes. Shutdown
+waits at most 100 ms for the final file write. The first reporting error is logged
+as a warning; reporting errors do not fail the backup.
+
+Normal command cleanup publishes `completed`; context cancellation publishes
+`canceled`, and a panic unwinding the command's cleanup publishes `failed`. Fatal
+exits, kills, crashes, or a stalled writer can leave the last `running` snapshot.
+Final publication is best-effort: check snapshot freshness and the process exit
+status rather than treating an old `running` record as a live process.
+
+`--progress-retention` defaults to `24h`; nonpositive values disable cleanup. After
+the first successful write, the worker scans at most 1024 directory entries, in
+batches, once per run and removes recognized completed/failed/canceled snapshots
+whose finish time is older than the retention period. Running, malformed, foreign,
+and temporary files are preserved. Cleanup is bounded rather than a hard directory
+size limit: stale running snapshots and temporary files left by crashes need external
+housekeeping after confirming their processes have stopped. No cleanup runs when
+there are no new WAL-G invocations.
+
 ### ``backup-fetch``
 
 When fetching base backups, the user should pass in the name of the backup and a path to a directory to extract to. If this directory does not exist, WAL-G will create it and any intermediate subdirectories.

@@ -2,7 +2,6 @@ package progress
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"math"
 	"time"
@@ -53,17 +52,22 @@ func TrackDownload(ctx context.Context, name string, r io.ReadCloser) io.ReadClo
 	return TrackReadCloser(ctx, r)
 }
 
-// downloadSummary samples the transfer rate while Tracker.mu is held. A
+// estimateDownload samples the transfer rate while Tracker.mu is held. A
 // five-second exponential average smooths bursty reads without a sample buffer.
-func (p *Tracker) downloadSummary(now time.Time, current int64, idle bool) string {
+type downloadEstimate struct {
+	transferred, total int64
+	etaSeconds         *int64
+}
+
+func (p *Tracker) estimateDownload(now time.Time, current int64, idle bool) *downloadEstimate {
 	d := p.download
 	if d == nil {
-		return ""
+		return nil
 	}
 	transferred := current - d.baseline
 	if transferred < 0 || transferred > d.total {
 		p.download = nil // Storage size changed or reads did not match the selected total.
-		return ""
+		return nil
 	}
 	if seconds := now.Sub(d.sampled).Seconds(); seconds > 0 {
 		rate := float64(current-d.lastBytes) / seconds
@@ -74,17 +78,19 @@ func (p *Tracker) downloadSummary(now time.Time, current int64, idle bool) strin
 		}
 		d.sampled, d.lastBytes = now, current
 	}
-	eta := "--"
+	var eta *int64
 	switch {
 	case transferred == d.total:
-		eta = "0s" // All expected bytes were read; extraction/validation may still be running.
+		zero := int64(0)
+		eta = &zero // All expected bytes were read; extraction/validation may still be running.
 	case idle:
 		d.rate = 0
 	case d.rate > 0 && now.Sub(d.started) >= time.Second:
 		seconds := math.Ceil(float64(d.total-transferred) / d.rate)
 		if seconds < float64(math.MaxInt64)/float64(time.Second) {
-			eta = "~" + (time.Duration(seconds) * time.Second).String()
+			estimate := int64(seconds)
+			eta = &estimate
 		}
 	}
-	return fmt.Sprintf("%s/%s | ETA %s", formatBytes(float64(transferred)), formatBytes(float64(d.total)), eta)
+	return &downloadEstimate{transferred: transferred, total: d.total, etaSeconds: eta}
 }

@@ -107,6 +107,10 @@ Removing a sentinel also does not protect a restore that has already read it.
   The shared byte counter includes retries: repeated archive reads invalidate ETA
   until the next backup. See `tars_to_extract_progress_test.go` and
   `internal/progress/download_test.go`.
+- File progress is best-effort: filesystem work and cleanup must stay outside
+  `Tracker.mu`, with a bounded latest-only queue and bounded shutdown wait. An old
+  heartbeat does not prove that a process stopped; never expire `running` snapshots
+  automatically. See `internal/progress/file_test.go`.
 
 ## WAL pipelines
 

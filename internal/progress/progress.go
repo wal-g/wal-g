@@ -25,6 +25,7 @@ type contextKey struct{}
 // Tracker counts concurrent streams and serializes progress with log messages.
 type Tracker struct {
 	bytes         atomic.Int64
+	failed        atomic.Bool
 	stage         atomic.Pointer[string]
 	download      *download
 	mu            sync.Mutex
@@ -32,6 +33,11 @@ type Tracker struct {
 	label         string
 	fallbackWidth int
 	started       time.Time
+	stageStarted  time.Time
+	file          *fileReporter
+	fileLast      time.Time
+	fileStage     string
+	wake          chan struct{}
 	sampled       time.Time
 	lastProgress  time.Time
 	lastBytes     int64
@@ -50,7 +56,8 @@ func newTracker(out io.Writer, label string, fallbackWidth int) *Tracker {
 	now := time.Now()
 	return &Tracker{
 		out: out, label: label, fallbackWidth: fallbackWidth,
-		started: now, sampled: now, lastProgress: now,
+		started: now, stageStarted: now, sampled: now, lastProgress: now,
+		wake: make(chan struct{}, 1),
 		stop: make(chan struct{}), done: make(chan struct{}),
 	}
 }
@@ -59,19 +66,40 @@ func newTracker(out io.Writer, label string, fallbackWidth int) *Tracker {
 // interrupt a backup. The terminal width is refreshed on every frame; fallbackWidth
 // is used when it cannot be determined, with zero selecting an 80-column default.
 func Start(ctx context.Context, out io.Writer, label string, fallbackWidth int) *Tracker {
+	return StartWithFile(ctx, out, label, fallbackWidth, FileOptions{})
+}
+
+// StartWithFile optionally publishes JSON snapshots independently of terminal
+// rendering. A nil out disables terminal output; file errors never fail a backup.
+func StartWithFile(ctx context.Context, out io.Writer, label string, fallbackWidth int, options FileOptions) *Tracker {
 	p := newTracker(out, label, fallbackWidth)
+	if options.Directory != "" {
+		f := newStateFile(options)
+		p.file = startFileReporter(f.write, options.OnError)
+	}
 	p.render(p.started)
 	go func() {
 		defer close(p.done)
-		defer p.finish()
-		ticker := time.NewTicker(refreshInterval)
+		status := "completed"
+		defer func() { p.finish(status) }()
+		interval := refreshInterval
+		if out == nil {
+			interval = time.Second
+		}
+		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
+				status = "canceled"
 				return
 			case <-p.stop:
+				if ctx.Err() != nil {
+					status = "canceled"
+				}
 				return
+			case <-p.wake:
+				p.render(time.Now())
 			case now := <-ticker.C:
 				p.render(now)
 			}
@@ -84,13 +112,31 @@ func Start(ctx context.Context, out io.Writer, label string, fallbackWidth int) 
 func (p *Tracker) Stop() {
 	p.once.Do(func() { close(p.stop) })
 	<-p.done
+	if p.file != nil {
+		p.file.wait()
+	}
 }
 
-func (p *Tracker) finish() {
+// StopOnFailure preserves a failed outcome when unwinding a command panic.
+func (p *Tracker) StopOnFailure() {
+	p.failed.Store(true)
+	p.Stop()
+}
+
+func (p *Tracker) finish(status string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.stopped = true
 	p.clear()
+	if p.file != nil {
+		s := p.snapshot(time.Now())
+		if p.failed.Load() {
+			status = "failed"
+		}
+		s.Status = status
+		s.FinishedAt = &s.UpdatedAt
+		p.file.submit(s)
+	}
 }
 
 func (p *Tracker) clear() {
@@ -134,30 +180,32 @@ func (p *Tracker) render(now time.Time) {
 	if p.stopped {
 		return
 	}
-	// Refresh the width on every frame so resizing does not cause wrapped lines
-	// that cannot be removed by clearing the current line.
-	width := p.fallbackWidth
-	if terminal, ok := p.out.(interface{ Fd() uintptr }); ok {
-		if columns, _, err := term.GetSize(int(terminal.Fd())); err == nil && columns > 0 {
-			width = columns
+	s := p.snapshot(now)
+	if p.out != nil {
+		// Refresh terminal width on every frame to avoid wrapped lines after resize.
+		width := p.fallbackWidth
+		if terminal, ok := p.out.(interface{ Fd() uintptr }); ok {
+			if columns, _, err := term.GetSize(int(terminal.Fd())); err == nil && columns > 0 {
+				width = columns
+			}
 		}
+		line := fitText(p.formatSnapshot(s, width-1), width-1)
+		_, _ = fmt.Fprintf(p.out, "\r\x1b[2K%s", line)
+		p.visible = true
 	}
-	line := fitText(p.formatLine(now, width-1), width-1)
-	_, _ = fmt.Fprintf(p.out, "\r\x1b[2K%s", line)
-	p.visible = true
+	if p.file != nil && (p.out == nil || p.fileLast.IsZero() || s.Stage != p.fileStage || now.Sub(p.fileLast) >= time.Second) {
+		p.file.submit(s)
+		p.fileLast, p.fileStage = now, s.Stage
+	}
 }
 
-// formatLine updates the rate sample and animation frame while p.mu is held.
+// formatLine is used by deterministic rendering tests; production samples once
+// per tick and shares the same snapshot across both outputs.
 func (p *Tracker) formatLine(now time.Time, width int) string {
-	current := p.bytes.Load()
-	var rate float64
-	if seconds := now.Sub(p.sampled).Seconds(); seconds > 0 {
-		rate = float64(current-p.lastBytes) / seconds
-	}
-	if current != p.lastBytes {
-		p.lastProgress = now
-	}
-	p.sampled, p.lastBytes = now, current
+	return p.formatSnapshot(p.snapshot(now), width)
+}
+
+func (p *Tracker) formatSnapshot(s Snapshot, width int) string {
 	bar := []byte("            ")
 	position := p.frame % (2 * (len(bar) - 3))
 	if position > len(bar)-3 {
@@ -165,24 +213,26 @@ func (p *Tracker) formatLine(now time.Time, width int) string {
 	}
 	copy(bar[position:], "===")
 	p.frame++
+	elapsed := time.Duration(s.ElapsedSeconds * float64(time.Second)).Truncate(time.Second)
 	line := fmt.Sprintf("%s [%s] %s | %s/s | %s", p.label, bar,
-		formatBytes(float64(current)), formatBytes(rate), now.Sub(p.started).Truncate(time.Second))
-	var status, idleSuffix string
-	if stage := p.stage.Load(); stage != nil {
-		status = *stage
-	}
-	if idle := now.Sub(p.lastProgress).Truncate(time.Second); idle >= idleThreshold {
+		formatBytes(float64(s.TransferredBytes)), formatBytes(s.BytesPerSecond), elapsed)
+	status, idleSuffix := s.Stage, ""
+	if idle := time.Duration(s.IdleSeconds * float64(time.Second)).Truncate(time.Second); idle >= idleThreshold {
 		idleSuffix = fmt.Sprintf(" (idle %s)", idle)
 	}
-	// Reserve room for a known download total and ETA before adding optional
-	// throughput/time details. The stage prefix and idle suffix retain priority.
-	if summary := p.downloadSummary(now, current, idleSuffix != ""); summary != "" {
+	if s.TotalBytes != nil {
+		eta := "--"
+		if s.ETASeconds != nil {
+			eta = (time.Duration(*s.ETASeconds) * time.Second).String()
+			if *s.ETASeconds > 0 {
+				eta = "~" + eta
+			}
+		}
+		summary := fmt.Sprintf("%s/%s | ETA %s", formatBytes(float64(*s.DownloadedBytes)), formatBytes(float64(*s.TotalBytes)), eta)
 		stageWidth := max(20, width-len(idleSuffix)-len(summary)-3)
 		status = fitText(status, stageWidth)
-		line = fmt.Sprintf("%s | %s/s | %s", summary, formatBytes(rate), now.Sub(p.started).Truncate(time.Second))
+		line = fmt.Sprintf("%s | %s/s | %s", summary, formatBytes(s.BytesPerSecond), elapsed)
 	}
-	// Keep the stage and its idle suffix visible before transfer statistics.
-	// Long backup names may be shortened, but must not push the idle time off screen.
 	status = fitText(status, width-len(idleSuffix)) + idleSuffix
 	if status != "" {
 		line = status + " | " + line
@@ -229,8 +279,17 @@ func SetStage(ctx context.Context, stage string) {
 	if p, _ := ctx.Value(contextKey{}).(*Tracker); p != nil {
 		p.mu.Lock()
 		defer p.mu.Unlock()
+		if old := p.stage.Load(); old == nil || *old != stage {
+			p.stageStarted = time.Now()
+		}
 		p.stage.Store(&stage)
 		p.download = nil
+		if p.file != nil {
+			select {
+			case p.wake <- struct{}{}:
+			default:
+			}
+		}
 	}
 }
 
