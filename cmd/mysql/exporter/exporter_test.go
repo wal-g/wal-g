@@ -1,202 +1,269 @@
 package main
 
 import (
+	"context"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// realBinlogListJSON and realBackupListJSON are the outputs of 'wal-g binlog-list --json' and
+// realBinlogListJSON and realBackupListJSON are outputs of 'wal-g binlog-list --json' and
 // 'wal-g backup-list --detail --json' of the MySQL binary.
-const realBinlogListJSON = `[{"name":"mysql-bin.000001","size":1000,"last_modified":"2026-10-27T17:50:23.625471526+01:00"},{"name":"mysql-bin.000002","size":2000,"last_modified":"2026-10-27T17:50:23.631783551+01:00"}]`
+const realBinlogListJSON = `[
+  {"name":"mysql-bin.000001","size":1000,"last_modified":"2026-10-27T17:50:23.625471526+01:00"},
+  {"name":"mysql-bin.000002","size":2000,"last_modified":"2026-10-27T17:50:23.631783551+01:00"}
+]`
 
-const realBackupListJSON = `[{"backup_name":"stream_20260101T000000Z","modify_time":"2026-10-27T17:50:53.340358836+01:00","binlog_start":"mysql-bin.000001","binlog_end":"mysql-bin.000002","start_local_time":"2026-01-01T00:00:00Z","stop_local_time":"2026-01-01T00:05:00Z","uncompressed_size":5000,"compressed_size":1000,"hostname":"db1","is_permanent":false}]`
+const realBackupListJSON = `[
+  {"backup_name":"stream_20260101T000000Z","modify_time":"2026-10-27T17:50:53.340358836+01:00",
+   "binlog_start":"mysql-bin.000001","binlog_end":"mysql-bin.000002",
+   "start_local_time":"2026-01-01T00:00:00Z","stop_local_time":"2026-01-01T00:05:00Z",
+   "uncompressed_size":5000,"compressed_size":1000,"hostname":"db1","is_permanent":false}
+]`
 
-func TestParseBinlogList(t *testing.T) {
-	t.Run("valid output", func(t *testing.T) {
-		binlogs, err := parseBinlogList([]byte(realBinlogListJSON))
-		require.NoError(t, err)
-		require.Len(t, binlogs, 2)
-
-		assert.Equal(t, "mysql-bin.000001", binlogs[0].Name)
-		assert.Equal(t, int64(1000), binlogs[0].Size)
-		assert.Equal(t, "mysql-bin.000002", binlogs[1].Name)
-		assert.Equal(t, int64(2000), binlogs[1].Size)
-		assert.Equal(t, 2026, binlogs[1].ModifiedTime.Year())
-	})
-
-	t.Run("empty output", func(t *testing.T) {
-		binlogs, err := parseBinlogList(nil)
-		require.NoError(t, err)
-		assert.Empty(t, binlogs)
-	})
-
-	t.Run("empty list", func(t *testing.T) {
-		binlogs, err := parseBinlogList([]byte("[]"))
-		require.NoError(t, err)
-		assert.Empty(t, binlogs)
-	})
-
-	t.Run("invalid json", func(t *testing.T) {
-		_, err := parseBinlogList([]byte("name size modified"))
-		require.Error(t, err)
-	})
+func readTestdata(t *testing.T, name string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", name))
+	require.NoError(t, err)
+	return string(data)
 }
 
-// writeFakeWalg writes a 'wal-g' stand-in that prints the given outputs for backup-list and binlog-list
-// and fails for anything else, and returns its path.
-func writeFakeWalg(t *testing.T, backupList, binlogList string) string {
+// fakeWalg is a stand-in for the wal-g binary that prints the given outputs.
+type fakeWalg struct {
+	backupList string
+	binlogList string
+	// failing holds the commands that exit with an error
+	failing map[string]bool
+}
+
+func (f fakeWalg) install(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "backups.json"), []byte(backupList), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "binlogs.json"), []byte(binlogList), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "backups.json"), []byte(f.backupList), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "binlogs.json"), []byte(f.binlogList), 0o600))
 
-	script := "#!/bin/sh\n" +
-		"case \"$1 $2 $3\" in\n" +
-		"  \"backup-list --detail --json\") cat " + filepath.Join(dir, "backups.json") + " ;;\n" +
-		"  \"binlog-list --json\"*) cat " + filepath.Join(dir, "binlogs.json") + " ;;\n" +
-		"  *) echo \"unexpected arguments: $*\" >&2; exit 1 ;;\n" +
-		"esac\n"
+	var script strings.Builder
+	script.WriteString("#!/bin/sh\ncase \"$1\" in\n")
+	for cmd, file := range map[string]string{"backup-list": "backups.json", "binlog-list": "binlogs.json"} {
+		if f.failing[cmd] {
+			script.WriteString("  " + cmd + ") echo failing >&2; exit 1 ;;\n")
+		} else {
+			script.WriteString("  " + cmd + ") cat " + filepath.Join(dir, file) + " ;;\n")
+		}
+	}
+	if f.failing["st"] {
+		script.WriteString("  st) echo failing >&2; exit 1 ;;\n")
+	} else {
+		script.WriteString("  st) exit 0 ;;\n")
+	}
+	script.WriteString("  *) echo \"unexpected arguments: $*\" >&2; exit 1 ;;\nesac\n")
+
 	path := filepath.Join(dir, "wal-g")
-	require.NoError(t, os.WriteFile(path, []byte(script), 0o700))
+	require.NoError(t, os.WriteFile(path, []byte(script.String()), 0o700))
 	return path
 }
 
-func TestFetchUsesMachineReadableOutput(t *testing.T) {
-	e := &Exporter{walgPath: writeFakeWalg(t, realBackupListJSON, realBinlogListJSON)}
+func newTestExporter(t *testing.T, prefix string, f fakeWalg) *Exporter {
+	t.Helper()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	return NewExporter(logger, Config{
+		MetricPrefix:          prefix,
+		WalgPath:              f.install(t),
+		StorageScrapeInterval: time.Hour,
+		WalgScrapeInterval:    time.Hour,
+	})
+}
 
-	backups, err := e.fetchBackupList()
+func defaultFake(t *testing.T) fakeWalg {
+	t.Helper()
+	return fakeWalg{backupList: readTestdata(t, "backup-list.json"), binlogList: readTestdata(t, "binlog-list.json")}
+}
+
+func TestMetricNamesUseDatabasePrefix(t *testing.T) {
+	for _, namespace := range []string{"walg_mysql", "walg_mariadb"} {
+		t.Run(namespace, func(t *testing.T) {
+			e := newTestExporter(t, namespace, defaultFake(t))
+			e.checkStorageAliveness(context.Background())
+			e.scrapeAllWalgMetrics(context.Background())
+
+			registry := prometheus.NewPedanticRegistry()
+			registry.MustRegister(e)
+			families, err := registry.Gather()
+			require.NoError(t, err)
+
+			got := map[string]bool{}
+			for _, family := range families {
+				got[family.GetName()] = true
+				assert.True(t, strings.HasPrefix(family.GetName(), namespace+"_"), "unexpected name %s", family.GetName())
+			}
+
+			// errors_total has no series until an error happens
+			for _, suffix := range []string{
+				"backups", "backup_start_timestamp", "backup_finish_timestamp", "backup_uncompressed_size_bytes",
+				"backup_compressed_size_bytes", "backup_duration_seconds", "binlog_count", "binlog_latest_timestamp",
+				"binlog_oldest_timestamp", "binlog_total_size_bytes", "rpo_seconds", "binlog_gap_seconds",
+				"storage_up", "storage_latency_seconds", "storage_scrape_duration_seconds", "walg_scrape_duration_seconds",
+				"backup_scrape_duration_seconds", "binlog_scrape_duration_seconds", "scrape_errors_total",
+			} {
+				assert.True(t, got[namespace+"_"+suffix], "metric %s_%s is missing", namespace, suffix)
+			}
+		})
+	}
+}
+
+func TestMetricPrefix(t *testing.T) {
+	for database, want := range map[string]string{"mysql": "walg_mysql", "mariadb": "walg_mariadb"} {
+		got, err := metricPrefix(database)
+		require.NoError(t, err)
+		assert.Equal(t, want, got)
+	}
+
+	for _, invalid := range []string{"", "postgres", "MySQL", "mariadb ", "walg_mariadb"} {
+		_, err := metricPrefix(invalid)
+		assert.Error(t, err, "%q", invalid)
+	}
+}
+
+func TestBackupAndBinlogMetrics(t *testing.T) {
+	e := newTestExporter(t, "walg_mysql", defaultFake(t))
+	ctx := context.Background()
+
+	backups, err := e.getBackupList(ctx)
 	require.NoError(t, err)
-	require.Len(t, backups, 1)
-	assert.Equal(t, "stream_20260101T000000Z", backups[0].BackupName)
-	assert.Equal(t, "mysql-bin.000002", backups[0].BinLogEnd)
-	assert.Equal(t, int64(1000), backups[0].CompressedSize)
-
-	binlogs, err := e.fetchBinlogList()
+	binlogs, err := e.getBinlogList(ctx)
 	require.NoError(t, err)
-	require.Len(t, binlogs, 2)
-	assert.Equal(t, "mysql-bin.000001", binlogs[0].Name)
+	require.Len(t, backups, 3)
+	require.Len(t, binlogs, 5)
+
+	// one hour after the latest binlog
+	now := time.Date(2025, 2, 22, 7, 45, 0, 0, time.UTC)
+	e.updateBackupMetrics(backups)
+	e.updateBinlogMetrics(binlogs, now)
+	e.updateBinlogGap(backups, binlogs)
+
+	assert.Equal(t, 3.0, testutil.ToFloat64(e.backupCount.WithLabelValues("full")))
+	assert.Equal(t, 99.0, testutil.ToFloat64(e.backupDuration.WithLabelValues("stream_20250222T020001Z")))
+	assert.Equal(t, 927914660.0, testutil.ToFloat64(e.backupCompressedSize.WithLabelValues("stream_20250222T020001Z")))
+	assert.Equal(t, 2782971598.0, testutil.ToFloat64(e.backupUncompressedSize.WithLabelValues("stream_20250222T020001Z")))
+	assert.Equal(t, float64(time.Date(2025, 2, 22, 2, 1, 40, 0, time.UTC).Unix()), testutil.ToFloat64(e.backupFinishTimestamp.WithLabelValues("stream_20250222T020001Z")))
+	// one series per finished backup
+	assert.Equal(t, 3, testutil.CollectAndCount(e.backupFinishTimestamp))
+
+	assert.Equal(t, 5.0, testutil.ToFloat64(e.binlogCount))
+	assert.Equal(t, 6029312.0, testutil.ToFloat64(e.binlogTotalSize))
+	assert.Equal(t, float64(time.Date(2025, 2, 22, 6, 45, 0, 0, time.UTC).Unix()), testutil.ToFloat64(e.binlogLatestTimestamp))
+	assert.Equal(t, float64(time.Date(2025, 2, 21, 1, 30, 0, 0, time.UTC).Unix()), testutil.ToFloat64(e.binlogOldestTimestamp))
+	assert.Equal(t, 3600.0, testutil.ToFloat64(e.rpoSeconds))
+
+	// the oldest binlog (Feb 21 01:30:00) is older than the latest backup finish (Feb 22 02:01:40): no hole, the gap is negative
+	assert.Equal(t, -(24*3600 + 31*60 + 40.0), testutil.ToFloat64(e.binlogGapSeconds))
 }
 
-func TestFetchBinlogListNoBinlogs(t *testing.T) {
-	// 'wal-g binlog-list' prints nothing and exits with 0 when the storage has no binlogs.
-	e := &Exporter{walgPath: writeFakeWalg(t, "[]", "")}
+func TestBinlogGapIsPositiveWhenBinlogsDoNotReachTheBackup(t *testing.T) {
+	e := newTestExporter(t, "walg_mysql", fakeWalg{backupList: realBackupListJSON, binlogList: "[]"})
 
-	binlogs, err := e.fetchBinlogList()
-	require.NoError(t, err)
-	assert.Empty(t, binlogs)
+	backups := []BackupInfo{{BackupName: "b", StopLocalTime: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}}
+	binlogs := []BinlogInfo{{Name: "bin.1", LastModified: time.Date(2025, 1, 1, 1, 0, 0, 0, time.UTC)}}
+	e.updateBinlogGap(backups, binlogs)
+	assert.Equal(t, 3600.0, testutil.ToFloat64(e.binlogGapSeconds))
+
+	e.updateBinlogGap(nil, binlogs)
+	assert.Equal(t, 0.0, testutil.ToFloat64(e.binlogGapSeconds))
 }
 
-func TestFetchBinlogListCommandFailure(t *testing.T) {
-	// a failing command must not look like an empty storage
-	e := &Exporter{walgPath: "/nonexistent/wal-g"}
+func TestRealWalgOutputFormat(t *testing.T) {
+	e := newTestExporter(t, "walg_mysql", fakeWalg{backupList: realBackupListJSON, binlogList: realBinlogListJSON})
+	e.scrapeAllWalgMetrics(context.Background())
 
-	_, err := e.fetchBinlogList()
-	require.Error(t, err)
+	assert.Equal(t, 1.0, testutil.ToFloat64(e.backupCount.WithLabelValues("full")))
+	assert.Equal(t, 5000.0, testutil.ToFloat64(e.backupUncompressedSize.WithLabelValues("stream_20260101T000000Z")))
+	assert.Equal(t, 2.0, testutil.ToFloat64(e.binlogCount))
+	assert.Equal(t, 3000.0, testutil.ToFloat64(e.binlogTotalSize))
+	assert.Equal(t, 0.0, testutil.ToFloat64(e.scrapeErrors))
 }
 
-func TestBackupDuration(t *testing.T) {
-	t.Run("valid times", func(t *testing.T) {
-		start := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
-		stop := start.Add(30 * time.Minute)
-		b := &BackupInfo{StartLocalTime: start, StopLocalTime: stop}
-		assert.Equal(t, (30 * time.Minute).Seconds(), b.duration())
-	})
+func TestNoBackupsAndNoBinlogs(t *testing.T) {
+	// wal-g prints an empty list for backups and nothing for binlogs
+	e := newTestExporter(t, "walg_mysql", fakeWalg{backupList: "[]", binlogList: ""})
+	e.scrapeAllWalgMetrics(context.Background())
 
-	t.Run("zero times returns 0", func(t *testing.T) {
-		b := &BackupInfo{}
-		assert.Equal(t, float64(0), b.duration())
-	})
+	assert.Equal(t, 0.0, testutil.ToFloat64(e.backupCount.WithLabelValues("full")))
+	assert.Equal(t, 0.0, testutil.ToFloat64(e.binlogCount))
+	assert.Equal(t, 0.0, testutil.ToFloat64(e.scrapeErrors))
+	assert.True(t, e.successfulWalgScrapes.Load() > 0)
 }
 
-func TestOldestNonPermanentStart(t *testing.T) {
-	t1 := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
-	t2 := time.Date(2026, 5, 2, 0, 0, 0, 0, time.UTC)
-	t3 := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
+func TestFailingCommandsAreReported(t *testing.T) {
+	for _, command := range []string{"backup-list", "binlog-list"} {
+		t.Run(command, func(t *testing.T) {
+			f := defaultFake(t)
+			f.failing = map[string]bool{command: true}
+			e := newTestExporter(t, "walg_mysql", f)
+			e.scrapeAllWalgMetrics(context.Background())
 
-	t.Run("returns oldest non-permanent", func(t *testing.T) {
-		backups := []BackupInfo{
-			{StartLocalTime: t1, IsPermanent: false},
-			{StartLocalTime: t2, IsPermanent: false},
-			{StartLocalTime: t3, IsPermanent: true},
-		}
-		result := oldestNonPermanentStart(backups)
-		assert.Equal(t, t1, result)
-	})
-
-	t.Run("all permanent returns zero time", func(t *testing.T) {
-		backups := []BackupInfo{
-			{StartLocalTime: t1, IsPermanent: true},
-		}
-		result := oldestNonPermanentStart(backups)
-		assert.True(t, result.IsZero())
-	})
-
-	t.Run("empty slice returns zero time", func(t *testing.T) {
-		result := oldestNonPermanentStart(nil)
-		assert.True(t, result.IsZero())
-	})
+			assert.Equal(t, 1.0, testutil.ToFloat64(e.scrapeErrors))
+			assert.Equal(t, 1.0, testutil.ToFloat64(e.errors.WithLabelValues(command, "command_failed")))
+			assert.Equal(t, int64(0), e.successfulWalgScrapes.Load())
+		})
+	}
 }
 
-func TestLatestBinlogTime(t *testing.T) {
-	t1 := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
-	t2 := time.Date(2026, 5, 3, 0, 0, 0, 0, time.UTC)
-	t3 := time.Date(2026, 5, 2, 0, 0, 0, 0, time.UTC)
+func TestStorageCheck(t *testing.T) {
+	e := newTestExporter(t, "walg_mysql", defaultFake(t))
+	e.checkStorageAliveness(context.Background())
+	assert.Equal(t, 1.0, testutil.ToFloat64(e.storageUp))
 
-	t.Run("returns latest", func(t *testing.T) {
-		binlogs := []BinlogInfo{
-			{ModifiedTime: t1},
-			{ModifiedTime: t2},
-			{ModifiedTime: t3},
-		}
-		assert.Equal(t, t2, latestBinlogTime(binlogs))
-	})
-
-	t.Run("empty slice returns zero time", func(t *testing.T) {
-		assert.True(t, latestBinlogTime(nil).IsZero())
-	})
+	f := defaultFake(t)
+	f.failing = map[string]bool{"st": true}
+	e = newTestExporter(t, "walg_mysql", f)
+	e.checkStorageAliveness(context.Background())
+	assert.Equal(t, 0.0, testutil.ToFloat64(e.storageUp))
+	assert.Equal(t, 1.0, testutil.ToFloat64(e.errors.WithLabelValues("storage-check", "connectivity_failed")))
 }
 
-func TestUpdateBinlogCoverage(t *testing.T) {
-	t.Run("computes coverage correctly", func(t *testing.T) {
-		e := &Exporter{
-			lastOldestBackupStart: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
-			lastLatestBinlogTime:  time.Date(2026, 5, 2, 0, 0, 0, 0, time.UTC),
-			binlogCoverage:        newTestGauge(),
-		}
-		e.updateBinlogCoverage()
-		assert.Equal(t, (24 * time.Hour).Seconds(), gaugeValue(e.binlogCoverage))
-	})
+func TestHTTPEndpoints(t *testing.T) {
+	e := newTestExporter(t, "walg_mariadb", defaultFake(t))
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(e)
+	server := httptest.NewServer(newHandler(e, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}), "/metrics"))
+	t.Cleanup(server.Close)
 
-	t.Run("zero when binlog time is zero", func(t *testing.T) {
-		e := &Exporter{
-			lastOldestBackupStart: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
-			binlogCoverage:        newTestGauge(),
-		}
-		e.updateBinlogCoverage()
-		assert.Equal(t, float64(0), gaugeValue(e.binlogCoverage))
-	})
+	get := func(path string) (int, string) {
+		resp, err := http.Get(server.URL + path)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		return resp.StatusCode, string(body)
+	}
 
-	t.Run("zero when backup start is zero", func(t *testing.T) {
-		e := &Exporter{
-			lastLatestBinlogTime: time.Date(2026, 5, 2, 0, 0, 0, 0, time.UTC),
-			binlogCoverage:       newTestGauge(),
-		}
-		e.updateBinlogCoverage()
-		assert.Equal(t, float64(0), gaugeValue(e.binlogCoverage))
-	})
+	status, _ := get("/health")
+	assert.Equal(t, http.StatusOK, status)
 
-	t.Run("clamps negative coverage to zero", func(t *testing.T) {
-		e := &Exporter{
-			lastOldestBackupStart: time.Date(2026, 5, 2, 0, 0, 0, 0, time.UTC),
-			lastLatestBinlogTime:  time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
-			binlogCoverage:        newTestGauge(),
-		}
-		e.updateBinlogCoverage()
-		assert.Equal(t, float64(0), gaugeValue(e.binlogCoverage))
-	})
+	status, _ = get("/ready")
+	assert.Equal(t, http.StatusServiceUnavailable, status, "not ready before the first scrape")
+
+	e.checkStorageAliveness(context.Background())
+	e.scrapeAllWalgMetrics(context.Background())
+
+	status, _ = get("/ready")
+	assert.Equal(t, http.StatusOK, status)
+
+	status, body := get("/metrics")
+	assert.Equal(t, http.StatusOK, status)
+	assert.Contains(t, body, "walg_mariadb_backups{backup_type=\"full\"} 3")
+	assert.Contains(t, body, "walg_mariadb_binlog_count 5")
+	assert.Contains(t, body, "walg_mariadb_storage_up 1")
 }

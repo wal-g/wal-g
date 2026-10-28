@@ -444,15 +444,9 @@ make MYSQL_TEST_FILTER=pitr mysql_integration_test
 
 ## Monitoring with Prometheus Exporter
 
-WAL-G provides a production-ready Prometheus exporter for MySQL/MariaDB backup monitoring. The exporter provides comprehensive metrics for backups, binlogs, and storage health.
-
-### Features
-
-- **Backup metrics**: Track backup timestamps, sizes and duration
-- **Binlog monitoring**: Monitor binlog count, latest timestamp, and total size
-- **Storage health**: Monitor storage connectivity and latency
-- **Error tracking**: Track WAL-G operation errors
-- **Zero dependencies**: Single binary with graceful shutdown support
+WAL-G has a Prometheus exporter for MySQL and MariaDB backup monitoring in `cmd/mysql/exporter`. It runs the `wal-g`
+binary and exposes the backups, binlogs, the data loss window (RPO), the gaps in the binlog coverage and the storage
+health as metrics.
 
 ### Installation
 
@@ -470,12 +464,16 @@ go build -o walg-mysql-exporter .
   --walg.config-path=/etc/wal-g/config.json
 ```
 
+The metric names start with `walg_mysql` by default. Use `--database=mariadb` to get the `walg_mariadb` prefix instead.
+
 ### Key Metrics
 
 - `walg_mysql_backup_finish_timestamp` - When backups completed
 - `walg_mysql_backup_duration_seconds` - How long backups took
 - `walg_mysql_backup_compressed_size_bytes` - Backup sizes
 - `walg_mysql_binlog_count` - Number of binlogs in storage
+- `walg_mysql_rpo_seconds` - Seconds since the most recent binlog was archived
+- `walg_mysql_binlog_gap_seconds` - Positive when the binlogs do not reach back to the latest backup
 - `walg_mysql_storage_up` - Storage connectivity status (1=up, 0=down)
 
 ### Example Prometheus Queries
@@ -485,14 +483,14 @@ go build -o walg-mysql-exporter .
 (time() - max(walg_mysql_backup_finish_timestamp)) / 3600
 ```
 
-**Backup compression ratio**:
-```promql
-walg_mysql_backup_compressed_size_bytes / walg_mysql_backup_uncompressed_size_bytes
-```
-
 **Alert if no backup in 25 hours**:
 ```promql
 (time() - max(walg_mysql_backup_finish_timestamp)) / 3600 > 25
+```
+
+**Alert if point-in-time recovery has a hole**:
+```promql
+walg_mysql_binlog_gap_seconds > 0
 ```
 
 For complete documentation, see [cmd/mysql/exporter/README.md](../cmd/mysql/exporter/README.md)
