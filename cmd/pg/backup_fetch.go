@@ -27,6 +27,7 @@ Separate parameters with comma. Use 'database' or 'database/namespace.table' as 
 Sets reverse delta unpack & skip redundant tars options automatically. Always downloads system databases and tables.`
 )
 
+var fetchWAL bool
 var fileMask string
 var restoreSpec string
 var reverseDeltaUnpack bool
@@ -81,6 +82,10 @@ var backupFetchCmd = &cobra.Command{
 			pgFetcher = postgres.GetFetcherOld(args[0], fileMask, restoreSpec, extractProv)
 		}
 
+		if fetchWAL {
+			pgFetcher = postgres.WithWALFetch(pgFetcher, args[0])
+		}
+
 		internal.HandleBackupFetch(cmd.Context(), rootFolder, targetBackupSelector, pgFetcher)
 	},
 }
@@ -102,6 +107,8 @@ func createTargetFetchBackupSelector(cmd *cobra.Command,
 }
 
 func init() {
+	backupFetchCmd.Flags().BoolVar(&fetchWAL, "fetch-wal", false,
+		"Download WAL required to recover the selected backup into its WAL directory")
 	backupFetchCmd.Flags().StringVar(&fileMask, "mask", "", maskFlagDescription)
 	backupFetchCmd.Flags().StringVar(&restoreSpec, "restore-spec", "", restoreSpecDescription)
 	backupFetchCmd.Flags().BoolVar(&reverseDeltaUnpack, "reverse-unpack",

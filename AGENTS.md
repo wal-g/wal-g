@@ -101,6 +101,12 @@ Removing a sentinel also does not protect a restore that has already read it.
 
 ## WAL pipelines
 
+- `backup-fetch --fetch-wal` starts at the restored `backup_label` filename,
+  including exact segment boundaries, and ends at the selected backup's exclusive
+  finish LSN (or recorded end WAL filename). Delta ancestors do not extend this
+  recovery interval. Downloads must reach decoder EOF before publication, even
+  after a WAL-sized payload; see `backup_fetch_wal.go` and its regression tests.
+
 - Keep one `pgproto3.Backend` per `wal-send` connection, including startup and
   COPY: it can buffer the next query while reading CopyDone. Hand reading back
   to the command loop only after the COPY reader exits, and serialize each

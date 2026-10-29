@@ -23,6 +23,10 @@ import (
 func TestWalSendCLIStandby(t *testing.T) { walSendCLIStandby(t, 16) }
 
 func walSendCLIStandby(t *testing.T, walMB int) {
+	walSendCLIBackupRestore(t, walMB, false, false)
+}
+
+func walSendCLIBackupRestore(t *testing.T, walMB int, fetchWAL, reverse bool) {
 	t.Helper()
 	bin := walSendPostgresBin(t)
 	walg, configPath := os.Getenv("WALG_TEST_WALG_BIN"), os.Getenv("WALG_TEST_CLI_CONFIG")
@@ -109,6 +113,26 @@ func walSendCLIStandby(t *testing.T, walMB int) {
 		if len(entry.Name()) == 24 && entry.Name() < current {
 			cli("wal-push", filepath.Join(primary, "pg_wal", entry.Name()))
 		}
+	}
+	if fetchWAL {
+		args := []string{"backup-fetch", standby, "LATEST", "--fetch-wal"}
+		if reverse {
+			args = append(args, "--reverse-unpack")
+		}
+		cli(args...)
+		// Recovery must succeed with only the downloaded WAL: restore_command cannot fetch anything.
+		recovery := "restore_command = 'false'\nrecovery_target = 'immediate'\nrecovery_target_action = 'promote'\n"
+		if walSendPostgresMajor(t, bin) >= 12 {
+			require.NoError(t, os.WriteFile(filepath.Join(standby, "postgresql.auto.conf"), []byte(recovery), 0600))
+			require.NoError(t, os.WriteFile(filepath.Join(standby, "recovery.signal"), nil, 0600))
+		} else {
+			require.NoError(t, os.WriteFile(filepath.Join(standby, "recovery.conf"), []byte(recovery), 0600))
+		}
+		address := walSendPostgresAddress(t)
+		walSendPostgresStart(t, ctx, bin, standby, address)
+		require.Equal(t, "1", walSendPostgresSQL(t, ctx, address, "SELECT string_agg(id::text, ',' ORDER BY id) FROM wal_send_cli_probe"))
+		require.Equal(t, "f", walSendPostgresSQL(t, ctx, address, "SELECT pg_is_in_recovery()"))
+		return
 	}
 	cli("backup-fetch", standby, "LATEST")
 	// Streaming must supply every WAL required by the backup. There is no
