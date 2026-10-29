@@ -369,24 +369,51 @@ INFO: Delta backup from base_000000010000000100000040 with LSN 140000060.
 ```
 
 #### Page checksums verification
-To enable verification of the page checksums during the backup-push, use the `--verify` flag or set the `WALG_VERIFY_PAGE_CHECKSUMS` env variable. If found any, corrupted block numbers (currently no more than 10 of them) will be recorded to the backup sentinel json, for example:
-```json
-...
-"/base/13690/13535": {
-"IsSkipped": true,
-"MTime": "2020-08-20T21:02:56.690095409+05:00",
-"IsIncremented": false
-},
-"/base/16384/16397": {
-"CorruptBlocks": [
-1
-],
-"IsIncremented": false,
-"IsSkipped": false,
-"MTime": "2020-08-21T19:09:52.966149937+05:00"
-},
-...
+
+Enable page checksum verification during `backup-push` with `--verify` or
+`WALG_VERIFY_PAGE_CHECKSUMS=true`. PostgreSQL must have `data_checksums` enabled;
+otherwise local verification is skipped with a warning.
+
+For local backups, set `WALG_MAX_CHECKSUM_RETRIES` to a nonnegative integer to
+reread pages with checksum mismatches. The default is `0` (no retries). The limit
+counts **additional reads per mismatching page**, after its initial read:
+
+```bash
+WALG_MAX_CHECKSUM_RETRIES=3 wal-g backup-push /path/to/PGDATA --verify
 ```
+
+This allows at most four reads of a mismatching page. WAL-G retries only that
+page, stops when verification succeeds, and archives the final page bytes.
+Retries can reduce false corruption reports from concurrent PostgreSQL writes,
+but cannot guarantee a consistent read while a write is in progress. They apply
+to full backups and the pages included in incremental backups; skipped pages
+are not checked again. Rereads use a separate buffered file descriptor, including
+when the initial backup read uses `WALG_DIRECT_IO`.
+
+If the checksum still mismatches after the retry limit, WAL-G logs a warning
+and records the corrupt block in file metadata; the mismatch alone does not
+fail the backup. Read errors do fail the backup. Pages removed by a concurrent
+truncation are zero-filled to preserve the archive's declared file size.
+Remote/streaming backups use PostgreSQL's own checksum verification; this
+setting does not change its retry behavior.
+
+With file metadata enabled, `files_metadata.json` records the total number of
+corrupt blocks and, by default, the first ten block numbers per file:
+
+```json
+"/base/16384/16397": {
+  "CorruptBlocks": {
+    "CorruptBlocksCount": 1,
+    "SomeCorruptBlocks": [1]
+  },
+  "IsIncremented": false,
+  "IsSkipped": false,
+  "MTime": "2020-08-21T19:09:52.966149937+05:00"
+}
+```
+
+Use `--store-all-corrupt` or `WALG_STORE_ALL_CORRUPT_BLOCKS=true` to record all
+corrupt block numbers. Older backup formats stored file metadata in the sentinel.
 
 ### ``wal-fetch``
 

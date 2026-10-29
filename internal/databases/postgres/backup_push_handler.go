@@ -762,6 +762,9 @@ func (bh *BackupHandler) initBackupTerminator(ctx context.Context) {
 
 func (bh *BackupHandler) checkDataChecksums(ctx context.Context) error {
 	if bh.Arguments.verifyPageChecksums {
+		if _, err := conf.GetMaxChecksumRetries(); err != nil {
+			return err
+		}
 		tracelog.DebugLogger.Println("checkDataChecksums: Checking data_checksums setting.")
 
 		dataChecksums, err := bh.Workers.QueryRunner.GetDataChecksums(ctx)
