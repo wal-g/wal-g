@@ -90,7 +90,14 @@ for kind in full delta; do
       echo "recovery_target_action = 'promote'"
     } | write_recovery_settings "$restored"
     pg_ctl -D "$restored" -l "$work/recovery.log" -w -t 60 start || { cat "$work/recovery.log"; exit 1; }
-    test "$(PGHOST="$work" PGPORT=5433 psql -At -v ON_ERROR_STOP=1 -c 'SELECT pg_is_in_recovery()')" = f
+    # pg_ctl can return when hot standby accepts connections, before promotion
+    # finishes. Wait for recovery to end before checking the restored data.
+    for attempt in $(seq 1 60); do
+      in_recovery=$(PGHOST="$work" PGPORT=5433 psql -At -v ON_ERROR_STOP=1 -c 'SELECT pg_is_in_recovery()') || { cat "$work/recovery.log"; exit 1; }
+      if [ "$in_recovery" = f ]; then break; fi
+      sleep 1
+    done
+    test "$in_recovery" = f || { cat "$work/recovery.log"; exit 1; }
     PGHOST="$work" PGPORT=5433 dump_db "$work/restored.sql" postgres
     compare_dumps "$work/$kind.sql" "$work/restored.sql"
     pg_ctl -D "$restored" -m fast -w stop
