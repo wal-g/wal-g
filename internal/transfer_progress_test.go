@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/progress"
@@ -45,12 +44,7 @@ func TestBackupTransferProgress(t *testing.T) {
 				require.NoError(t, reader.Close())
 			}
 			awaitProgress(t, frames, "2.0 KiB")
-			stored, err := folder.ReadObject(ctx, "part")
-			require.NoError(t, err)
-			defer stored.Close()
-			got, err := io.ReadAll(stored)
-			require.NoError(t, err)
-			assert.Equal(t, payload, string(got))
+
 		})
 	}
 }

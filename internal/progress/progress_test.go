@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -97,37 +98,51 @@ func TestRenderShowsRateAndIdleWithoutInventingPercentage(t *testing.T) {
 }
 
 func TestIdleKeepsCurrentStageVisible(t *testing.T) {
-	for _, stage := range []string{
-		"stopping backup/waiting for WAL",
-		"restoring delta base_0000000100000000000000A2_D_0000000100000000000000A1",
+	const deltaStage = "restoring delta base_0000000100000000000000A2_D_0000000100000000000000A1"
+	for _, tc := range []struct {
+		stage string
+		total int64
+	}{
+		{"stopping backup/waiting for WAL", 0},
+		{deltaStage, 0},
+		{deltaStage, 4096},
 	} {
-		t.Run(stage, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s/total=%d", tc.stage, tc.total), func(t *testing.T) {
 			var out bytes.Buffer
 			p := newTracker(&out, "backup-fetch", 80)
-			ctx := WithTracker(context.Background(), p)
-			SetStage(ctx, stage)
-			p.render(p.started.Add(10 * time.Second))
-			frame := strings.TrimPrefix(out.String(), "\r\x1b[2K")
-			assert.Contains(t, frame, " (idle 10s)")
-			assert.Less(t, len([]rune(frame)), 80)
-			if stage == "stopping backup/waiting for WAL" {
-				assert.Contains(t, frame, "stopping backup/waiting for WAL (idle 10s)")
-			} else {
-				assert.Contains(t, frame, "restoring delta base_")
+			ctx := WithTracker(t.Context(), p)
+			SetStage(ctx, tc.stage)
+			started := p.started
+			if tc.total > 0 {
+				BeginDownload(ctx, tc.total)
+				started = p.download.started
 			}
-
-			out.Reset()
-			SetStage(ctx, "uploading metadata")
-			p.render(p.started.Add(11 * time.Second))
-			assert.Contains(t, out.String(), "uploading metadata (idle 11s)")
-			assert.NotContains(t, out.String(), "restoring delta")
-			assert.NotContains(t, out.String(), "waiting for WAL")
-
-			out.Reset()
+			render := func(seconds int) string {
+				out.Reset()
+				p.render(started.Add(time.Duration(seconds) * time.Second))
+				frame := strings.TrimPrefix(out.String(), "\r\x1b[2K")
+				assert.Less(t, len([]rune(frame)), 80)
+				return frame
+			}
 			p.bytes.Add(1024)
-			p.render(p.started.Add(12 * time.Second))
-			assert.Contains(t, out.String(), "uploading metadata")
-			assert.NotContains(t, out.String(), "idle")
+			frame := render(1)
+			if tc.total > 0 {
+				assert.Contains(t, frame, "1.0 KiB/4.0 KiB | ETA ~3s")
+			}
+			frame = render(11)
+			assert.Contains(t, frame, strings.Split(tc.stage, " base_")[0])
+			assert.Contains(t, frame, " (idle 10s)")
+			if tc.total > 0 {
+				assert.Contains(t, frame, "ETA --")
+			}
+			SetStage(ctx, "uploading metadata")
+			frame = render(12)
+			assert.Contains(t, frame, "uploading metadata (idle 11s)")
+			assert.NotContains(t, frame, "restoring delta")
+			assert.NotContains(t, frame, "waiting for WAL")
+			assert.NotContains(t, frame, "ETA")
+			p.bytes.Add(1024)
+			assert.NotContains(t, render(13), "idle")
 		})
 	}
 }
@@ -185,11 +200,7 @@ func TestStopAndCancellationFinishOutput(t *testing.T) {
 		p := Start(ctx, &out, "backup-fetch", 80)
 		if cancelFirst {
 			cancel()
-			select {
-			case <-p.done:
-			case <-time.After(time.Second):
-				t.Fatal("renderer did not stop on cancellation")
-			}
+			waitForSignal(t, p.done)
 		}
 		p.Stop()
 		p.Stop()

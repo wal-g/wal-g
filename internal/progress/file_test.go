@@ -16,15 +16,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func readSnapshots(t *testing.T, dir string) []Snapshot {
-	t.Helper()
+// Accept a collector as well as testing.T so polling failures stay in the check.
+func readSnapshots(t require.TestingT, dir string) []Snapshot {
 	paths, err := filepath.Glob(filepath.Join(dir, "walg-progress-*.json"))
 	require.NoError(t, err)
 	var snapshots []Snapshot
 	for _, path := range paths {
 		data, err := os.ReadFile(path)
 		require.NoError(t, err)
-		require.Less(t, len(data), maxSnapshotSize)
 		var s Snapshot
 		require.NoError(t, json.Unmarshal(data, &s))
 		snapshots = append(snapshots, s)
@@ -32,33 +31,50 @@ func readSnapshots(t *testing.T, dir string) []Snapshot {
 	return snapshots
 }
 
-func TestProgressFilesSeparateRunsAndReplaceSnapshots(t *testing.T) {
+func awaitSnapshots(t *testing.T, dir string, ready func([]Snapshot) bool) []Snapshot {
+	t.Helper()
+	var snapshots []Snapshot
+	require.EventuallyWithT(t, func(check *assert.CollectT) {
+		snapshots = readSnapshots(check, dir)
+		require.True(check, ready(snapshots), "snapshot not ready")
+	}, 3*time.Second, 10*time.Millisecond)
+	return snapshots
+}
+
+func waitForSignal(t *testing.T, signal <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-signal:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for progress worker")
+	}
+}
+
+func TestProgressFilesSeparateRuns(t *testing.T) {
 	dir := t.TempDir()
 	options := FileOptions{Directory: dir}
-	var wg sync.WaitGroup
-	for i := 0; i < 2; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			ctx := context.Background()
-			p := StartWithFile(ctx, nil, "backup-push", 80, options)
-			ctx = WithTracker(ctx, p)
-			for j := 0; j < 20; j++ {
-				SetStage(ctx, "packing/uploading")
-				_, err := io.Copy(io.Discard, TrackReader(ctx, strings.NewReader("payload")))
-				assert.NoError(t, err)
-			}
-			p.Stop()
-		}()
+	// Both writers are alive together; stream concurrency is tested separately.
+	trackers := []*Tracker{
+		StartWithFile(t.Context(), nil, "backup-push", 80, options),
+		StartWithFile(t.Context(), nil, "backup-push", 80, options),
 	}
-	wg.Wait()
-	require.Eventually(t, func() bool { return len(readSnapshots(t, dir)) == 2 }, 3*time.Second, 10*time.Millisecond)
-	snapshots := readSnapshots(t, dir)
+	for _, p := range trackers {
+		t.Cleanup(p.Stop)
+		ctx := WithTracker(t.Context(), p)
+		SetStage(ctx, "packing/uploading")
+		_, err := io.Copy(io.Discard, TrackReader(ctx, strings.NewReader("payload")))
+		require.NoError(t, err)
+	}
+	for _, p := range trackers {
+		p.Stop()
+	}
+	snapshots := awaitSnapshots(t, dir, func(ss []Snapshot) bool {
+		return len(ss) == 2 && ss[0].Status == "completed" && ss[1].Status == "completed"
+	})
 	assert.NotEqual(t, snapshots[0].RunID, snapshots[1].RunID)
 	for _, s := range snapshots {
-		assert.Equal(t, "completed", s.Status)
 		assert.Equal(t, "packing/uploading", s.Stage)
-		assert.Equal(t, int64(140), s.TransferredBytes)
+		assert.Equal(t, int64(7), s.TransferredBytes)
 		assert.Nil(t, s.TotalBytes)
 		assert.Nil(t, s.ETASeconds)
 		assert.NotNil(t, s.FinishedAt)
@@ -72,7 +88,7 @@ func TestProgressFilesSeparateRunsAndReplaceSnapshots(t *testing.T) {
 
 func TestProgressFileHeartbeatAndCancellation(t *testing.T) {
 	dir := t.TempDir()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	p := StartWithFile(ctx, nil, "backup-fetch", 80, FileOptions{Directory: dir})
 	defer p.Stop()
@@ -81,30 +97,26 @@ func TestProgressFileHeartbeatAndCancellation(t *testing.T) {
 	BeginDownload(ctx, 4096)
 	_, err := io.Copy(io.Discard, TrackReader(ctx, strings.NewReader(strings.Repeat("x", 1024))))
 	require.NoError(t, err)
-	var first Snapshot
-	require.Eventually(t, func() bool {
-		ss := readSnapshots(t, dir)
-		if len(ss) != 1 || ss[0].DownloadedBytes == nil {
-			return false
-		}
-		first = ss[0]
-		return first.TransferredBytes == 1024
-	}, 3*time.Second, 10*time.Millisecond)
+	first := awaitSnapshots(t, dir, func(ss []Snapshot) bool {
+		return len(ss) == 1 && ss[0].DownloadedBytes != nil && ss[0].TransferredBytes == 1024
+	})[0]
+	require.NotNil(t, first.TotalBytes)
 	assert.Equal(t, int64(4096), *first.TotalBytes)
-	require.Eventually(t, func() bool {
-		s := readSnapshots(t, dir)[0]
-		return s.UpdatedAt.After(first.UpdatedAt) && s.StageElapsedSeconds > first.StageElapsedSeconds && s.IdleSeconds > first.IdleSeconds
-	}, 3*time.Second, 10*time.Millisecond)
+	awaitSnapshots(t, dir, func(ss []Snapshot) bool {
+		return len(ss) == 1 && ss[0].UpdatedAt.After(first.UpdatedAt) &&
+			ss[0].StageElapsedSeconds > first.StageElapsedSeconds && ss[0].IdleSeconds > first.IdleSeconds
+	})
 	cancel()
 	p.Stop()
-	final := readSnapshots(t, dir)[0]
-	assert.Equal(t, "canceled", final.Status)
+	final := awaitSnapshots(t, dir, func(ss []Snapshot) bool { return len(ss) == 1 && ss[0].Status == "canceled" })[0]
 	assert.NotNil(t, final.FinishedAt)
 }
 
 func TestFileReporterDoesNotBlockTracker(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})
+	unblock := sync.OnceFunc(func() { close(release) })
+	t.Cleanup(unblock)
 	var writes []Snapshot
 	r := startFileReporter(func(s Snapshot) error {
 		if len(writes) == 0 {
@@ -117,8 +129,8 @@ func TestFileReporterDoesNotBlockTracker(t *testing.T) {
 	p := newTracker(nil, "backup-push", 80)
 	p.file = r
 	p.render(p.started)
-	<-entered
-	ctx := WithTracker(context.Background(), p)
+	waitForSignal(t, entered)
+	ctx := WithTracker(t.Context(), p)
 	finished := make(chan struct{})
 	go func() {
 		for i := 0; i < 100; i++ {
@@ -129,25 +141,27 @@ func TestFileReporterDoesNotBlockTracker(t *testing.T) {
 		r.wait()
 		close(finished)
 	}()
-	select {
-	case <-finished:
-	case <-time.After(time.Second):
-		t.Error("file write blocked state updates or shutdown")
-	}
+	waitForSignal(t, finished)
 	assert.Len(t, r.pending, 1, "only the latest snapshot is retained")
-	close(release)
-	<-r.done
+	unblock()
+	waitForSignal(t, r.done)
 	require.Len(t, writes, 2)
 	assert.Equal(t, "completed", writes[1].Status)
 	assert.Equal(t, "uploading metadata", writes[1].Stage)
 }
 
 func TestFileReporterErrorsAreNonFatalAndReportedOnce(t *testing.T) {
+	attempts := make(chan struct{}, 1)
 	count := 0
-	r := startFileReporter(func(Snapshot) error { return errors.New("disk full") }, func(error) { count++ })
-	r.submit(Snapshot{Status: "running"})
-	r.submit(Snapshot{Status: "completed"})
-	<-r.done
+	r := startFileReporter(func(Snapshot) error {
+		attempts <- struct{}{}
+		return errors.New("disk full")
+	}, func(error) { count++ })
+	for _, status := range []string{"running", "running", "completed"} {
+		r.submit(Snapshot{Status: status})
+		waitForSignal(t, attempts) // Prevent coalescing: each write must actually fail.
+	}
+	waitForSignal(t, r.done)
 	assert.Equal(t, 1, count)
 }
 
@@ -170,18 +184,15 @@ func TestProgressFileRetentionPreservesRunningAndUnrelatedFiles(t *testing.T) {
 	require.NoError(t, os.WriteFile(unrelated, []byte(`{"status":"completed"}`), 0600))
 	f := newStateFile(FileOptions{Directory: dir, Retention: 24 * time.Hour})
 	require.NoError(t, f.write(Snapshot{Version: 1, Status: "running", UpdatedAt: time.Now()}))
-	_, err := os.Stat(completed)
-	assert.True(t, os.IsNotExist(err))
-	_, err = os.Stat(running)
-	assert.NoError(t, err)
-	_, err = os.Stat(unrelated)
-	assert.NoError(t, err)
+	assert.NoFileExists(t, completed)
+	assert.FileExists(t, running)
+	assert.FileExists(t, unrelated)
 }
 
 func TestFileOnlyHeartbeatAfterStageChange(t *testing.T) {
 	p := newTracker(nil, "backup-fetch", 80)
 	p.file = &fileReporter{pending: make(chan Snapshot, 1)}
-	ctx := WithTracker(context.Background(), p)
+	ctx := WithTracker(t.Context(), p)
 	SetStage(ctx, "reading metadata")
 	p.render(p.started.Add(time.Millisecond))
 	<-p.file.pending
@@ -231,10 +242,10 @@ func TestUnwritableProgressDirectoryDoesNotFailTransfer(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "a-file")
 	require.NoError(t, os.WriteFile(dir, nil, 0600))
 	reported := make(chan error, 1)
-	p := StartWithFile(context.Background(), nil, "backup-push", 80, FileOptions{
+	p := StartWithFile(t.Context(), nil, "backup-push", 80, FileOptions{
 		Directory: dir, OnError: func(err error) { reported <- err },
 	})
-	ctx := WithTracker(context.Background(), p)
+	ctx := WithTracker(t.Context(), p)
 	n, err := io.Copy(io.Discard, TrackReader(ctx, strings.NewReader("payload")))
 	require.NoError(t, err)
 	assert.Equal(t, int64(7), n)

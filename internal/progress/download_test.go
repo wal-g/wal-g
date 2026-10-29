@@ -2,7 +2,6 @@ package progress
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"strings"
 	"testing"
@@ -13,52 +12,57 @@ import (
 )
 
 func TestDownloadETAAndStageReset(t *testing.T) {
-	var out bytes.Buffer
-	p := newTracker(&out, "backup-fetch", 160)
-	ctx := WithTracker(context.Background(), p)
-	p.bytes.Store(4096) // Earlier metadata/transfers must not count toward this backup.
+	p := newTracker(io.Discard, "backup-fetch", 160)
+	ctx := WithTracker(t.Context(), p)
+	p.bytes.Store(4096) // Reads from earlier backups are excluded from this total.
 	SetStage(ctx, "restoring full base_1")
 	BeginDownload(ctx, 4096)
 	started := p.download.started
-	p.render(started)
-	assert.Contains(t, out.String(), "0 B/4.0 KiB | ETA --")
-	out.Reset()
-	p.bytes.Add(1024)
-	p.render(started.Add(time.Second))
-	assert.Contains(t, out.String(), "1.0 KiB/4.0 KiB | ETA ~3s")
-	out.Reset()
-	p.render(started.Add(6 * time.Second))
-	assert.Contains(t, out.String(), "(idle 5s)")
-	assert.Contains(t, out.String(), "ETA --")
-	out.Reset()
-	p.bytes.Add(1024)
-	p.render(started.Add(7 * time.Second))
-	assert.NotContains(t, out.String(), "idle")
-	assert.Contains(t, out.String(), "2.0 KiB/4.0 KiB | ETA ~2s")
-	out.Reset()
-	p.bytes.Add(2048)
-	p.render(started.Add(8 * time.Second))
-	assert.Contains(t, out.String(), "4.0 KiB/4.0 KiB | ETA 0s")
-	out.Reset()
+	for _, step := range []struct {
+		name                   string
+		after                  time.Duration
+		added, downloaded, eta int64 // Negative ETA means unknown.
+		idle                   float64
+	}{
+		{"start", 0, 0, 0, -1, 0},
+		{"transfer", time.Second, 1024, 1024, 3, 0},
+		{"idle", 6 * time.Second, 0, 1024, -1, 5},
+		{"resume", 7 * time.Second, 1024, 2048, 2, 0},
+		{"read complete", 8 * time.Second, 2048, 4096, 0, 0},
+	} {
+		p.bytes.Add(step.added)
+		s := p.snapshot(started.Add(step.after))
+		require.NotNil(t, s.DownloadedBytes, step.name)
+		assert.Equal(t, step.downloaded, *s.DownloadedBytes, step.name)
+		assert.Equal(t, step.idle, s.IdleSeconds, step.name)
+		if step.eta < 0 {
+			assert.Nil(t, s.ETASeconds, step.name)
+		} else {
+			require.NotNil(t, s.ETASeconds, step.name)
+			assert.Equal(t, step.eta, *s.ETASeconds, step.name)
+		}
+	}
 	SetStage(ctx, "reading backup metadata: base_2")
-	p.render(started.Add(9 * time.Second))
-	assert.NotContains(t, out.String(), "ETA")
+	assert.Nil(t, p.snapshot(started.Add(9*time.Second)).TotalBytes)
 	BeginDownload(ctx, 2048)
-	out.Reset()
-	p.render(p.download.started)
-	assert.Contains(t, out.String(), "0 B/2.0 KiB | ETA --")
+	s := p.snapshot(p.download.started)
+	require.NotNil(t, s.DownloadedBytes)
+	require.NotNil(t, s.TotalBytes)
+	assert.Zero(t, *s.DownloadedBytes)
+	assert.Equal(t, int64(2048), *s.TotalBytes)
+	assert.Nil(t, s.ETASeconds)
 }
 
 func TestDownloadETAUnknownSizesRetriesAndOverrun(t *testing.T) {
 	for _, total := range []int64{0, -1} {
 		p := newTracker(io.Discard, "backup-fetch", 160)
-		BeginDownload(WithTracker(context.Background(), p), total)
+		BeginDownload(WithTracker(t.Context(), p), total)
 		assert.NotContains(t, p.formatLine(p.started.Add(time.Second), 160), "ETA")
 	}
 	for _, retry := range []bool{false, true} {
 		var out bytes.Buffer
 		p := newTracker(&out, "backup-fetch", 160)
-		ctx := WithTracker(context.Background(), p)
+		ctx := WithTracker(t.Context(), p)
 		BeginDownload(ctx, 4)
 		read := func(name, data string) {
 			r := TrackDownload(ctx, name, io.NopCloser(strings.NewReader(data)))
@@ -76,27 +80,5 @@ func TestDownloadETAUnknownSizesRetriesAndOverrun(t *testing.T) {
 		assert.NotContains(t, out.String(), "ETA", "must not estimate after retry or size mismatch")
 	}
 	r := &closeReader{Reader: strings.NewReader("payload")}
-	assert.Same(t, r, TrackDownload(context.Background(), "part", r))
-}
-
-func TestDownloadETAFitsWithStageAndIdle(t *testing.T) {
-	var out bytes.Buffer
-	p := newTracker(&out, "backup-fetch", 80)
-	ctx := WithTracker(context.Background(), p)
-	SetStage(ctx, "restoring delta base_0000000100000000000000A2_D_0000000100000000000000A1")
-	BeginDownload(ctx, 4096)
-	started := p.download.started
-	p.bytes.Add(1024)
-	p.render(started.Add(time.Second))
-	frame := strings.TrimPrefix(out.String(), "\r\x1b[2K")
-	assert.Less(t, len([]rune(frame)), 80)
-	assert.Contains(t, frame, "restoring delta")
-	assert.Contains(t, frame, "1.0 KiB/4.0 KiB | ETA ~3s")
-	out.Reset()
-	p.render(started.Add(6 * time.Second))
-	frame = strings.TrimPrefix(out.String(), "\r\x1b[2K")
-	assert.Less(t, len([]rune(frame)), 80)
-	assert.Contains(t, frame, "restoring delta")
-	assert.Contains(t, frame, " (idle 5s)")
-	assert.Contains(t, frame, "ETA --")
+	assert.Same(t, r, TrackDownload(t.Context(), "part", r))
 }
