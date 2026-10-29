@@ -311,7 +311,11 @@ func (bh *BackupHandler) handleDeltaBackup(ctx context.Context, folder storage.F
 		useWalDelta, _, err := configureWalDeltaUsage()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		if useWalDelta {
+		if viper.GetBool(conf.UseWalSummarySetting) {
+			if err := bh.loadWalSummaryDeltaMap(ctx, folder); err != nil {
+				return err
+			}
+		} else if useWalDelta {
 			ForceWalDetal, _ := conf.GetBoolSettingDefault(conf.ForceWalDetal, false)
 			err := bh.Workers.Bundle.DownloadDeltaMap(ctx, internal.NewFolderReader(folder.GetSubFolder(utility.WalPath)), bh.CurBackupInfo.startLSN)
 			if err == nil {
@@ -359,6 +363,9 @@ func (bh *BackupHandler) SetComposerInitFunc(initFunc func(ctx context.Context, 
 }
 
 func configureTarBallComposer(ctx context.Context, bh *BackupHandler, tarBallComposerType TarBallComposerType) error {
+	if bh.Workers.Bundle.UseWalSummary && tarBallComposerType != RegularComposer {
+		return fmt.Errorf("WAL summary PoC requires the regular tar composer")
+	}
 	maker, err := NewTarBallComposerMaker(ctx, tarBallComposerType, bh.Workers.QueryRunner,
 		bh.Arguments.Uploader, bh.CurBackupInfo.Name,
 		NewTarBallFilePackerOptions(bh.Arguments.verifyPageChecksums, bh.Arguments.storeAllCorruptBlocks),
