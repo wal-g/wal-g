@@ -27,7 +27,11 @@ func TestInteractiveProgress(t *testing.T) {
 			})
 			require.NoError(t, tracelog.Setup(terminal, tracelog.NormalLogLevel))
 			cmd := &cobra.Command{Use: "backup-push"}
-			cmd.Flags().Bool("progress", !disabled, "")
+			addProgressFlag(cmd)
+			// Without an explicit flag, even a terminal must retain the old output.
+			if !disabled {
+				require.NoError(t, cmd.Flags().Set(progressFlag, "true"))
+			}
 			ctx := context.Background()
 			cmd.SetContext(ctx)
 			cmd.SetErr(terminal)
@@ -64,7 +68,8 @@ func TestProgressAdaptsToTerminalResize(t *testing.T) {
 	t.Setenv("TERM", "xterm")
 	master, terminal := openProgressTerminal(t)
 	cmd := &cobra.Command{Use: "backup-push"}
-	cmd.Flags().Bool("progress", true, "")
+	addProgressFlag(cmd)
+	require.NoError(t, cmd.Flags().Set(progressFlag, "true"))
 	cmd.SetContext(context.Background())
 	cmd.SetErr(terminal)
 	stop := startProgress(cmd)

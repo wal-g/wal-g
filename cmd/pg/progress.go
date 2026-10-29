@@ -70,7 +70,7 @@ func startProgress(cmd *cobra.Command) func() {
 }
 
 func addProgressFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool(progressFlag, true, "Show live transfer progress on an interactive stderr terminal")
+	cmd.Flags().Bool(progressFlag, false, "Show live transfer progress on an interactive stderr terminal")
 	cmd.Flags().String(progressDirectoryFlag, "", "Write a separate JSON progress snapshot per run in this directory")
 	cmd.Flags().Duration(progressRetentionFlag, 24*time.Hour, "Remove completed progress snapshots older than this at startup (nonpositive disables cleanup)")
 }
