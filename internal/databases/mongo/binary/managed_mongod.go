@@ -54,7 +54,7 @@ func startManagedMongodProcess(ctx context.Context, process *MongodProcess) (sup
 
 func recoverOplogBeforeCatchUp(ctx context.Context, minimalConfigPath string) error {
 	process := Mongod(minimalConfigPath).
-		WithParams(RecoverFromOplogAsStandalone, TakeUnstableCheckpointOnShutdown)
+		WithParams(RecoverFromOplogAsStandalone, StartupRecoveryForRestore, TakeUnstableCheckpointOnShutdown)
 	mongod, err := startManagedMongodProcess(ctx, process)
 	if err != nil {
 		return err
