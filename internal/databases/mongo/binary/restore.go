@@ -17,6 +17,7 @@ var (
 	DisableLogicalSessionCacheRefresh = "disableLogicalSessionCacheRefresh=true"
 	SkipShardingConfigurationChecks   = "skipShardingConfigurationChecks=true"
 	RecoverFromOplogAsStandalone      = "recoverFromOplogAsStandalone=true"
+	StartupRecoveryForRestore         = "startupRecoveryForRestore=true"
 	TakeUnstableCheckpointOnShutdown  = "takeUnstableCheckpointOnShutdown=true"
 )
 
@@ -188,10 +189,6 @@ func (restoreService *RestoreService) fixSystemData(
 	}
 
 	if err = mongodService.CleanCacheAndSessions(shConfig); err != nil {
-		return err
-	}
-
-	if err = mongodService.ClearMinvalid(); err != nil {
 		return err
 	}
 

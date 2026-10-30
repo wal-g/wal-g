@@ -47,6 +47,12 @@ func newReplayAttemptExecutor() replayAttemptExecutor {
 }
 
 func runSupervisedOplogReplay(ctx context.Context, replayArgs ReplyOplogConfig) error {
+	if replayArgs.WithCatchUpReconfig {
+		tracelog.InfoLogger.Println("Recovering local oplog before catch-up replay")
+		if err := recoverOplogBeforeCatchUp(ctx, replayArgs.MinimalConfigPath); err != nil {
+			return errors.Wrap(err, "unable to recover local oplog before catch-up replay")
+		}
+	}
 	progress := stages.NewReplayProgress(replayArgs.Since)
 	executor := newReplayAttemptExecutor()
 	return superviseOplogReplay(ctx, replayArgs, progress, func(attempt oplogReplayAttempt) replayAttemptResult {
