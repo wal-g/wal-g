@@ -36,6 +36,10 @@ func startManagedMongod(
 	if replayArgs.Partial {
 		process.WithRestore()
 	}
+	return startManagedMongodProcess(ctx, process)
+}
+
+func startManagedMongodProcess(ctx context.Context, process *MongodProcess) (supervisedMongod, error) {
 	if _, err := process.Start(ctx); err != nil {
 		return nil, err
 	}
@@ -46,6 +50,24 @@ func startManagedMongod(
 		close(mongod.done)
 	}()
 	return mongod, nil
+}
+
+func recoverOplogBeforeCatchUp(ctx context.Context, minimalConfigPath string) error {
+	process := Mongod(minimalConfigPath).
+		WithParams(RecoverFromOplogAsStandalone, TakeUnstableCheckpointOnShutdown)
+	mongod, err := startManagedMongodProcess(ctx, process)
+	if err != nil {
+		return err
+	}
+	defer mongod.Close()
+
+	if err := mongod.Connect(ctx); err != nil {
+		return err
+	}
+	if err := mongod.Shutdown(ctx); err != nil {
+		return err
+	}
+	return mongod.Wait()
 }
 
 func (m *managedMongod) URI() string {
