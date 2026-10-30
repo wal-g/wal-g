@@ -149,6 +149,10 @@ Removing a sentinel also does not protect a restore that has already read it.
   finalization. On upload errors, close source files and compression pipe readers
   so producers cannot remain blocked. See `prefetch.go`, `uploader.go`,
   `compress_and_encrypt.go` and their failure-path tests.
+- MongoDB catch-up replay with a managed `mongod` first recovers the local oplog
+  as a standalone process and checkpoints it on shutdown. Keep that preflight
+  limited to catch-up mode and preserve its exact recovery parameters; see
+  `managed_mongod.go`.
 
 ## Validation and handoff
 

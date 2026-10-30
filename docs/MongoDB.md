@@ -283,6 +283,10 @@ When `binary-backup-fetch` replays PITR data using its temporary `mongod`, WAL-G
 exit and resumes after the last durable timestamp. `OPLOG_REPLAY_MAX_MONGOD_RESTARTS` limits consecutive restarts without
 durable progress and defaults to `5`.
 
+Before a managed catch-up replay, WAL-G starts `mongod` once with `recoverFromOplogAsStandalone` and
+`takeUnstableCheckpointOnShutdown`, using the supplied minimal config. This applies the existing local oplog and checkpoints
+it on shutdown before WAL-G starts applying archived oplog entries.
+
 Recovery has at-least-once semantics: MongoDB may have persisted some operations after the last completed `fsync`, so an
 automatic restart can apply those operations again.
 
