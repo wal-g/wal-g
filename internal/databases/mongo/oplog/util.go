@@ -49,6 +49,60 @@ func newFilteredApplyOps(cmd *bson.D) (bson.D, error) {
 	return doc, nil
 }
 
+func filterNestedApplyOps(op *db.Oplog, catchUp bool) (allFiltered bool, err error) {
+	if op.Operation != "c" || !isApplyOpsCmd(op.Object) {
+		return false, nil
+	}
+
+	ops, err := unwrapNestedApplyOps(&op.Object)
+	if err != nil {
+		return false, err
+	}
+
+	kept := make([]db.Oplog, 0, len(ops))
+	hasNestedApplyOps := false
+	for i := range ops {
+		if shouldSkip(&ops[i], catchUp) != nil {
+			continue
+		}
+		if ops[i].Operation == "c" && isApplyOpsCmd(ops[i].Object) {
+			hasNestedApplyOps = true
+		}
+		nestedFiltered, err := filterNestedApplyOps(&ops[i], catchUp)
+		if err != nil {
+			return false, err
+		}
+		if !nestedFiltered {
+			kept = append(kept, ops[i])
+		}
+	}
+
+	if len(kept) == 0 {
+		return true, nil
+	}
+	if len(kept) == len(ops) && !hasNestedApplyOps {
+		return false, nil
+	}
+
+	op.Object, err = replaceNestedApplyOps(op.Object, kept)
+	return false, err
+}
+
+func replaceNestedApplyOps(cmd bson.D, ops []db.Oplog) (bson.D, error) {
+	wrapped, err := wrapNestedApplyOps(ops)
+	if err != nil {
+		return nil, err
+	}
+
+	result := slices.Clone(cmd)
+	for i := range result {
+		if result[i].Key == "applyOps" {
+			result[i].Value = wrapped[0].Value
+		}
+	}
+	return result, nil
+}
+
 // isApplyOpsCmd returns true if a document seems to be an applyOps command.
 func isApplyOpsCmd(cmd bson.D) bool {
 	return slices.ContainsFunc(cmd, func(v bson.E) bool { return v.Key == "applyOps" })
