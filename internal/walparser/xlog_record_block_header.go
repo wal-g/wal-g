@@ -5,6 +5,7 @@ const (
 	XlrBlockIDDataShort = 255
 	XlrBlockIDDataLong  = 254
 	XlrBlockIDOrigin    = 253
+	MainForkNum         = 0
 
 	BkpBlockForkMask uint8 = 0x0F
 	BkpBlockFlagMask uint8 = 0xF0
