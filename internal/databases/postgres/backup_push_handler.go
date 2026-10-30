@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
@@ -70,6 +71,8 @@ func (err backupFromOtherBD) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+const waitForWALArchivePollInterval = time.Minute
+
 // BackupArguments holds all arguments parsed from cmd to this handler class
 type BackupArguments struct {
 	Uploader                 internal.Uploader
@@ -85,6 +88,7 @@ type BackupArguments struct {
 	withoutFilesMetadata     bool
 	composerInitFunc         func(ctx context.Context, handler *BackupHandler) error
 	preventConcurrentBackups bool
+	waitForWALArchive        bool
 	countJournals            bool
 	json                     bool
 	pretty                   bool
@@ -172,6 +176,10 @@ func (ba *BackupArguments) EnablePreventConcurrentBackups() {
 	tracelog.InfoLogger.Println("Concurrent backups are disabled")
 }
 
+func (ba *BackupArguments) EnableWaitForWALArchive() {
+	ba.waitForWALArchive = true
+}
+
 func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	var err error
 	folder := bh.Arguments.Uploader.Folder()
@@ -208,6 +216,8 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	tarFileSets := bh.uploadBackup(ctx)
 	sentinelDto, filesMetaDto, err := bh.setupDTO(ctx, tarFileSets)
+	tracelog.ErrorLogger.FatalOnError(err)
+	err = bh.waitForWALArchive(ctx, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 	bh.markBackups(ctx, folder, sentinelDto)
 	bh.uploadMetadata(ctx, sentinelDto, filesMetaDto)
@@ -275,22 +285,21 @@ func (bh *BackupHandler) startBackup(ctx context.Context) error {
 }
 
 func (bh *BackupHandler) initQueryRunner(ctx context.Context) error {
-	if bh.Workers.QueryRunner != nil {
-		return nil
+	if bh.Workers.QueryRunner == nil {
+		// Keep supporting handlers constructed without a preinitialized runner.
+		tracelog.DebugLogger.Println("Connecting to Postgres.")
+		conn, err := Connect(ctx)
+		if err != nil {
+			return err
+		}
+		runner, err := NewPgQueryRunner(ctx, conn)
+		if err != nil {
+			utility.LoggedCloseContext(context.Background(), conn, "")
+			return fmt.Errorf("failed to build query runner: %v", err)
+		}
+		bh.Workers.QueryRunner = runner
 	}
-
-	// Keep supporting handlers constructed without a preinitialized runner.
-	tracelog.DebugLogger.Println("Connecting to Postgres.")
-	conn, err := Connect(ctx)
-	if err != nil {
-		return err
-	}
-	runner, err := NewPgQueryRunner(ctx, conn)
-	if err != nil {
-		utility.LoggedCloseContext(context.Background(), conn, "")
-		return fmt.Errorf("failed to build query runner: %v", err)
-	}
-	bh.Workers.QueryRunner = runner
+	bh.Workers.QueryRunner.skipWaitForArchive = bh.Arguments.waitForWALArchive
 	return nil
 }
 
@@ -537,6 +546,7 @@ func (bh *BackupHandler) handleBackupPushLocal(ctx context.Context) {
 func (bh *BackupHandler) createAndPushRemoteBackup(ctx context.Context) {
 	var err error
 	uploader := bh.Arguments.Uploader
+	rootFolder := uploader.Folder()
 	uploader.ChangeDirectory(utility.BaseBackupPath)
 	tracelog.DebugLogger.Printf("Uploading folder: %s", uploader.Folder())
 
@@ -558,10 +568,78 @@ func (bh *BackupHandler) createAndPushRemoteBackup(ctx context.Context) {
 	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec())
 	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, tarFileSets)
 	bh.CurBackupInfo.Name = baseBackup.BackupName()
+	err = bh.waitForWALArchive(ctx, rootFolder)
+	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Println("Uploading metadata")
 	bh.uploadMetadata(ctx, sentinelDto, filesMetadataDto)
 	// logging backup set Name
 	tracelog.InfoLogger.Printf("Wrote backup with name %s", bh.CurBackupInfo.Name)
+}
+
+func (bh *BackupHandler) waitForWALArchive(ctx context.Context, rootFolder storage.Folder) error {
+	if !bh.Arguments.waitForWALArchive {
+		return nil
+	}
+
+	timeline, _, err := ParseWALFilename(utility.StripWalFileName(bh.CurBackupInfo.Name))
+	if err != nil {
+		return fmt.Errorf("failed to determine backup timeline: %w", err)
+	}
+	firstSegment := NewWalSegmentNo(bh.CurBackupInfo.startLSN - 1)
+	lastSegment := NewWalSegmentNo(bh.CurBackupInfo.endLSN - 1)
+	walFolder := rootFolder.GetSubFolder(utility.WalPath)
+	compressionExtension := bh.Arguments.Uploader.Compression().FileExtension()
+	compressionExtensions := []string{compressionExtension}
+	for _, decompressor := range compression.Decompressors {
+		extension := decompressor.FileExtension()
+		if extension != compressionExtension && extension != "" {
+			compressionExtensions = append(compressionExtensions, extension)
+		}
+	}
+	if compressionExtension != "" {
+		compressionExtensions = append(compressionExtensions, "")
+	}
+	tracelog.InfoLogger.Printf(
+		"Waiting for WAL segments %s through %s to be archived",
+		firstSegment.GetFilename(timeline),
+		lastSegment.GetFilename(timeline),
+	)
+
+	ticker := time.NewTicker(waitForWALArchivePollInterval)
+	defer ticker.Stop()
+
+	for segment := firstSegment; segment <= lastSegment; {
+		walFilename := segment.GetFilename(timeline)
+		found := false
+		for i, extension := range compressionExtensions {
+			_, err := walFolder.StatObject(ctx, utility.AddFileExtension(walFilename, extension))
+			if err == nil {
+				// Try the previous segment's format first, including on subsequent polls.
+				copy(compressionExtensions[1:i+1], compressionExtensions[:i])
+				compressionExtensions[0] = extension
+				found = true
+				break
+			}
+			var notFoundError storage.ObjectNotFoundError
+			if !errors.As(err, &notFoundError) {
+				return fmt.Errorf("failed to stat archived WAL segment %s: %w", walFilename, err)
+			}
+		}
+		if found {
+			segment = segment.Next()
+			continue
+		}
+
+		tracelog.DebugLogger.Printf("Waiting for WAL segment %s", walFilename)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+
+	tracelog.InfoLogger.Println("All WAL segments required for the backup are archived")
+	return nil
 }
 
 func (bh *BackupHandler) uploadMetadata(ctx context.Context, sentinelDto BackupSentinelDto, filesMetaDto FilesMetadataDto) {
@@ -638,6 +716,7 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(conf.TarSizeThresholdSetting), bh.PgInfo.PgVersion, conn)
+	baseBackup.skipWaitForArchive = bh.Arguments.waitForWALArchive
 	var bundleFiles internal.BundleFiles
 	if bh.Arguments.withoutFilesMetadata {
 		bundleFiles = &internal.NopBundleFiles{}
