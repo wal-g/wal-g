@@ -5,6 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -38,6 +40,8 @@ const (
 )
 
 var (
+	copyOutput       string
+	copyOutputFile   string
 	targetBackupName string
 	fromConfigFile   string
 	toConfigFile     string
@@ -67,6 +71,23 @@ var (
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
+	if cmd.Flags().Changed("output") {
+		if copyOutput != "rclone" {
+			tracelog.ErrorLogger.Fatalf("unsupported --output %q: expected rclone", copyOutput)
+		}
+		if copyOutputFile == "" {
+			tracelog.ErrorLogger.Fatalf("--output-file must not be empty")
+		}
+		from, _, err := internal.StorageAndConfigFromFile(cmd.Context(), fromConfigFile)
+		tracelog.ErrorLogger.FatalOnError(err)
+		plan, err := greenplum.BuildCopyPlan(cmd.Context(), from.RootFolder(), nil, targetBackupName, withHistory)
+		tracelog.ErrorLogger.FatalOnError(err)
+		if err := plan.WriteRcloneFileList(copyOutputFile); err != nil {
+			tracelog.ErrorLogger.Fatalf("write rclone file list %q: %v", copyOutputFile, err)
+		}
+		tracelog.InfoLogger.Printf("Wrote rclone file list to %q.", copyOutputFile)
+		return
+	}
 	greenplum.HandleCopyWithHistory(cmd.Context(), fromConfigFile, toConfigFile, targetBackupName, withHistory, walWaitTimeout)
 }
 
@@ -80,6 +101,9 @@ func init() {
 	backupCopyCmd.Flags().DurationVar(&walWaitTimeout, walWaitTimeoutFlag, greenplum.DefaultCopyWALWaitTimeout,
 		walWaitTimeoutDescription)
 
-	_ = backupCopyCmd.MarkFlagRequired(toFlag)
+	backupCopyCmd.Flags().StringVar(&copyOutput, "output", "", "write a file list instead of copying: rclone")
+	backupCopyCmd.Flags().StringVar(&copyOutputFile, "output-file", "", "path to the output file list")
+	backupCopyCmd.MarkFlagsRequiredTogether("output", "output-file")
+	backupCopyCmd.MarkFlagsOneRequired("to", "output")
 	_ = backupCopyCmd.MarkFlagRequired(fromFlag)
 }
