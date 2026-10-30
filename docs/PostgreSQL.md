@@ -49,6 +49,24 @@ To configure how many concurrency streams are reading disk during ```backup-push
 
 Overrides the default `number of WAL files to upload during one scan`. By default, at most 32 WAL files will be uploaded.
 
+In daemon mode (without `WALG_USE_WAL_DELTA`), this bounds discovery batches to
+`TOTAL_BG_UPLOADED_LIMIT - 1` candidates, not total background progress. After the
+first WAL request, the daemon keeps draining ready segments independently of
+further requests. Values at or below 1 disable background uploads. Periodic
+directory passes rediscover failed uploads and late ready files behind the cursor.
+
+* `WALG_PG_WAL_FULL_SCAN_INTERVAL` (default: `5s`)
+
+Minimum interval between full `archive_status` directory scans by the background
+uploader used by standalone `wal-push` and the legacy daemon WAL-delta path.
+Contiguous WAL names are predicted and checked every 100 ms without listing the
+directory. Gaps, other timelines and non-segment files may wait up to this interval
+for discovery, plus time spent uploading an already discovered batch.
+Set `0` to disable full-scan throttling and list the directory on every scan poll,
+even when prediction finds a full batch. Values must be non-negative Go durations
+(for example, `500ms` or `5s`). Invalid values disable background scanning with an
+error in the log; foreground WAL uploads remain available.
+
 * `WALG_SENTINEL_USER_DATA`
 
 This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups. Note: UserData must be a valid JSON string.
@@ -524,6 +542,54 @@ wal-g wal-receive
 ```
 
 
+### ``wal-send``
+
+The counterpart of ``wal-receive``: serve the WAL stored in the archive to connecting
+clients (a standby, `pg_receivewal`, etc.) over the PostgreSQL
+[streaming replication](https://www.postgresql.org/docs/current/protocol-replication.html)
+protocol. This effectively turns WAL-G into a read-only "primary" fed by the WAL archive.
+
+```bash
+wal-g wal-send [--address 127.0.0.1:8000] [--poll-interval 5s]
+```
+
+Flags:
+* `--address` — address to listen replication connections on
+  (default `127.0.0.1:8000`: the server serves WAL with trust auth and no TLS,
+  so it binds to the loopback interface unless an address is given explicitly);
+* `--poll-interval` — how often to poll the storage for new WAL segments and
+  send keepalive messages to idle clients (default `5s`).
+
+Notes:
+* trust authentication, no TLS; replication slots are accepted and ignored —
+  the WAL is served from the storage as-is;
+* `IDENTIFY_SYSTEM` takes the system identifier from the latest backup sentinel
+  and reports the newest compatible archived timeline and that timeline's WAL end;
+* WAL segments use direct object access. Identifying the archive head lists
+  the WAL folder, which can contain millions of retained WAL objects. Explicit
+  `IDENTIFY_SYSTEM`/`START_REPLICATION` requests share a cache for the poll
+  interval. While waiting for missing WAL, streams also refresh the archive
+  identity every 12 poll intervals (one minute by default), shared across all
+  connections, so live promotion discovery does not require a `.partial` file.
+  The retained catalog contains one entry per timeline;
+* timeline transitions require a readable, valid history file and a fork point
+  compatible with the requested LSN. The server ends COPY at that point and
+  reports the immediate successor timeline and switch LSN. Standard clients can
+  request the next timeline on the same connection. An unavailable history file
+  never authorizes a transition;
+* `SHOW data_directory_mode` and `SHOW wal_segment_size` support stock
+  `pg_receivewal`. Set `WALG_TEST_PG_BIN` to a PostgreSQL `bin` directory to run
+  the opt-in stock-client and real-standby tests in `TestWalSend*`. Docker CI
+  runs them with the race detector on PostgreSQL 14–18 via
+  `docker/pg_tests/scripts/tests/wal_send_stock_clients_test.sh`.
+  `TestWalSendCLIStandby` additionally requires `WALG_TEST_WALG_BIN` and
+  `WALG_TEST_CLI_CONFIG` (a self-contained S3 or filesystem config with a PGP key).
+  It runs backup/restore and streaming through the CLI with encrypted LZ4 WAL;
+  Docker CI supplies the S3 service via `wal_send_cli_test.sh` and repeats the
+  CLI recovery with 64 MiB WAL on PostgreSQL 14–18. Regular unit CI also checks
+  64 MiB prefetch and the WAL filename rollover at `1/0`.
+
+
 ### ``backup-mark``
 
 Backups can be marked as permanent to prevent them from being removed when running ``delete``. Backup permanence can be altered via this command by passing in the name of the backup (retrievable via `wal-g backup-list --pretty --detail --json`), which will mark the named backup and all previous related backups as permanent. The reverse is also possible by providing the `-i` flag.
@@ -649,7 +715,22 @@ Configuration:
 
 * `WALG_DAEMON_WAL_UPLOAD_TIMEOUT`
 
-Per-archive operation time limit. Operations exceeding it are interrupted. Default `60s`.
+Per-archive request and per-upload time limit. Default `60s`. Background uploads have
+their own deadline starting when they begin; they are not cancelled by a client disconnect.
+
+Without `WALG_USE_WAL_DELTA`, the daemon maintains a shared archival pipeline across
+requests. A successful reply waits for the requested WAL and its metadata, not unrelated
+background uploads. At most `WALG_UPLOAD_CONCURRENCY` WAL uploads run concurrently;
+at most `WALG_UPLOAD_CONCURRENCY - 1` are speculative. Completed uploads are recorded
+in the existing archive status manager and survive daemon restarts. Failed uploads are
+not acknowledged. Background failures are retried with a short delay; PostgreSQL can
+retry a failed foreground request immediately.
+
+Next WAL names are predicted arithmetically and checked for `.ready` status. A bounded,
+streaming directory scan handles gaps and periodically revisits failures and late ready
+files. Directory passes are separated by at least five seconds. Storage selection is repeated for each new upload
+using the existing multi-storage health cache; in-flight uploads are not moved between
+storages. Standalone `wal-push` and WAL delta mode retain their batch lifecycle.
 
 ##### ``walg-daemon-client``
 

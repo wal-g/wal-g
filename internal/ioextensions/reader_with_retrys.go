@@ -12,6 +12,7 @@ type ReaderWithRetry struct {
 	retryAttempts int
 	alreadyRead   int
 	attempt       int
+	lastErr       error
 }
 
 func NewReaderWithRetry(getReader func() (io.ReadCloser, error), retryAttempts int) io.ReadCloser {
@@ -39,7 +40,6 @@ func (r *ReaderWithRetry) setupNewReader() error {
 
 func (r *ReaderWithRetry) Read(p []byte) (int, error) {
 	n := 0
-	var lastErr error
 	for r.attempt < r.retryAttempts {
 		if r.reader == nil {
 			err := r.setupNewReader()
@@ -55,7 +55,7 @@ func (r *ReaderWithRetry) Read(p []byte) (int, error) {
 		}
 
 		read, err := r.reader.Read(p[n:])
-		lastErr = err
+		r.lastErr = err
 		n += read
 		r.alreadyRead += read
 
@@ -72,7 +72,7 @@ func (r *ReaderWithRetry) Read(p []byte) (int, error) {
 		}
 	}
 
-	return n, lastErr
+	return n, r.lastErr
 }
 
 func (r *ReaderWithRetry) Close() error {

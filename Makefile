@@ -17,9 +17,9 @@ TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
 TEST := "pg_tests"
-# PostgreSQL version the test services run on. 10 uses the old bionic image (the
-# only one that has wal-e); 14-18 use the shared PGDG image.
-PG_MAJOR ?= 10
+# PostgreSQL version the test services run on by default. PG 10 remains available
+# for explicit compatibility runs using its bionic image with wal-e.
+PG_MAJOR ?= 14
 export PG_MAJOR
 # pgBackRest is built from source and added to the PG test image, so it must be
 # built on the same Ubuntu version as that image. 2.54 and later need meson,
@@ -112,18 +112,18 @@ endif
 	docker compose build pg
 	docker compose build pg_tests_template
 
-# PG 10 is built by pg10_build_image (bionic + wal-e), the rest by pg_build_image.
-# This list is also what CI tests: dockertests-par.yml reads it from here.
-PG_VERSIONS ?= 10 14 15 16 17 18
+# Default CI matrix, also used by pg_matrix_test. PG 10 can still be requested
+# explicitly with PG_MAJOR=10 or PG_VERSIONS="10" for a compatibility run.
+PG_VERSIONS ?= 14 15 16 17 18
 
 .PHONY: print_pg_versions
 print_pg_versions:
 	@echo $(PG_VERSIONS)
 
 # Run the whole suite sequentially for each version in PG_VERSIONS.
-#   make pg_matrix_test                       # all supported versions
+#   make pg_matrix_test                       # default CI versions
 #   make PG_VERSIONS="17" pg_matrix_test      # just one
-#   make PG_VERSIONS="10 18" pg_matrix_test   # the edges
+#   make PG_VERSIONS="14 18" pg_matrix_test   # the edges
 pg_matrix_test:
 	@for v in $(PG_VERSIONS); do \
 		echo "=============== PostgreSQL $$v ==============="; \
