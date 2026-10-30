@@ -2,10 +2,12 @@ package postgres
 
 import (
 	"context"
+	"math"
 	"regexp"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/progress"
 )
 
 type FilesToExtractProvider interface {
@@ -23,45 +25,48 @@ func (t FilesToExtractProviderImpl) Get(ctx context.Context, backup Backup, file
 		return nil, nil, err
 	}
 
-	tarNames, err := backup.GetTarNames(ctx)
+	objects, err := backup.getTarObjects(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	tracelog.DebugLogger.Printf("Tars to extract: '%+v'\n", tarNames)
-	concurrentTarsToExtract = make([]internal.ReaderMaker, 0, len(tarNames))
+	tracelog.DebugLogger.Printf("Found %d tar archives to consider for extraction", len(objects))
+	concurrentTarsToExtract = make([]internal.ReaderMaker, 0, len(objects))
 	sequentialTarsToExtract = make([]internal.ReaderMaker, 0, 2)
 
 	pgControlRe := regexp.MustCompile(`^.*?pg_control\.tar(\..+$|$)`)
 	backupLabelRe := regexp.MustCompile(`^.*?backup_label\.tar(\..+$|$)`)
-	for _, tarName := range tarNames {
-		// Separate the pg_control tarName from the others to
-		// extract it at the end, as to prevent server startup
-		// with incomplete backup restoration.  But only if it
-		// exists: it won't in the case of WAL-E backup
-		// backwards compatibility.
-		if pgControlRe.MatchString(tarName) {
-			tarToExtract := internal.NewStorageReaderMaker(backup.GetTarPartitionFolder(), tarName)
-			sequentialTarsToExtract = append(sequentialTarsToExtract, tarToExtract)
+	var total int64
+	knownSize := true
+	needPgControl := IsPgControlRequired(backup)
+	for _, object := range objects {
+		tarName := object.GetName()
+		// Extract pg_control and the generated backup_label last: they mark a
+		// consistent backup and must override any older label from the data directory.
+		sequential := pgControlRe.MatchString(tarName) || backupLabelRe.MatchString(tarName)
+		if !sequential && skipRedundantTars && !shouldUnwrapTar(tarName, filesMeta, filesToUnwrap) {
 			continue
 		}
-
-		// wal-g creates fictional `backup_label.tar` at the end of backup.
-		// It contains values from `pg_stop_backup`. Postgres datadir may have other `backup_label` file
-		// from some exclusive backup (likely not ours).
-		// We should override it in order to reach correct end of backup point.
-		// so, we should extract our `backup_label` after extracting regular tars.
-		if backupLabelRe.MatchString(tarName) {
-			tarToExtract := internal.NewStorageReaderMaker(backup.GetTarPartitionFolder(), tarName)
-			sequentialTarsToExtract = append(sequentialTarsToExtract, tarToExtract)
-			continue
-		}
-
-		if skipRedundantTars && !shouldUnwrapTar(tarName, filesMeta, filesToUnwrap) {
-			continue
-		}
-
 		tarToExtract := internal.NewStorageReaderMaker(backup.GetTarPartitionFolder(), tarName)
-		concurrentTarsToExtract = append(concurrentTarsToExtract, tarToExtract)
+		if sequential {
+			sequentialTarsToExtract = append(sequentialTarsToExtract, tarToExtract)
+		} else {
+			concurrentTarsToExtract = append(concurrentTarsToExtract, tarToExtract)
+		}
+		// Legacy WAL-E restores may skip the sequential archives entirely.
+		if !sequential || needPgControl {
+			size := object.GetSize()
+			if size <= 0 || total > math.MaxInt64-size {
+				knownSize = false
+			} else {
+				total += size
+			}
+		}
 	}
+	// Reverse unpack skips a backup with no useful concurrent archives before
+	// reading its control/label files. Unknown sizes must remain indeterminate.
+	if !knownSize || len(concurrentTarsToExtract) == 0 {
+		total = 0
+	}
+	progress.BeginDownload(ctx, total)
 	return concurrentTarsToExtract, sequentialTarsToExtract, nil
 }

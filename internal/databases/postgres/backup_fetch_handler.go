@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/progress"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -65,6 +66,7 @@ func chooseTablespaceSpecification(sentinelDtoSpec, spec *TablespaceSpec) *Table
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
 func deltaFetchRecursionOld(ctx context.Context, backup Backup, rootFolder storage.Folder, dbDataDirectory string,
 	tablespaceSpec *TablespaceSpec, filesToUnwrap map[string]bool, extractProv ExtractProvider) error {
+	progress.SetStage(ctx, "reading backup metadata: "+backup.Name)
 	sentinelDto, filesMetaDto, err := backup.GetSentinelAndFilesMetadata(ctx)
 	if err != nil {
 		return err
@@ -107,6 +109,7 @@ func deltaFetchRecursionOld(ctx context.Context, backup Backup, rootFolder stora
 
 func GetFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string, extractProv ExtractProvider) internal.Fetcher {
 	return func(ctx context.Context, rootFolder storage.Folder, backup internal.Backup) {
+		progress.SetStage(ctx, "reading backup metadata: "+backup.Name)
 		pgBackup := ToPgBackup(backup)
 		filesToUnwrap, err := pgBackup.GetFilesToUnwrap(ctx, fileMask)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)

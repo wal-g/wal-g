@@ -71,6 +71,7 @@ func (backup *Backup) unwrapNew(
 	ctx context.Context,
 	dbDataDirectory string, filesToUnwrap map[string]bool,
 	createIncrementalFiles, skipRedundantTars bool, extractProv ExtractProvider) (*UnwrapResult, error) {
+	backup.setRestoreProgress(ctx)
 	useNewUnwrapImplementation = true
 	err := checkDBDirectoryForUnwrapNew(dbDataDirectory, *backup.SentinelDto, *backup.FilesMetadataDto)
 	if err != nil {
