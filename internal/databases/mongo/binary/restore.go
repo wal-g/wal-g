@@ -17,6 +17,7 @@ var (
 	DisableLogicalSessionCacheRefresh = "disableLogicalSessionCacheRefresh=true"
 	SkipShardingConfigurationChecks   = "skipShardingConfigurationChecks=true"
 	RecoverFromOplogAsStandalone      = "recoverFromOplogAsStandalone=true"
+	StartupRecoveryForRestore         = "startupRecoveryForRestore=true"
 	TakeUnstableCheckpointOnShutdown  = "takeUnstableCheckpointOnShutdown=true"
 )
 
