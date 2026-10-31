@@ -55,6 +55,7 @@ func NewDeleteHandler(ctx context.Context, folder storage.Folder, permanentBacku
 				folder,
 				postgresBackups,
 				lessFunc,
+				internal.SkipFolderFunc(isBackupReservationFolder),
 				internal.IsPermanentFunc(
 					makePermanentFunc(permanentBackups, permanentWals))),
 		}

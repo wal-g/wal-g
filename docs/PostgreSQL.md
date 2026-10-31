@@ -221,6 +221,16 @@ Because of unrestored databases' or tables remains are still in system tables, i
 
 ### ``backup-push``
 
+#### Backup name reservation
+
+On S3 and filesystem storage, WAL-G automatically reserves backup names to prevent
+overwrites. A reserved name cannot be reused, even after a failed backup or
+deletion. On a standby, retry after the restartpoint advances to a new WAL segment.
+
+Upgrade all writers and cleanup jobs together. Exclude `backup_reservations/` from
+lifecycle deletion and routine cleanup. S3-compatible storage must support
+conditional writes.
+
 When uploading backups to storage, the user should pass the Postgres data directory as an argument.
 
 ```bash

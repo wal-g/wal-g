@@ -78,6 +78,14 @@ func IsPermanentFunc(isPermanent func(storage.Object) bool) DeleteHandlerOption 
 	}
 }
 
+// SkipFolderFunc excludes subtrees from ordinary cleanup before listing them.
+// Paths are relative to the listing root. DeleteEverything ignores this option.
+func SkipFolderFunc(skipFolder func(string) bool) DeleteHandlerOption {
+	return func(h *DeleteHandler) {
+		h.skipFolder = skipFolder
+	}
+}
+
 func NewDeleteHandler(
 	folder storage.Folder,
 	backups []BackupObject,
@@ -110,6 +118,16 @@ type DeleteHandler struct {
 	greater func(object1, object2 storage.Object) bool
 
 	isPermanent func(object storage.Object) bool
+	skipFolder  func(name string) bool
+}
+
+func (h *DeleteHandler) filterFolders(selector func(string) bool) func(string) bool {
+	if h.skipFolder == nil {
+		return selector
+	}
+	return func(name string) bool {
+		return !h.skipFolder(name) && selector(name)
+	}
 }
 
 func (h *DeleteHandler) HandleDeleteBefore(ctx context.Context, args []string, confirmed bool) {
@@ -383,7 +401,7 @@ func (h *DeleteHandler) DeleteBeforeTargetWhere(
 
 	return DeleteObjectsWhere(ctx, h.Folder, confirmed, func(object storage.Object) bool {
 		return objSelector(object) && h.less(object, target) && !h.isPermanent(object)
-	}, folderFilter)
+	}, h.filterFolders(folderFilter))
 }
 
 func (h *DeleteHandler) DeleteWhere(
@@ -396,7 +414,7 @@ func (h *DeleteHandler) DeleteWhere(
 
 	return DeleteObjectsWhere(ctx, h.Folder, confirmed, func(object storage.Object) bool {
 		return objSelector(object) && !h.isPermanent(object)
-	}, folderFilter)
+	}, h.filterFolders(folderFilter))
 }
 
 func (h *DeleteHandler) DeleteTarget(ctx context.Context, target BackupObject, confirmed, findFull bool,
@@ -422,7 +440,7 @@ func (h *DeleteHandler) DeleteTarget(ctx context.Context, target BackupObject, c
 	return DeleteObjectsWhere(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath),
 		confirmed, func(object storage.Object) bool {
 			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object)
-		}, folderFilter)
+		}, h.filterFolders(folderFilter))
 }
 
 // TODO: unit tests

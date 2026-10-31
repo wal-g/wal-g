@@ -206,6 +206,8 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	}
 	err = bh.handleDeltaBackup(ctx, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
+	err = reserveBackupName(ctx, folder, bh.Arguments.backupsFolder, bh.CurBackupInfo.Name)
+	tracelog.ErrorLogger.FatalOnError(err)
 	tarFileSets := bh.uploadBackup(ctx)
 	sentinelDto, filesMetaDto, err := bh.setupDTO(ctx, tarFileSets)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -537,6 +539,7 @@ func (bh *BackupHandler) handleBackupPushLocal(ctx context.Context) {
 func (bh *BackupHandler) createAndPushRemoteBackup(ctx context.Context) {
 	var err error
 	uploader := bh.Arguments.Uploader
+	rootFolder := uploader.Folder()
 	uploader.ChangeDirectory(utility.BaseBackupPath)
 	tracelog.DebugLogger.Printf("Uploading folder: %s", uploader.Folder())
 
@@ -547,7 +550,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup(ctx context.Context) {
 		tarFileSets = internal.NewRegularTarFileSets()
 	}
 
-	baseBackup := bh.runRemoteBackup(ctx)
+	baseBackup := bh.runRemoteBackup(ctx, rootFolder)
 	tracelog.InfoLogger.Println("Updating metadata")
 	bh.CurBackupInfo.startLSN = LSN(baseBackup.StartLSN)
 	bh.CurBackupInfo.endLSN = LSN(baseBackup.EndLSN)
@@ -622,7 +625,7 @@ func NewBackupHandler(ctx context.Context, arguments BackupArguments) (bh *Backu
 	return bh, nil
 }
 
-func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBackup {
+func (bh *BackupHandler) runRemoteBackup(ctx context.Context, rootFolder storage.Folder) *StreamingBaseBackup {
 	var diskLimit int32
 	if viper.IsSet(conf.DiskRateLimitSetting) {
 		// Note that BASE_BACKUP (pg protocol) allows to limit in kb/sec
@@ -646,6 +649,8 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	}
 	tracelog.InfoLogger.Println("Starting remote backup")
 	err = baseBackup.Start(ctx, bh.Arguments.verifyPageChecksums, diskLimit)
+	tracelog.ErrorLogger.FatalOnError(err)
+	err = reserveBackupName(ctx, rootFolder, utility.BaseBackupPath, baseBackup.BackupName())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Streaming remote backup")
