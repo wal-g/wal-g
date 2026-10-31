@@ -101,6 +101,16 @@ Removing a sentinel also does not protect a restore that has already read it.
 
 ## WAL pipelines
 
+- The WAL summary PoC requires complete coverage from the predecessor's start
+  LSN to the new start LSN, including WAL generated during the previous backup.
+  Do not fall back silently on a gap or checksum failure. Finite limit blocks
+  and database-wide relNumber=0 markers force full copies; mtimes cannot veto
+  summary changes. See `wal_summary_reader.go`, `wal_summary_cli_test.go` and
+  [the PoC notes](docs/PostgreSQL-wal-summary-poc.md).
+- A summarizer can publish an in-memory range after its older files are
+  removed. Summary-retention tests must first wait for publication beyond the
+  predecessor's start LSN. A checkpoint creates the summary boundary; a WAL
+  switch alone does not. See `TestWalSummaryIncrementalCLI:finishSummary`.
 - Keep one `pgproto3.Backend` per `wal-send` connection, including startup and
   COPY: it can buffer the next query while reading CopyDone. Hand reading back
   to the command loop only after the COPY reader exits, and serialize each
