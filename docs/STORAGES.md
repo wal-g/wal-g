@@ -99,7 +99,7 @@ Limits additional attempts for each S3 request. Default is 15 (at most 16 total 
 
 * `WALG_S3_RESPONSE_HEADER_TIMEOUT`
 
-Sets the timeout for waiting for response headers from S3 in seconds. Default is 0 (no timeout).
+Sets the timeout for waiting for response headers from S3 in seconds. Default is 0 (no timeout). Go starts this timer only after the entire request, including its body, has been written. It bounds waiting for response headers, not a stalled upload, response-body read, or the whole WAL-G operation across retries.
 
 * `S3_MIN_THROTTLING_RETRY_DELAY`
 
