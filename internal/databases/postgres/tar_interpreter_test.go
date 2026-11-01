@@ -36,6 +36,7 @@ func testInterpret(t *testing.T,
 		&bytes.Buffer{},
 		&tar.Header{
 			Name:     name,
+			Linkname: name,
 			Typeflag: typeflag,
 		},
 	)
@@ -198,6 +199,22 @@ func TestMultiInterpretTypeSymlink(t *testing.T) {
 		)
 	}
 
+}
+
+func TestInterpretTypeSymlinkUsesLinkname(t *testing.T) {
+	dbDataDirectory := t.TempDir()
+	tarInterpreter := &postgres.FileTarInterpreter{DBDataDirectory: dbDataDirectory}
+
+	err := tarInterpreter.Interpret(&bytes.Buffer{}, &tar.Header{
+		Name:     "postgresql.auto.conf",
+		Linkname: "link_target",
+		Typeflag: tar.TypeSymlink,
+	})
+	assert.NoError(t, err)
+
+	target, err := os.Readlink(filepath.Join(dbDataDirectory, "postgresql.auto.conf"))
+	assert.NoError(t, err)
+	assert.Equal(t, "link_target", target)
 }
 
 func TestPrepareDirsForLocalDirectory(t *testing.T) {

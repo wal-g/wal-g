@@ -81,7 +81,7 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Rea
 // handleSymlink will follow all required logic to properly handle symlinks.
 // Logic depends on which unwrap implementation is used, whether the file was already extracted before
 // and other file stat information on the target file
-func handleSymlink(sourcePath string, targetPath string) error {
+func handleSymlink(linkTarget string, targetPath string) error {
 	// In some edge cases symlinks end up in the delta backups multiple times.
 	// os.Symlink cannot replace symlinks that already exist, and we want the latest symlink in our final restore.
 	// Therefore, we check symlinks in the tar file to see if they already exist and already are symlinks in the
@@ -105,7 +105,7 @@ func handleSymlink(sourcePath string, targetPath string) error {
 		// this probably is coming from an earlier tar from this restore, but let's not take any chances
 		return fmt.Errorf("Interpret: %s exists and is no symlink", targetPath)
 	}
-	if err := os.Symlink(sourcePath, targetPath); err != nil {
+	if err := os.Symlink(linkTarget, targetPath); err != nil {
 		return errors.Wrapf(err, "Interpret: failed to create symlink %s", targetPath)
 	}
 	return nil
@@ -139,7 +139,7 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 			return errors.Wrapf(err, "Interpret: failed to create hardlink %s", targetPath)
 		}
 	case tar.TypeSymlink:
-		if err := handleSymlink(fileInfo.Name, targetPath); err != nil {
+		if err := handleSymlink(fileInfo.Linkname, targetPath); err != nil {
 			return err
 		}
 	}
