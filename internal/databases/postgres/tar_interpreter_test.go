@@ -177,8 +177,6 @@ func TestInterpretTypeSymlink(t *testing.T) {
 func TestMultiInterpretTypeSymlink(t *testing.T) {
 	fileName := "test_file"
 	dbDataDirectory := os.TempDir()
-	createFile(fileName)
-	defer os.Remove(fileName)
 	// Since we pass a noop for delete, we need to remove outside testInterpret
 	defer os.Remove(path.Join(dbDataDirectory, fileName))
 	for i := 1; i < 5; i++ {
@@ -187,9 +185,9 @@ func TestMultiInterpretTypeSymlink(t *testing.T) {
 
 			"test_file",
 			tar.TypeSymlink,
-			func(s string) error {
-				return nil
-			},
+			// testInterpret runs in a fresh temp dir, so the source must be created on every call
+			createFile,
+			// keep the restored symlink, so the next iteration finds an existing one
 			func(s string) error {
 				return nil
 			},
