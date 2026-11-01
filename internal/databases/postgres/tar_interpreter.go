@@ -87,24 +87,23 @@ func handleSymlink(sourcePath string, targetPath string) error {
 	// Therefore, we check symlinks in the tar file to see if they already exist and already are symlinks in the
 	// restore in which case we replace it (remove before creation).
 	if fi, err := os.Lstat(targetPath); os.IsNotExist(err) {
-		tracelog.DebugLogger.Printf("%s does not yet exist", targetPath)
+		tracelog.DebugLogger.Printf("Interpret: %s does not yet exist", targetPath)
 	} else if err != nil {
-		tracelog.ErrorLogger.Printf("failed to stat %s: %s", targetPath, err.Error())
-		return err
+		return fmt.Errorf("Interpret: failed to stat %s: %w", targetPath, err)
 	} else if fi.Mode()&fs.ModeSymlink != 0 {
 		if useNewUnwrapImplementation {
-			tracelog.DebugLogger.Println("New unwrap implementation, so this is an older version than the one we found before.", targetPath)
+			tracelog.DebugLogger.Printf("Interpret: symlink %s already exists from a newer backup, keeping it", targetPath)
 			return nil
 		} else if err = os.Remove(targetPath); err == nil {
 			// target exists and is symlink and using old unwrap implementation. Replace (remove before create)
-			tracelog.DebugLogger.Println("Symlink already existed. Removed so we can replace.", targetPath)
+			tracelog.DebugLogger.Printf("Interpret: symlink %s already existed. Removed so we can replace.", targetPath)
 		} else if err != os.ErrNotExist {
-			return fmt.Errorf("symlink %s already exists, and could not be removed", targetPath)
+			return fmt.Errorf("Interpret: symlink %s already exists, and could not be removed", targetPath)
 		}
 	} else {
 		// if it exists and is no symlink we could remove data
 		// this probably is coming from an earlier tar from this restore, but let's not take any chances
-		return fmt.Errorf("%s exists and is no symlink", targetPath)
+		return fmt.Errorf("Interpret: %s exists and is no symlink", targetPath)
 	}
 	if err := os.Symlink(sourcePath, targetPath); err != nil {
 		return errors.Wrapf(err, "Interpret: failed to create symlink %s", targetPath)
