@@ -79,12 +79,12 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Rea
 }
 
 // handleSymlink will follow all required logic to properly handle symlinks.
-// Logic depends on which unwrap implementation is uses, wether the file was already extracted before
+// Logic depends on which unwrap implementation is used, whether the file was already extracted before
 // and other file stat information on the target file
 func handleSymlink(sourcePath string, targetPath string) error {
 	// In some edge cases symlinks end up in the delta backups multiple times.
 	// os.Symlink cannot replace symlinks that already exist, and we want the latest symlink in our final restore.
-	// Therefore, we check symlinks in the tar file to see if the already exist and already are symlinks in the
+	// Therefore, we check symlinks in the tar file to see if they already exist and already are symlinks in the
 	// restore in which case we replace it (remove before creation).
 	if fi, err := os.Lstat(targetPath); os.IsNotExist(err) {
 		tracelog.DebugLogger.Printf("%s does not yet exist", targetPath)
@@ -102,7 +102,7 @@ func handleSymlink(sourcePath string, targetPath string) error {
 			return fmt.Errorf("symlink %s already exists, and could not be removed", targetPath)
 		}
 	} else {
-		// if is exists and is no symlink we could remove data
+		// if it exists and is no symlink we could remove data
 		// this probably is coming from an earlier tar from this restore, but let's not take any chances
 		return fmt.Errorf("%s exists and is no symlink", targetPath)
 	}
@@ -140,10 +140,6 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 			return errors.Wrapf(err, "Interpret: failed to create hardlink %s", targetPath)
 		}
 	case tar.TypeSymlink:
-		// In some edge cases symlinks end up in the delta backups multiple times.
-		// os.Symlink cannot replace symlinks that already exist, and we want the latest symlink in our final restore.
-		// Therefore, we check symlinks in the tar file to see if the already exist and already are symlinks in the
-		// restore in which case we replace it (remove before creation).
 		if err := handleSymlink(fileInfo.Name, targetPath); err != nil {
 			return err
 		}
