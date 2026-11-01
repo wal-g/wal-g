@@ -97,8 +97,8 @@ func handleSymlink(sourcePath string, targetPath string) error {
 		} else if err = os.Remove(targetPath); err == nil {
 			// target exists and is symlink and using old unwrap implementation. Replace (remove before create)
 			tracelog.DebugLogger.Printf("Interpret: symlink %s already existed. Removed so we can replace.", targetPath)
-		} else if err != os.ErrNotExist {
-			return fmt.Errorf("Interpret: symlink %s already exists, and could not be removed", targetPath)
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("Interpret: symlink %s already exists, and could not be removed: %w", targetPath, err)
 		}
 	} else {
 		// if it exists and is no symlink we could remove data
