@@ -109,6 +109,62 @@ func TestGreenplumPlainCopyIncludesRestorePointWal(t *testing.T) {
 	require.Less(t, entries[walObject(-1, 1, 4)].Phase, entries[restorePointObject(backupName)].Phase)
 }
 
+func TestGreenplumCopyFiltersHistoryPerSegment(t *testing.T) {
+	postgres.SetWalSize(64)
+	for _, withHistory := range []bool{false, true} {
+		t.Run(map[bool]string{false: "exact", true: "with history"}[withHistory], func(t *testing.T) {
+			from := testtools.MakeDefaultInMemoryStorageFolder()
+			to := testtools.MakeDefaultInMemoryStorageFolder()
+			backupName := "backup_20260721T130000Z"
+			now := time.Now().UTC()
+			timelines := map[int]uint32{-1: 3, 0: 5}
+			var segments []greenplum.SegmentMetadata
+			for _, contentID := range []int{-1, 0} {
+				timeline := timelines[contentID]
+				segmentBackup := "base_" + postgres.WalSegmentNo(2).GetFilename(timeline)
+				segmentBase := greenplum.FormatSegmentBackupPath(contentID)
+				segments = append(segments, greenplum.SegmentMetadata{
+					ContentID: contentID, BackupName: segmentBackup, RestorePointLSN: lsnIn(4),
+				})
+				putDTO(t, from, path.Join(segmentBase, internal.SentinelNameFromBackup(segmentBackup)), postgres.BackupSentinelDto{})
+				putDTO(t, from, path.Join(segmentBase, segmentBackup, utility.MetadataFileName), postgres.ExtendedMetadataDto{
+					StartLsn:  postgres.LSN(postgres.WalSegmentSize*2 + recordOffset),
+					FinishLsn: postgres.LSN(postgres.WalSegmentSize*3 + recordOffset),
+				})
+				putObjects(t, from, map[string]string{path.Join(segmentBase, segmentBackup, "part.tar.lz4"): "opaque-backup"})
+				putWal(t, from, contentID, timeline, 2, 3, 4)
+				for _, name := range []string{"00000002.history", "00000003.history.br", "00000004.history.gz",
+					"00000005.history.lz4", "00000006.history.zst", "unknown.history"} {
+					putObjects(t, from, map[string]string{
+						path.Join(greenplum.FormatSegmentStoragePrefix(contentID), utility.WalPath, name): "opaque-history",
+					})
+				}
+			}
+			putDTO(t, from, path.Join(utility.BaseBackupPath, internal.SentinelNameFromBackup(backupName)),
+				greenplum.BackupSentinelDto{RestorePoint: &backupName, FinishTime: now, Segments: segments})
+			putRestorePoint(t, from, backupName, now, 3, timelines, map[int]string{-1: lsnIn(4), 0: lsnIn(4)})
+
+			plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, withHistory)
+			require.NoError(t, err)
+			entries := planEntries(plan)
+			for _, contentID := range []int{-1, 0} {
+				walPrefix := path.Join(greenplum.FormatSegmentStoragePrefix(contentID), utility.WalPath)
+				require.NotContains(t, entries, path.Join(walPrefix, "00000002.history"))
+				for _, name := range []string{"00000003.history.br", "00000004.history.gz"} {
+					if contentID == -1 {
+						require.Contains(t, entries, path.Join(walPrefix, name))
+					} else {
+						require.NotContains(t, entries, path.Join(walPrefix, name))
+					}
+				}
+				for _, name := range []string{"00000005.history.lz4", "00000006.history.zst", "unknown.history"} {
+					require.Contains(t, entries, path.Join(walPrefix, name))
+				}
+			}
+		})
+	}
+}
+
 func TestGreenplumPlainCopyReadsOnlySelectedRestorePoints(t *testing.T) {
 	backups := []greenplumBackupFixture{
 		{topName: "backup_20260721T140000Z", segmentName: "base_000000010000000000000001"},

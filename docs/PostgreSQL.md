@@ -49,6 +49,24 @@ To configure how many concurrency streams are reading disk during ```backup-push
 
 Overrides the default `number of WAL files to upload during one scan`. By default, at most 32 WAL files will be uploaded.
 
+In daemon mode (without `WALG_USE_WAL_DELTA`), this bounds discovery batches to
+`TOTAL_BG_UPLOADED_LIMIT - 1` candidates, not total background progress. After the
+first WAL request, the daemon keeps draining ready segments independently of
+further requests. Values at or below 1 disable background uploads. Periodic
+directory passes rediscover failed uploads and late ready files behind the cursor.
+
+* `WALG_PG_WAL_FULL_SCAN_INTERVAL` (default: `5s`)
+
+Minimum interval between full `archive_status` directory scans by the background
+uploader used by standalone `wal-push` and the legacy daemon WAL-delta path.
+Contiguous WAL names are predicted and checked every 100 ms without listing the
+directory. Gaps, other timelines and non-segment files may wait up to this interval
+for discovery, plus time spent uploading an already discovered batch.
+Set `0` to disable full-scan throttling and list the directory on every scan poll,
+even when prediction finds a full batch. Values must be non-negative Go durations
+(for example, `500ms` or `5s`). Invalid values disable background scanning with an
+error in the log; foreground WAL uploads remain available.
+
 * `WALG_SENTINEL_USER_DATA`
 
 This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups. Note: UserData must be a valid JSON string.
@@ -202,6 +220,16 @@ Options `--skip-redundant-tars` and `--reverse-unpack` are set automatically.
 Because of unrestored databases' or tables remains are still in system tables, it is recommended to drop them.
 
 ### ``backup-push``
+
+#### Backup name reservation
+
+On S3 and filesystem storage, WAL-G automatically reserves backup names to prevent
+overwrites. A reserved name cannot be reused, even after a failed backup or
+deletion. On a standby, retry after the restartpoint advances to a new WAL segment.
+
+Upgrade all writers and cleanup jobs together. Exclude `backup_reservations/` from
+lifecycle deletion and routine cleanup. S3-compatible storage must support
+conditional writes.
 
 When uploading backups to storage, the user should pass the Postgres data directory as an argument.
 
@@ -524,6 +552,54 @@ wal-g wal-receive
 ```
 
 
+### ``wal-send``
+
+The counterpart of ``wal-receive``: serve the WAL stored in the archive to connecting
+clients (a standby, `pg_receivewal`, etc.) over the PostgreSQL
+[streaming replication](https://www.postgresql.org/docs/current/protocol-replication.html)
+protocol. This effectively turns WAL-G into a read-only "primary" fed by the WAL archive.
+
+```bash
+wal-g wal-send [--address 127.0.0.1:8000] [--poll-interval 5s]
+```
+
+Flags:
+* `--address` — address to listen replication connections on
+  (default `127.0.0.1:8000`: the server serves WAL with trust auth and no TLS,
+  so it binds to the loopback interface unless an address is given explicitly);
+* `--poll-interval` — how often to poll the storage for new WAL segments and
+  send keepalive messages to idle clients (default `5s`).
+
+Notes:
+* trust authentication, no TLS; replication slots are accepted and ignored —
+  the WAL is served from the storage as-is;
+* `IDENTIFY_SYSTEM` takes the system identifier from the latest backup sentinel
+  and reports the newest compatible archived timeline and that timeline's WAL end;
+* WAL segments use direct object access. Identifying the archive head lists
+  the WAL folder, which can contain millions of retained WAL objects. Explicit
+  `IDENTIFY_SYSTEM`/`START_REPLICATION` requests share a cache for the poll
+  interval. While waiting for missing WAL, streams also refresh the archive
+  identity every 12 poll intervals (one minute by default), shared across all
+  connections, so live promotion discovery does not require a `.partial` file.
+  The retained catalog contains one entry per timeline;
+* timeline transitions require a readable, valid history file and a fork point
+  compatible with the requested LSN. The server ends COPY at that point and
+  reports the immediate successor timeline and switch LSN. Standard clients can
+  request the next timeline on the same connection. An unavailable history file
+  never authorizes a transition;
+* `SHOW data_directory_mode` and `SHOW wal_segment_size` support stock
+  `pg_receivewal`. Set `WALG_TEST_PG_BIN` to a PostgreSQL `bin` directory to run
+  the opt-in stock-client and real-standby tests in `TestWalSend*`. Docker CI
+  runs them with the race detector on PostgreSQL 14–18 via
+  `docker/pg_tests/scripts/tests/wal_send_stock_clients_test.sh`.
+  `TestWalSendCLIStandby` additionally requires `WALG_TEST_WALG_BIN` and
+  `WALG_TEST_CLI_CONFIG` (a self-contained S3 or filesystem config with a PGP key).
+  It runs backup/restore and streaming through the CLI with encrypted LZ4 WAL;
+  Docker CI supplies the S3 service via `wal_send_cli_test.sh` and repeats the
+  CLI recovery with 64 MiB WAL on PostgreSQL 14–18. Regular unit CI also checks
+  64 MiB prefetch and the WAL filename rollover at `1/0`.
+
+
 ### ``backup-mark``
 
 Backups can be marked as permanent to prevent them from being removed when running ``delete``. Backup permanence can be altered via this command by passing in the name of the backup (retrievable via `wal-g backup-list --pretty --detail --json`), which will mark the named backup and all previous related backups as permanent. The reverse is also possible by providing the `-i` flag.
@@ -576,6 +652,20 @@ wal-g catchup-send ${PGDATA_PRIMARY} hostname:1337
 This command copies restorable backup closures between storages without decrypting, decompressing, recompressing, or re-encrypting their payload objects. Existing destination objects with the same path and size are skipped. For example, `wal-g copy --from=config_from.json --to=config_to.json` copies all backups and their exact-restore WAL.
 
 `--with-history` synchronizes continuous WAL from the selected backup recovery point through the latest archived WAL visible when the command starts. The command is resumable: run it again later to add newly archived WAL without retransferring existing immutable objects.
+
+In both modes, timeline history files with IDs below the first required WAL's timeline are omitted: the starting timeline's history already contains its ancestry. That timeline's history and all later history files are retained so recovery can discover later timelines with `recovery_target_timeline=latest`. Unrecognized history filenames are retained conservatively. Selection uses filenames without opening or decrypting the files.
+
+Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to overwrite destination objects whose sizes differ from the source, including zero-byte objects. Each planned replacement is logged with both sizes. Equal-sized immutable objects are still skipped. The default is `false`, which rejects size conflicts before transferring any objects.
+
+Disaster mode also allows matching transfer errors to be logged as warnings while copying continues. `WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES` controls which source object paths may have their transfer errors skipped; it does not restrict which size conflicts are overwritten. Its database-specific default matches timeline history files, including compressed files:
+
+```yaml
+WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES: '^wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$'
+```
+
+An explicit pattern in `--to` takes precedence over `--from`, then the main config/environment and the database default. An empty pattern disables transfer-error skipping but still allows conflicting objects to be overwritten; an invalid pattern fails the command when disaster mode is enabled. Retryable transfer failures are skipped only after exhausting the configured retries; permanent matching transfer failures are skipped immediately. Transfer errors for unmatched objects and cancellation remain fatal, including during replacement of conflicting objects.
+
+Disaster-mode completion does not guarantee recovery. Same-timeline recovery may succeed without a history file, but a missing target history file can prevent startup, and a gap in history files can prevent `latest` from discovering later timelines. Normal mode continues to fail on transfer errors after applicable retries.
 
 Flags:
 
@@ -635,7 +725,22 @@ Configuration:
 
 * `WALG_DAEMON_WAL_UPLOAD_TIMEOUT`
 
-Per-archive operation time limit. Operations exceeding it are interrupted. Default `60s`.
+Per-archive request and per-upload time limit. Default `60s`. Background uploads have
+their own deadline starting when they begin; they are not cancelled by a client disconnect.
+
+Without `WALG_USE_WAL_DELTA`, the daemon maintains a shared archival pipeline across
+requests. A successful reply waits for the requested WAL and its metadata, not unrelated
+background uploads. At most `WALG_UPLOAD_CONCURRENCY` WAL uploads run concurrently;
+at most `WALG_UPLOAD_CONCURRENCY - 1` are speculative. Completed uploads are recorded
+in the existing archive status manager and survive daemon restarts. Failed uploads are
+not acknowledged. Background failures are retried with a short delay; PostgreSQL can
+retry a failed foreground request immediately.
+
+Next WAL names are predicted arithmetically and checked for `.ready` status. A bounded,
+streaming directory scan handles gaps and periodically revisits failures and late ready
+files. Directory passes are separated by at least five seconds. Storage selection is repeated for each new upload
+using the existing multi-storage health cache; in-flight uploads are not moved between
+storages. Standalone `wal-push` and WAL delta mode retain their batch lifecycle.
 
 ##### ``walg-daemon-client``
 

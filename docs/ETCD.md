@@ -37,7 +37,9 @@ Copies one snapshot backup or all snapshot backups between storage configuration
 wal-g copy --from=config_from.json --to=config_to.json --backup-name=LATEST
 ```
 
-Snapshot restore does not consume the separately archived etcd WAL directory, so `copy` includes only the selected backup closure. Repeating it skips immutable objects already present at the destination.
+Snapshot restore does not consume the separately archived etcd WAL directory, so `copy` includes only the selected backup closure. Repeating it skips immutable objects already present at the destination with the same path and size.
+
+Size conflicts fail the command before any transfers by default. Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to overwrite all size conflicts with source bytes, including zero-byte destinations. Each planned replacement is logged with both sizes; equal-sized immutable objects are still skipped. Transfer failures remain fatal after applicable retries; cancellation remains fatal.
 
 ### ``backup-push``
 

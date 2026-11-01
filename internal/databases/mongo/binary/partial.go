@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/mongodb/mongo-tools/common/util"
@@ -27,29 +28,44 @@ func (pmc *PartialMetadataCollector) GetRoutes() *models.BackupRoutesInfo {
 }
 
 func (pmc *PartialMetadataCollector) EnrichWithTarPaths(tarPaths map[string][]string) error {
-	tarFilesSet := make(SetMap)
+	tarPathsByFile := make(map[string][]string)
 	for tarPath, files := range tarPaths {
-		tarFilesSet[tarPath] = make(map[string]struct{}, len(files))
+		seenFiles := make(map[string]struct{}, len(files))
 		for _, file := range files {
-			tarFilesSet[tarPath][file] = struct{}{}
+			if _, ok := seenFiles[file]; ok {
+				continue
+			}
+			seenFiles[file] = struct{}{}
+			tarPathsByFile[file] = append(tarPathsByFile[file], tarPath)
 		}
 	}
-	visited := make(map[string]struct{})
+	for _, paths := range tarPathsByFile {
+		sort.Strings(paths)
+	}
+	databaseFiles := make(map[string]struct{})
 
 	for dbName, dbInfo := range pmc.routes.Databases {
 		for colName, colInfo := range dbInfo {
-			colTarPath, ok := getFromTarFilesSet(colInfo.DBPath, tarFilesSet, visited)
+			colTarPaths, ok := tarPathsByFile[colInfo.DBPath]
 			if !ok {
 				return errors.Errorf("file %s not found in tar directory", colInfo.DBPath)
 			}
-			colInfo.TarPath = colTarPath
+			databaseFiles[colInfo.DBPath] = struct{}{}
+			colInfo.TarPath = colTarPaths[0]
+			if len(colTarPaths) > 1 {
+				colInfo.TarPaths = colTarPaths
+			}
 
 			for indexName, indexInfo := range colInfo.IndexInfo {
-				indTarPath, ok := getFromTarFilesSet(indexInfo.DBPath, tarFilesSet, visited)
+				indTarPaths, ok := tarPathsByFile[indexInfo.DBPath]
 				if !ok {
 					return errors.Errorf("file %s not found in tar directory", indexInfo.DBPath)
 				}
-				indexInfo.TarPath = indTarPath
+				databaseFiles[indexInfo.DBPath] = struct{}{}
+				indexInfo.TarPath = indTarPaths[0]
+				if len(indTarPaths) > 1 {
+					indexInfo.TarPaths = indTarPaths
+				}
 				colInfo.IndexInfo[indexName] = indexInfo
 			}
 
@@ -57,15 +73,26 @@ func (pmc *PartialMetadataCollector) EnrichWithTarPaths(tarPaths map[string][]st
 		}
 	}
 
-	for tarFile, tarFileSet := range tarFilesSet {
-		if _, ok := visited[tarFile]; !ok {
-			for dbFile := range tarFileSet {
-				pmc.routes.Service[dbFile] = tarFile
+	pmc.enrichServiceTarPaths(tarPathsByFile, databaseFiles)
+	return nil
+}
+
+func (pmc *PartialMetadataCollector) enrichServiceTarPaths(
+	tarPathsByFile map[string][]string,
+	databaseFiles map[string]struct{},
+) {
+	for dbFile, tarPaths := range tarPathsByFile {
+		if _, ok := databaseFiles[dbFile]; ok {
+			continue
+		}
+		pmc.routes.Service[dbFile] = tarPaths[0]
+		if len(tarPaths) > 1 {
+			if pmc.routes.ServiceTarPaths == nil {
+				pmc.routes.ServiceTarPaths = make(map[string][]string)
 			}
+			pmc.routes.ServiceTarPaths[dbFile] = tarPaths
 		}
 	}
-
-	return nil
 }
 
 func (pmc *PartialMetadataCollector) HandleNsInfo(nsInfo *models.NsInfo) {
@@ -91,20 +118,6 @@ func (pmc *PartialMetadataCollector) HandleNsInfo(nsInfo *models.NsInfo) {
 	pmc.routes.Databases[db][col] = colInfo
 }
 
-func getFromTarFilesSet(
-	key string,
-	tarFilesSet SetMap,
-	visited map[string]struct{},
-) (string, bool) {
-	for tarFile, tarFileSet := range tarFilesSet {
-		if _, ok := tarFileSet[key]; ok {
-			visited[tarFile] = struct{}{}
-			return tarFile, ok
-		}
-	}
-	return "", false
-}
-
 func GetTarFilesFilter(
 	routes *models.BackupRoutesInfo,
 	whitelist []string,
@@ -122,9 +135,15 @@ func GetTarFilesFilter(
 		for col, colInfo := range dbInfo {
 			if shouldDownload(db, col, whitelistFilter, blacklistFilter, whitelistSpecified) {
 				tarFilter[colInfo.TarPath] = struct{}{}
+				for _, tarPath := range colInfo.TarPaths {
+					tarFilter[tarPath] = struct{}{}
+				}
 				pathFilter[colInfo.DBPath] = struct{}{}
 				for _, indexPaths := range colInfo.IndexInfo {
 					tarFilter[indexPaths.TarPath] = struct{}{}
+					for _, tarPath := range indexPaths.TarPaths {
+						tarFilter[tarPath] = struct{}{}
+					}
 					pathFilter[indexPaths.DBPath] = struct{}{}
 				}
 			}
@@ -135,8 +154,27 @@ func GetTarFilesFilter(
 		tarFilter[tarFile] = struct{}{}
 		pathFilter[dbFile] = struct{}{}
 	}
+	for dbFile, tarPaths := range routes.ServiceTarPaths {
+		for _, tarPath := range tarPaths {
+			tarFilter[tarPath] = struct{}{}
+		}
+		pathFilter[dbFile] = struct{}{}
+	}
 
 	return pathFilter, tarFilter
+}
+
+func filterFileParts(parts *models.FilePartsInfo, paths map[string]struct{}) *models.FilePartsInfo {
+	if parts == nil {
+		return nil
+	}
+	filtered := &models.FilePartsInfo{PartSize: parts.PartSize, Files: make(map[string]int64)}
+	for name, size := range parts.Files {
+		if _, selected := paths[name]; selected {
+			filtered.Files[name] = size
+		}
+	}
+	return filtered
 }
 
 func convertToFile(ident string) string {

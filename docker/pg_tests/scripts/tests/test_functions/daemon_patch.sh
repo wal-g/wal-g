@@ -39,5 +39,6 @@ drop_pg() {
   # Stop the server properly, so the archiver can finish its queue: with SIGKILL
   # the last WAL segments were never archived and the dump comparison failed.
   pg_ctl -D "${PGDATA}" -w -m fast stop || pkill -9 postgres || true
-  rm -rf $PGDATA /tmp/basebackups_005 /tmp/wal_005 /tmp/spaces /tmp/spaces_backup
+  # Discard the old cluster's test repository, including its reserved names.
+  rm -rf $PGDATA /tmp/basebackups_005 /tmp/backup_reservations /tmp/wal_005 /tmp/spaces /tmp/spaces_backup
 }

@@ -2,17 +2,15 @@ package s3
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"hash/fnv"
 	"io"
-	"math"
-	"math/rand"
-	"strconv"
+	"math/rand/v2"
+	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 )
 
@@ -21,145 +19,209 @@ const (
 	maxRetryDelay = 300 * time.Second
 )
 
-var DebugLogBufferCounter = 0
+var rangeReaderCounter atomic.Uint64
 
 type RangeReader struct {
-	ctx           context.Context //nolint:containedctx // ctx-aware io.Reader; Read carries no ctx, reused for range re-reads
-	lastBody      io.ReadCloser
-	folder        *Folder
-	maxRetries    int
-	objectPath    string
-	storageCursor int64
-	reconnectID   int
-	logDebugID    string // hash from filename and logDebugID - unique logDebugID used only for debug
-}
-
-func (reader *RangeReader) getObjectRange(from, to int64) (*s3.GetObjectOutput, error) {
-	bytesRange := fmt.Sprintf("bytes=%d-", from)
-	if to != 0 {
-		bytesRange += strconv.Itoa(int(to))
-	}
-	input := &s3.GetObjectInput{
-		Bucket: reader.folder.bucket,
-		Key:    aws.String(reader.objectPath),
-		Range:  aws.String(bytesRange),
-	}
-	reader.debugLog("GetObject with range %s", bytesRange)
-	return reader.folder.s3API.GetObject(reader.ctx, input)
-}
-
-func (reader *RangeReader) Read(p []byte) (n int, err error) {
-	reconnect := reader.lastBody == nil // initial connect, if lastBody wasn't provided
-
-	for {
-		if reconnect {
-			connErr := reader.reconnect()
-			if connErr != nil {
-				reader.debugLog("reconnect failed %s", connErr)
-				return 0, connErr
-			}
-		}
-
-		n, err = reader.lastBody.Read(p)
-		if err != nil && err != io.EOF {
-			reader.debugLog("read(%d) to cursor(%d) failed: %+v", n, reader.storageCursor, err)
-			reconnect = true
-			continue
-		}
-		reader.storageCursor += int64(n)
-		return n, err
-	}
-}
-func (reader *RangeReader) getDebugLogLine(format string, v ...interface{}) string {
-	prefix := fmt.Sprintf("RangeReader [%s] ", reader.logDebugID)
-	message := fmt.Sprintf(format, v...)
-	return prefix + message
-}
-
-func (reader *RangeReader) debugLog(format string, v ...interface{}) {
-	tracelog.DebugLogger.Print(reader.getDebugLogLine(format, v...))
-}
-
-func (reader *RangeReader) reconnect() error {
-	failed := 0
-
-	for {
-		reader.reconnectID++
-		object, err := reader.getObjectRange(reader.storageCursor, 0)
-		if err != nil {
-			failed++
-			reader.debugLog("reconnect failed [%d/%d]: %s", failed, reader.maxRetries, err)
-			if failed >= reader.maxRetries {
-				return errors.Wrap(err, reader.getDebugLogLine("Too much reconnecting retries"))
-			}
-			sleepTime := reader.getIncrSleep(failed)
-			reader.debugLog("sleep: %s", sleepTime)
-			time.Sleep(sleepTime)
-			continue
-		}
-		if reader.lastBody != nil {
-			err = reader.lastBody.Close()
-			if err != nil {
-				msg := reader.getDebugLogLine("We have problems with closing previous connection")
-				tracelog.DebugLogger.Print(msg)
-				return errors.Wrap(err, msg)
-			}
-		}
-		reader.lastBody = object.Body
-		reader.debugLog("reconnect #%d succeeded", reader.reconnectID)
-		break
-	}
-	return nil
-}
-
-// This code stolen from s3 lib, from vendor/github.com/aws/aws-sdk-go/aws/client/default_retryer.go
-// func (d DefaultRetryer) RetryRules( .. ) time.Duration
-// this calculate sleep duration (jitter and exponential backoff)
-func (reader *RangeReader) getIncrSleep(retryCount int) time.Duration {
-	minDelay := minRetryDelay
-	maxDelay := maxRetryDelay
-	var delay time.Duration
-
-	actualRetryCount := int(math.Log2(float64(minDelay))) + 1
-	if actualRetryCount < 63-retryCount {
-		delay = time.Duration(1<<uint64(retryCount)) * getJitterDelay(minDelay)
-		if delay > maxDelay {
-			delay = getJitterDelay(maxDelay / 2)
-		}
-	} else {
-		delay = getJitterDelay(maxDelay / 2)
-	}
-	return delay
-}
-
-func (reader *RangeReader) Close() (err error) {
-	return reader.lastBody.Close()
+	ctx            context.Context //nolint:containedctx // io.Reader has no context parameter
+	lastBody       io.ReadCloser
+	folder         *Folder
+	input          s3.GetObjectInput
+	maxRetries     int
+	reconnects     int
+	storageCursor  int64
+	expectedLength int64
+	pendingError   error
+	terminalError  error
+	closed         bool
+	logDebugID     uint64
+	wait           func(context.Context, time.Duration) error
 }
 
 func NewRangeReader(ctx context.Context, body io.ReadCloser, objectPath string, retriesCount int, folder *Folder) *RangeReader {
-	DebugLogBufferCounter++
-	reader := &RangeReader{
-		ctx:        ctx,
-		lastBody:   body,
-		objectPath: objectPath,
-		maxRetries: retriesCount,
-		logDebugID: getHash(objectPath, DebugLogBufferCounter),
-		folder:     folder,
+	return newRangeReader(ctx, folder.getObjectInput(objectPath), &s3.GetObjectOutput{Body: body}, retriesCount, folder)
+}
+
+func newRangeReader(ctx context.Context, input *s3.GetObjectInput, object *s3.GetObjectOutput,
+	retriesCount int, folder *Folder) *RangeReader {
+	r := &RangeReader{ctx: ctx, lastBody: object.Body, folder: folder, input: *input,
+		maxRetries: max(0, retriesCount), expectedLength: -1,
+		logDebugID: rangeReaderCounter.Add(1), wait: waitForRangeRetry}
+	if object.ContentLength != nil {
+		r.expectedLength = *object.ContentLength
 	}
-
-	reader.debugLog("Init s3reader path %s", objectPath)
-	return reader
+	if object.VersionId != nil {
+		r.input.VersionId = object.VersionId
+	}
+	if object.ETag != nil {
+		r.input.IfMatch = object.ETag
+	}
+	return r
 }
 
-func getHash(objectPath string, id int) string {
-	hash := fnv.New32a()
-	_, err := hash.Write([]byte(objectPath))
-	tracelog.ErrorLogger.FatalfOnError("Fatal, can't write buffer to hash %v", err)
-
-	return fmt.Sprintf("%x_%d", hash.Sum32(), id)
+func (r *RangeReader) Read(p []byte) (int, error) {
+	if r.closed {
+		return 0, io.ErrClosedPipe
+	}
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	if len(p) == 0 {
+		return 0, nil
+	}
+	for {
+		if r.terminalError != nil {
+			return 0, r.terminalError
+		}
+		if r.pendingError != nil || r.lastBody == nil {
+			if err := r.reconnect(); err != nil {
+				r.terminalError = err
+				return 0, err
+			}
+		}
+		n, err := r.lastBody.Read(p)
+		r.storageCursor += int64(n)
+		err = r.checkReadLength(err)
+		if err == nil {
+			return n, nil
+		}
+		if err == io.EOF || !r.folder.IsRetryableError(err) {
+			r.terminalError = err
+			return n, err
+		}
+		r.pendingError = err
+		if n > 0 {
+			return n, nil
+		}
+	}
 }
 
-// getJitterDelay returns a jittered delay for retry
-func getJitterDelay(duration time.Duration) time.Duration {
-	return time.Duration(rand.Int63n(int64(duration)) + int64(duration))
+func (r *RangeReader) checkReadLength(err error) error {
+	if r.expectedLength >= 0 {
+		if r.storageCursor > r.expectedLength {
+			return errors.New("S3 range response exceeds the original content length")
+		}
+		if err == io.EOF && r.storageCursor < r.expectedLength {
+			return io.ErrUnexpectedEOF
+		}
+	}
+	return err
+}
+
+func (r *RangeReader) reconnect() error {
+	for {
+		if err := r.ctx.Err(); err != nil {
+			return err
+		}
+		if r.pendingError != nil {
+			if r.reconnects >= r.maxRetries {
+				return fmt.Errorf("S3 range recovery exhausted after %d reconnections: %w", r.reconnects, r.pendingError)
+			}
+			delay := r.getIncrSleep(r.reconnects)
+			r.closeBody()
+			tracelog.DebugLogger.Printf("RangeReader [%d]: reconnect %d/%d after transient read failure in %s",
+				r.logDebugID, r.reconnects+1, r.maxRetries, delay)
+			if err := r.wait(r.ctx, delay); err != nil {
+				return err
+			}
+			r.reconnects++
+		}
+		input := r.input
+		input.Range = aws.String(fmt.Sprintf("bytes=%d-", r.storageCursor))
+		object, err := r.folder.s3API.GetObject(r.ctx, &input)
+		if err != nil {
+			if !r.folder.IsRetryableError(err) {
+				return err
+			}
+			r.pendingError = err
+			continue
+		}
+		if err := r.validateRange(object); err != nil {
+			if object.Body != nil {
+				_ = object.Body.Close()
+			}
+			return err
+		}
+		r.lastBody = object.Body
+		r.pendingError = nil
+		return nil
+	}
+}
+
+func (r *RangeReader) validateRange(object *s3.GetObjectOutput) error {
+	if object.Body == nil {
+		return errors.New("S3 range response has no body")
+	}
+	if r.input.IfMatch != nil && object.ETag != nil && *r.input.IfMatch != *object.ETag {
+		return errors.New("S3 object ETag changed during range recovery")
+	}
+	if r.input.VersionId != nil && object.VersionId != nil && *r.input.VersionId != *object.VersionId {
+		return errors.New("S3 object version changed during range recovery")
+	}
+	if object.ContentRange == nil {
+		if r.storageCursor != 0 {
+			return errors.New("S3 range response is missing Content-Range")
+		}
+		if object.ContentLength != nil {
+			if r.expectedLength >= 0 && r.expectedLength != *object.ContentLength {
+				return errors.New("S3 object length changed during range recovery")
+			}
+			r.expectedLength = *object.ContentLength
+		}
+		return nil
+	}
+	return r.validateContentRange(object)
+}
+
+func (r *RangeReader) validateContentRange(object *s3.GetObjectOutput) error {
+	var start, end, total int64
+	n, err := fmt.Sscanf(*object.ContentRange, "bytes %d-%d/%d", &start, &end, &total)
+	if err != nil || n != 3 || start != r.storageCursor || end < start || total <= end ||
+		*object.ContentRange != fmt.Sprintf("bytes %d-%d/%d", start, end, total) ||
+		(r.expectedLength >= 0 && total != r.expectedLength) ||
+		(object.ContentLength != nil && *object.ContentLength != end-start+1) {
+		return errors.New("S3 range response has inconsistent Content-Range or length")
+	}
+	r.expectedLength = total
+	return nil
+}
+
+func (r *RangeReader) getIncrSleep(retryCount int) time.Duration {
+	delay := minRetryDelay
+	for i := 0; i < retryCount && delay < maxRetryDelay/2; i++ {
+		delay = min(delay*2, maxRetryDelay/2)
+	}
+	return delay + time.Duration(rand.Int64N(int64(delay)))
+}
+
+func waitForRangeRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return ctx.Err()
+	}
+}
+
+func (r *RangeReader) closeBody() {
+	if r.lastBody != nil {
+		if err := r.lastBody.Close(); err != nil {
+			tracelog.DebugLogger.Printf("RangeReader [%d]: failed to close interrupted response body", r.logDebugID)
+		}
+		r.lastBody = nil
+	}
+}
+
+func (r *RangeReader) Close() error {
+	if r.closed {
+		return nil
+	}
+	r.closed = true
+	if r.lastBody == nil {
+		return nil
+	}
+	err := r.lastBody.Close()
+	r.lastBody = nil
+	return err
 }

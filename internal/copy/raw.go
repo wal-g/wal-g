@@ -280,28 +280,24 @@ func ExecuteRaw(ctx context.Context, plan *Plan) error {
 }
 
 func Execute(ctx context.Context, plan *Plan, options ExecuteOptions) error {
-	targetObjects, err := storage.ListFolderRecursively(ctx, plan.To)
+	retries, err := options.copyRetries()
 	if err != nil {
-		return fmt.Errorf("list destination storage: %w", err)
+		return err
 	}
-	target := make(map[string]storage.Object, len(targetObjects))
-	for _, object := range targetObjects {
-		target[path.Clean(object.GetName())] = object
+	options.MaxRetries = &retries
+	byOrder, err := groupPendingEntries(ctx, plan, options)
+	if err != nil {
+		return err
 	}
 
-	byOrder := map[publicationOrder][]Entry{}
-	for _, entry := range plan.Entries() {
-		if existing, ok := target[entry.TargetPath]; ok && !entry.Mutable {
-			if existing.GetSize() != entry.Size {
-				return fmt.Errorf("destination object %q conflicts with source: source size %d, destination size %d",
-					entry.TargetPath, entry.Size, existing.GetSize())
-			}
-			tracelog.DebugLogger.Printf("Skipping existing object %q", entry.TargetPath)
-			continue
+	var objects, size int64
+	for _, entries := range byOrder {
+		for _, entry := range entries {
+			objects++
+			size += entry.Size
 		}
-		order := publicationOrder{phase: entry.Phase, sequence: entry.Sequence}
-		byOrder[order] = append(byOrder[order], entry)
 	}
+	tracelog.InfoLogger.Printf("Copying %d objects, %d bytes.", objects, size)
 
 	orders := make([]publicationOrder, 0, len(byOrder))
 	for order := range byOrder {
@@ -326,13 +322,46 @@ func Execute(ctx context.Context, plan *Plan, options ExecuteOptions) error {
 		group, groupCtx := errgroup.WithContext(ctx)
 		group.SetLimit(defaultRawCopyConcurrency)
 		for _, entry := range byOrder[order] {
+			if groupCtx.Err() != nil {
+				break
+			}
 			group.Go(func() error { return copyObject(groupCtx, plan.From, plan.To, entry, options) })
 		}
 		if err := group.Wait(); err != nil {
 			return err
 		}
 	}
-	return nil
+	return ctx.Err()
+}
+
+func groupPendingEntries(ctx context.Context, plan *Plan, options ExecuteOptions) (map[publicationOrder][]Entry, error) {
+	targetObjects, err := storage.ListFolderRecursively(ctx, plan.To)
+	if err != nil {
+		return nil, fmt.Errorf("list destination storage: %w", err)
+	}
+	target := make(map[string]storage.Object, len(targetObjects))
+	for _, object := range targetObjects {
+		target[path.Clean(object.GetName())] = object
+	}
+
+	byOrder := map[publicationOrder][]Entry{}
+	for _, entry := range plan.Entries() {
+		if existing, ok := target[entry.TargetPath]; ok && !entry.Mutable {
+			if existing.GetSize() == entry.Size {
+				tracelog.DebugLogger.Printf("Skipping existing object %q", entry.TargetPath)
+				continue
+			}
+			if !options.OverwriteConflicts {
+				return nil, fmt.Errorf("destination object %q conflicts with source: source size %d, destination size %d",
+					entry.TargetPath, entry.Size, existing.GetSize())
+			}
+			tracelog.WarningLogger.Printf("Will overwrite conflicting destination object %q: source size %d, destination size %d",
+				entry.TargetPath, entry.Size, existing.GetSize())
+		}
+		order := publicationOrder{phase: entry.Phase, sequence: entry.Sequence}
+		byOrder[order] = append(byOrder[order], entry)
+	}
+	return byOrder, nil
 }
 
 func copyObject(ctx context.Context, from, to storage.Folder, entry Entry, options ExecuteOptions) error {
@@ -340,54 +369,68 @@ func copyObject(ctx context.Context, from, to storage.Folder, entry Entry, optio
 	err := copyObjectWithoutMetrics(ctx, from, to, entry, options)
 	if err != nil {
 		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
+		if options.SkipErrorsFor != nil && ctx.Err() == nil &&
+			!errors.Is(err, context.Canceled) &&
+			options.SkipErrorsFor.MatchString(entry.SourcePath) {
+			tracelog.WarningLogger.Printf("Skipping failed copy of %q: %v", entry.SourcePath, err)
+			return nil
+		}
 	}
 	return err
 }
 
 func copyObjectWithoutMetrics(ctx context.Context, from, to storage.Folder, entry Entry, options ExecuteOptions) error {
+	retries, err := options.copyRetries()
+	if err != nil {
+		return err
+	}
+	var serverCopyErr error
+	err = retryCopy(ctx, retries, copyRetryDelay, func(ctx context.Context) error {
+		return copyObjectAttempt(ctx, from, to, entry, &options, &serverCopyErr)
+	})
+	if err != nil && serverCopyErr != nil && options.ServerSideCopyFallback {
+		return errors.Join(serverCopyErr, err)
+	}
+	return err
+}
+
+func copyObjectAttempt(ctx context.Context, from, to storage.Folder, entry Entry,
+	options *ExecuteOptions, serverCopyErr *error) error {
 	if entry.inline != nil {
 		if err := to.PutObject(ctx, entry.TargetPath, bytes.NewReader(entry.inline)); err != nil {
-			return fmt.Errorf("write destination metadata %q: %w", entry.TargetPath, err)
+			return &transferError{"write destination metadata", to, err}
 		}
-		tracelog.InfoLogger.Printf("Published metadata %q.", entry.TargetPath)
+		tracelog.InfoLogger.Printf("Published metadata %q (%d bytes).", entry.TargetPath, entry.Size)
 		return nil
 	}
 
-	var serverCopyErr error
 	if options.UseServerSideCopy {
 		if copier, ok := to.(storage.CrossFolderCopier); ok && copier.CanCopyFrom(from) {
-			serverCopyErr = copier.CopyObjectFrom(ctx, from, entry.SourcePath, entry.TargetPath, entry.Size)
-			if serverCopyErr == nil {
+			*serverCopyErr = copier.CopyObjectFrom(ctx, from, entry.SourcePath, entry.TargetPath, entry.Size)
+			if *serverCopyErr == nil {
+				tracelog.InfoLogger.Printf(
+					"Copied %q to %q on the storage side (%d bytes).",
+					entry.SourcePath, entry.TargetPath, entry.Size,
+				)
 				return nil
 			}
-			if ctx.Err() != nil || errors.Is(serverCopyErr, context.Canceled) ||
-				errors.Is(serverCopyErr, context.DeadlineExceeded) ||
+			if ctx.Err() != nil || errors.Is(*serverCopyErr, context.Canceled) ||
 				!options.ServerSideCopyFallback {
-				return fmt.Errorf("server-side copy %q to %q: %w", entry.SourcePath, entry.TargetPath, serverCopyErr)
+				return &transferError{"server-side copy", to, *serverCopyErr}
 			}
+			options.UseServerSideCopy = false
 			tracelog.WarningLogger.Printf(
 				"Server-side copy %q to %q failed, falling back to streaming: %v",
-				entry.SourcePath, entry.TargetPath, serverCopyErr)
+				entry.SourcePath, entry.TargetPath, *serverCopyErr)
 		}
 	}
 
-	reader, err := from.ReadObject(ctx, entry.SourcePath)
-	if err != nil {
-		streamErr := fmt.Errorf("read source object %q: %w", entry.SourcePath, err)
-		if serverCopyErr != nil {
-			return errors.Join(serverCopyErr, streamErr)
-		}
-		return streamErr
+	if err := streamObject(ctx, from, to, entry.SourcePath, entry.TargetPath, entry.Size, nil); err != nil {
+		return fmt.Errorf("copy %q to %q: %w", entry.SourcePath, entry.TargetPath, err)
 	}
-	defer reader.Close()
-
-	if err := to.PutObject(ctx, entry.TargetPath, reader); err != nil {
-		streamErr := fmt.Errorf("write destination object %q: %w", entry.TargetPath, err)
-		if serverCopyErr != nil {
-			return errors.Join(serverCopyErr, streamErr)
-		}
-		return streamErr
-	}
-	tracelog.InfoLogger.Printf("Streamed %q to %q through WAL-G without transformation.", entry.SourcePath, entry.TargetPath)
+	tracelog.InfoLogger.Printf(
+		"Streamed %q to %q through WAL-G without transformation (%d bytes).",
+		entry.SourcePath, entry.TargetPath, entry.Size,
+	)
 	return nil
 }

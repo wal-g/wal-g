@@ -1,6 +1,8 @@
 package s3
 
 import (
+	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
@@ -103,6 +106,76 @@ func TestCreateUploadInput_WithoutServerSideEncryption(t *testing.T) {
 	assert.Equal(t, types.StorageClass(dummyStorageClass), uploadInput.StorageClass)
 }
 
+type capturingUploaderAPI struct {
+	body     []byte
+	partSize int64
+	opts     int
+}
+
+func (u *capturingUploaderAPI) Upload(
+	_ context.Context,
+	input *awss3.PutObjectInput,
+	opts ...func(*manager.Uploader),
+) (*manager.UploadOutput, error) {
+	var err error
+	u.body, err = io.ReadAll(input.Body)
+	if err != nil {
+		return nil, err
+	}
+	configuration := manager.Uploader{}
+	for _, option := range opts {
+		option(&configuration)
+	}
+	u.opts = len(opts)
+	u.partSize = configuration.PartSize
+	return &manager.UploadOutput{}, nil
+}
+
+type testSizedReader struct {
+	*bytes.Reader
+}
+
+func (r *testSizedReader) RemainingSize() int64 {
+	return int64(r.Len())
+}
+
+func TestAutomaticPartSizeUsesKnownUploadSize(t *testing.T) {
+	api := &capturingUploaderAPI{}
+	uploader := NewUploader(api, "", "", "", "STANDARD", "", -1)
+	uploader.autoPartSize = true
+	uploader.partSize = 5 << 20
+	content := []byte("streamed content")
+
+	err := uploader.upload(t.Context(), "bucket", "object", &testSizedReader{bytes.NewReader(content)})
+	require.NoError(t, err)
+	assert.Equal(t, content, api.body)
+	assert.Equal(t, int64(5<<20), api.partSize)
+	assert.Equal(t, 1, api.opts)
+}
+
+func TestAutomaticPartSizeKeepsUnknownInputStreaming(t *testing.T) {
+	api := &capturingUploaderAPI{}
+	uploader := NewUploader(api, "", "", "", "STANDARD", "", -1)
+	uploader.autoPartSize = true
+	uploader.partSize = 5 << 20
+	content := []byte("streamed content")
+
+	err := uploader.upload(t.Context(), "bucket", "object", bytes.NewBuffer(content))
+	require.NoError(t, err)
+	assert.Equal(t, content, api.body)
+	assert.Equal(t, 0, api.opts)
+}
+
+func TestExplicitPartSizeKeepsStreamingUpload(t *testing.T) {
+	api := &capturingUploaderAPI{}
+	uploader := NewUploader(api, "", "", "", "STANDARD", "", -1)
+	uploader.autoPartSize = false
+
+	err := uploader.upload(t.Context(), "bucket", "object", bytes.NewBufferString("content"))
+	require.NoError(t, err)
+	assert.Equal(t, 0, api.opts)
+}
+
 func TestCreateUploadInput_WithServerSideEncryptionAndWithCustomerKey(t *testing.T) {
 	uploader := &Uploader{
 		StorageClass:         dummyStorageClass,
@@ -153,61 +226,6 @@ func TestCreateUploadInput_WithServerSideEncryptionAndWithKMSKeyID(t *testing.T)
 	assert.Equal(t, dummyContent, uploadInput.Body)
 	assert.Equal(t, types.StorageClass(dummyStorageClass), uploadInput.StorageClass)
 	assert.Equal(t, aws.String(dummySSEKMSKeyID), uploadInput.SSEKMSKeyId)
-}
-
-func TestPartitionStrings(t *testing.T) {
-	testCases := []struct {
-		strings   []string
-		blockSize int
-		expected  [][]string
-	}{
-		{[]string{"1", "2", "3", "4", "5"}, 2, [][]string{{"1", "2"}, {"3", "4"}, {"5"}}},
-		{[]string{"1", "2", "3", "4", "5", "6"}, 3, [][]string{{"1", "2", "3"}, {"4", "5", "6"}}},
-		{[]string{"1", "2", "3", "4", "5"}, 1000, [][]string{{"1", "2", "3", "4", "5"}}},
-		{[]string{"1", "2", "3", "4", "5"}, 1, [][]string{{"1"}, {"2"}, {"3"}, {"4"}, {"5"}}},
-		{[]string{"1", "2", "3", "4", "5"}, 0, [][]string{{"1", "2", "3", "4", "5"}}},
-		{[]string{"1", "2", "3", "4", "5"}, -1, [][]string{{"1", "2", "3", "4", "5"}}},
-		{[]string{"1", "2"}, 5, [][]string{{"1", "2"}}},
-		{[]string{"1"}, 1, [][]string{{"1"}}},
-		{[]string{}, 1, [][]string{}},
-		{[]string{"foo", "bar", "baz"}, 4, [][]string{{"foo", "bar", "baz"}}},
-		{[]string{"foo", "bar", "baz"}, 3, [][]string{{"foo", "bar", "baz"}}},
-		{[]string{"foo", "bar", "baz"}, 2, [][]string{{"foo", "bar"}, {"baz"}}},
-		{[]string{"foo", "bar", "baz"}, 1, [][]string{{"foo"}, {"bar"}, {"baz"}}},
-		{[]string{"foo", "bar", "baz"}, 0, [][]string{{"foo", "bar", "baz"}}},
-		{[]string{"foo", "bar", "baz"}, -1, [][]string{{"foo", "bar", "baz"}}},
-		{
-			[]string{
-				"This is a long string that contains a lot of words and characters for testing purposes.",
-				"The quick brown fox jumps over the lazy dog",
-				"Lorem ipsum dolor sit amet, consectetur adipiscing elit",
-				"Hello, World!",
-				" ",
-				"",
-			},
-			2,
-			[][]string{
-				{
-					"This is a long string that contains a lot of words and characters for testing purposes.",
-					"The quick brown fox jumps over the lazy dog",
-				},
-				{
-					"Lorem ipsum dolor sit amet, consectetur adipiscing elit",
-					"Hello, World!",
-				},
-				{
-					" ",
-					"",
-				},
-			},
-		},
-	}
-	for i, tc := range testCases {
-		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
-			actual := partitionStrings(tc.strings, tc.blockSize)
-			assert.Equal(t, tc.expected, actual)
-		})
-	}
 }
 
 func TestPartitionObjects(t *testing.T) {

@@ -150,6 +150,17 @@ func (w *WalgUtil) PushBinaryBackup(skipMetadata bool) error {
 	return nil
 }
 
+func (w *WalgUtil) PushBinaryBackupWithFileParts(partSize int) error {
+	_, err := RunCommandStrict(w.ctx, w.host, []string{
+		"env",
+		"WALG_MONGO_BACKUP_FILE_PART_SIZE=" + strconv.Itoa(partSize),
+		"WALG_COMPRESSION_METHOD=lz4",
+		"WALG_UPLOAD_CONCURRENCY=4",
+		w.cliPath, "--config", w.confPath, "binary-backup-push", "--count-journals",
+	})
+	return err
+}
+
 func (w *WalgUtil) GetBackupByNumber(backupNumber int) (string, error) {
 	backups, err := w.Backups()
 	if err != nil {
@@ -203,12 +214,13 @@ func (w *WalgUtil) FetchBinaryBackup(
 }
 
 func (w *WalgUtil) FetchBinaryBackupWithPITR(
-	backup, mongodConfigPath, mongodbVersion, since, until string,
+	backup, mongodConfigPath, mongodbVersion, since, until, checkpointDir string,
 ) (ExecResult, error) {
 	walgCommand := []string{
 		"env",
 		"OPLOG_REPLAY_FSYNC_INTERVAL=1ms",
 		"OPLOG_REPLAY_MAX_MONGOD_RESTARTS=5",
+		"WALG_TEST_REPLAY_CHECKPOINT_DIR=" + checkpointDir,
 		w.cliPath, "--config", w.confPath,
 		"binary-backup-fetch", backup, mongodConfigPath, mongodbVersion,
 		"--pitr-since", since,
@@ -233,15 +245,31 @@ done < "$1"
 	return logResult, logErr
 }
 
-func (w *WalgUtil) InterruptedReplayCheckpointLogged() (bool, error) {
-	result, err := RunCommand(w.ctx, w.host, []string{"bash", "-c", `
-while IFS= read -r line; do
-    case "$line" in
-        *"Oplog replay progress is durable through"*) exit 0 ;;
-    esac
-done < "$1" 2>/dev/null
-exit 1
-`, "--", interruptedReplayLogPath})
+func (w *WalgUtil) PrepareInterruptedReplay() (string, error) {
+	result, err := RunCommandStrict(w.ctx, w.host,
+		[]string{"mktemp", "-d", "/tmp/walg-replay-checkpoint.XXXXXX"})
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(result.Stdout()), nil
+}
+
+func (w *WalgUtil) CleanupInterruptedReplay(dir string) {
+	_, err := RunCommandStrict(w.ctx, w.host, []string{"bash", "-c", `
+rm -f -- "$1/ready" "$1/continue" && rmdir -- "$1"
+`, "--", dir})
+	if err != nil {
+		tracelog.WarningLogger.Printf("clean up replay checkpoint barrier: %v", err)
+	}
+}
+
+func (w *WalgUtil) ReleaseInterruptedReplayCheckpoint(dir string) error {
+	_, err := RunCommandStrict(w.ctx, w.host, []string{"touch", "--", dir + "/continue"})
+	return err
+}
+
+func (w *WalgUtil) InterruptedReplayCheckpointReady(dir string) (bool, error) {
+	result, err := RunCommand(w.ctx, w.host, []string{"test", "-f", dir + "/ready"})
 	if err != nil {
 		return false, err
 	}

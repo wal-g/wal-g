@@ -33,5 +33,7 @@ func HandleCopy(ctx context.Context, fromConfigFile, toConfigFile, backupName st
 	tracelog.ErrorLogger.FatalOnError(err)
 	plan, err := BuildCopyPlan(ctx, from.RootFolder(), to.RootFolder(), backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, copy.OptionsFromConfigs(fromConfig, toConfig)))
+	options, err := copy.OptionsFromConfigs(fromConfig, toConfig)
+	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, options))
 }

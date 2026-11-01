@@ -14,8 +14,9 @@ type NsInfo struct {
 }
 
 type Paths struct {
-	DBPath  string `json:"db_path"`
-	TarPath string `json:"tar_path"`
+	DBPath   string   `json:"db_path"`
+	TarPath  string   `json:"tar_path"`
+	TarPaths []string `json:"tar_paths,omitempty"`
 }
 
 type IndexInfo map[string]Paths
@@ -28,8 +29,9 @@ type CollectionInfo struct {
 type DBInfo map[string]CollectionInfo
 
 type BackupRoutesInfo struct {
-	Databases map[string]DBInfo `json:"databases"`
-	Service   map[string]string `json:"service"`
+	Databases       map[string]DBInfo   `json:"databases"`
+	Service         map[string]string   `json:"service"`
+	ServiceTarPaths map[string][]string `json:"service_tar_paths,omitempty"`
 }
 
 func NewBackupRoutesInfo() *BackupRoutesInfo {

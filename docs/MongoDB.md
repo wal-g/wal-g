@@ -26,6 +26,34 @@ Use the fast backup cursor retry strategy for checkpoint conflicts during `binar
 When enabled, WAL-G makes five retries with delays of 0, 100ms, 250ms, 500ms, and 1s.
 Default: `false`.
 
+* `WALG_MONGO_BACKUP_FILE_PART_SIZE`
+
+Maximum uncompressed payload size, in bytes, of a part of a binary-backup
+`collection-*.wt` or `index-*.wt` file. Default: `0` (disabled). For example,
+`WALG_MONGO_BACKUP_FILE_PART_SIZE=67108864` splits files larger than 64 MiB.
+The value must be a non-negative integer. Smaller files and other MongoDB files
+keep the existing archive format.
+
+Each part is stored in its own compressed and optionally encrypted tar object.
+Tar headers and compression/encryption add overhead to the configured payload
+size. A failed download retries its archive without downloading successful parts
+again. `WALG_DOWNLOAD_CONCURRENCY` controls parallel downloads.
+Completed parts are preserved during retries within the running
+`binary-backup-fetch` process. Starting a new fetch performs the usual dbPath
+cleanup and downloads the backup again.
+
+The backup sentinel records one shared part size and the size of each split
+file; each part carries its byte offset and complete file size in the
+database-independent `WAL-G.FileParts.Offset` and `WAL-G.FileParts.FileSize`
+PAX records. The same composer and interpreter wrappers can be used by other
+database integrations with their own file-selection policy.
+Restore writes parts to their original offsets and checks that every expected
+part is present before starting MongoDB. Full and partial restores support split
+files. Restore detects the format automatically; this setting is only needed
+when creating the backup.
+Use a WAL-G version supporting file parts to restore these backups. This version
+continues to restore existing backups created without file splitting.
+
 * `MONGODB_RESTORE_DISABLE_HOST_RESETUP`
 
 Do not perform any MongoDB reconfiguration steps during `binary-backup-fetch`. Usefull when one might want just to restore original host state.
@@ -92,7 +120,9 @@ Copies one backup or all backups between storage configurations without transfor
 wal-g copy --from=config_from.json --to=config_to.json --backup-name=LATEST
 ```
 
-Add `--with-history` to synchronize a continuous oplog sequence from the selected backup through the latest archived entry. Repeating the command adds newly archived oplog objects and skips immutable objects already present at the destination.
+Add `--with-history` to synchronize a continuous oplog sequence from the selected backup through the latest archived entry. Repeating the command adds newly archived oplog objects and skips immutable objects already present at the destination with the same path and size.
+
+Size conflicts fail the command before any transfers by default. Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to overwrite all size conflicts with source bytes, including zero-byte destinations. Each planned replacement is logged with both sizes; equal-sized immutable objects are still skipped. Transfer failures remain fatal after applicable retries; cancellation remains fatal.
 
 ### ``backup-push``
 
@@ -243,8 +273,11 @@ SINCE is included and UNTIL is NOT.
 wal-g oplog-replay 1593554109.1 1593559109.1
 ```
 
-During replay, WAL-G runs `fsync` periodically and remembers the last durable oplog timestamp in memory. The interval is
-configured with `OPLOG_REPLAY_FSYNC_INTERVAL` and defaults to `10m`.
+During replay, WAL-G creates durable checkpoints periodically and remembers the last checkpointed oplog timestamp in memory.
+The interval is configured with `OPLOG_REPLAY_FSYNC_INTERVAL` and defaults to `10m`. A regular replay checkpoint runs
+`fsync`. A catch-up replay checkpoint also records the last applied optime in the local oplog, updates `replset.minvalid`,
+clears `replset.oplogTruncateAfterPoint`, and then runs `fsync`. This leaves MongoDB consistent through that checkpoint if
+replay is stopped before reaching the requested end timestamp.
 
 When `binary-backup-fetch` replays PITR data using its temporary `mongod`, WAL-G restarts that process after an unexpected
 exit and resumes after the last durable timestamp. `OPLOG_REPLAY_MAX_MONGOD_RESTARTS` limits consecutive restarts without

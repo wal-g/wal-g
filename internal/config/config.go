@@ -98,6 +98,7 @@ const (
 	PgWalPageSize           = "WALG_PG_WAL_PAGE_SIZE"
 	PgBlockSize             = "WALG_PG_BLOCK_SIZE"
 	TotalBgUploadedLimit    = "TOTAL_BG_UPLOADED_LIMIT"
+	PgWalFullScanInterval   = "WALG_PG_WAL_FULL_SCAN_INTERVAL"
 	NameStreamCreateCmd     = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd    = "WALG_STREAM_RESTORE_COMMAND"
 	MaxDelayedSegmentsCount = "WALG_INTEGRITY_MAX_DELAYED_WALS"
@@ -135,6 +136,7 @@ const (
 	MongoDBLastWriteUpdateInterval      = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
 	MongoDBExtendBackupCursor           = "MONGODB_EXTEND_BACKUP_CURSOR"
 	MongoDBBackupCursorFastRetry        = "MONGODB_BACKUP_CURSOR_FAST_RETRY"
+	MongoDBBackupFilePartSize           = "WALG_MONGO_BACKUP_FILE_PART_SIZE"
 	MongoDBDeletionProtectionWhitelist  = "MONGODB_DELETION_PROTECTION_WHITELIST"
 	MongoDBExtraInternalDatabases       = "MONGODB_EXTRA_INTERNAL_DATABASES"
 	OplogArchiveAfterSize               = "OPLOG_ARCHIVE_AFTER_SIZE"
@@ -259,6 +261,8 @@ const (
 
 	ForceWalDetal          = "WALG_FORCE_WAL_DELTA"
 	ServerSideCopyFallback = "WALG_SERVER_SIDE_COPY_FALLBACK"
+	DisasterCopy           = "WALG_DISASTER_COPY"
+	DisasterCopySkipFiles  = "WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES"
 )
 
 var (
@@ -279,6 +283,7 @@ var (
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TarDisableFsyncSetting:       "false",
 		TotalBgUploadedLimit:         "32",
+		PgWalFullScanInterval:        "5s",
 		UseReverseUnpackSetting:      "false",
 		SkipRedundantTarsSetting:     "false",
 		VerifyPageChecksumsSetting:   "false",
@@ -296,6 +301,7 @@ var (
 		DirectIOBlockCountSetting:    "32",
 		LogLevelSetting:              "NORMAL",
 		ServerSideCopyFallback:       "true",
+		DisasterCopy:                 "false",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -333,6 +339,7 @@ var (
 	}
 
 	PGDefaultSettings = map[string]string{
+		DisasterCopySkipFiles:     `^wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$`,
 		PgWalSize:                 "16",
 		PgWalPageSize:             "8192",
 		PgBlockSize:               "8192",
@@ -345,6 +352,7 @@ var (
 	}
 
 	GPDefaultSettings = map[string]string{
+		DisasterCopySkipFiles:        `^segments_005/seg-?[0-9]+/wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$`,
 		GPLogsDirectory:              "/var/log",
 		PgWalSize:                    "64",
 		PgWalPageSize:                "32768",
@@ -405,6 +413,7 @@ var (
 		LibsodiumKeyPathSetting:       true,
 		LibsodiumKeyTransform:         true,
 		TotalBgUploadedLimit:          true,
+		PgWalFullScanInterval:         true,
 		NameStreamCreateCmd:           true,
 		NameStreamRestoreCmd:          true,
 		UseReverseUnpackSetting:       true,
@@ -423,6 +432,8 @@ var (
 		StatsdAddressSetting:          true,
 		StatsdExtraTagsSetting:        true,
 		ServerSideCopyFallback:        true,
+		DisasterCopy:                  true,
+		DisasterCopySkipFiles:         true,
 
 		ProfileSamplingRatio: true,
 		ProfileMode:          true,
@@ -565,6 +576,7 @@ var (
 		MongoDBLastWriteUpdateInterval:     true,
 		MongoDBExtendBackupCursor:          true,
 		MongoDBBackupCursorFastRetry:       true,
+		MongoDBBackupFilePartSize:          true,
 		MongoDBDeletionProtectionWhitelist: true,
 		MongoDBExtraInternalDatabases:      true,
 		OplogArchiveTimeoutInterval:        true,
@@ -777,19 +789,22 @@ func GetWaleCompatibleSettingFrom(key string, config *viper.Viper) (value string
 func ConfigureLogging() error {
 	var logFile *os.File
 	logLevel := CommonDefaultConfigValues[LogLevelSetting]
-	var err error
 
 	if viper.IsSet(LogLevelSetting) {
 		logLevel = viper.GetString(LogLevelSetting)
 	}
 
-	if viper.IsSet(LogDestinationSetting) && viper.GetString(LogDestinationSetting) != "stderr" {
-		logFileName := viper.GetString(LogDestinationSetting)
-		logFile, err = os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	logDestination := viper.GetString(LogDestinationSetting)
+	switch {
+	case logDestination == "stdout":
+		logFile = os.Stdout
+	case logDestination != "" && logDestination != "stderr":
+		var err error
+		logFile, err = os.OpenFile(logDestination, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		if err != nil {
 			return fmt.Errorf("could not open log file: %s", err)
 		}
-	} else {
+	default:
 		logFile = os.Stderr
 	}
 
@@ -800,7 +815,7 @@ func ConfigureLogging() error {
 	if logging.LogFile != nil {
 		_ = logging.LogFile.Close()
 	}
-	if logFile != os.Stderr {
+	if logFile != os.Stderr && logFile != os.Stdout {
 		logging.LogFile = logFile
 	}
 	return nil

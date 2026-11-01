@@ -196,13 +196,17 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 	backupCursor.StartKeepAlive()
 
 	mongodDBPath := backupCursor.BackupCursorMeta.DBPath
+	composerMaker, err := newTarBallComposerMaker()
+	if err != nil {
+		return err
+	}
 	concurrentUploader, err := internal.CreateConcurrentUploader(
 		ctx,
 		internal.CreateConcurrentUploaderArgs{
 			Uploader:             backupService.Uploader,
 			BackupName:           args.BackupName,
 			Directory:            mongodDBPath,
-			TarBallComposerMaker: NewDirDatabaseTarBallComposerMaker(),
+			TarBallComposerMaker: composerMaker,
 		})
 	if err != nil {
 		return err
@@ -228,6 +232,7 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 	if err != nil {
 		return err
 	}
+	backupService.Sentinel.FileParts = composerMaker.FileParts()
 
 	if !args.SkipMetadata {
 		if err = metadataCollector.Complete(ctx, tarFileSets); err != nil {
@@ -236,7 +241,6 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 		backupService.Sentinel.Top100Namespaces = *metadataCollector.top100Ns
 		backupService.Sentinel.NamespacesCount = metadataCollector.counter
 	}
-
 	return backupService.Finalize(ctx, concurrentUploader, backupCursor.BackupCursorMeta, args.CountJournals)
 }
 

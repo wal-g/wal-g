@@ -47,14 +47,15 @@ func (p *ReplayProgress) MarkDurable(opTime models.OpTime) {
 }
 
 type CheckpointingApplier struct {
-	db            client.MongoDriver
-	applier       replayDBApplier
-	interval      time.Duration
-	batchSize     int
-	progress      *ReplayProgress
-	checkpointDue bool
-	lastAppliedTS models.Timestamp
-	dirty         bool
+	db              client.MongoDriver
+	applier         replayDBApplier
+	interval        time.Duration
+	batchSize       int
+	progress        *ReplayProgress
+	checkpointDue   bool
+	lastAppliedTS   models.Timestamp
+	dirty           bool
+	finalizeCatchUp bool
 }
 
 type replayDBApplier interface {
@@ -85,13 +86,14 @@ func NewCheckpointingApplier(
 	interval time.Duration,
 	progress *ReplayProgress,
 	batchSize int,
+	finalizeCatchUp bool,
 ) *CheckpointingApplier {
 	if batchSize <= 0 {
 		batchSize = DefaultReplayApplyBatchSize
 	}
 	return &CheckpointingApplier{
 		db: db, applier: applier, interval: interval, progress: progress,
-		batchSize: batchSize,
+		batchSize: batchSize, finalizeCatchUp: finalizeCatchUp,
 	}
 }
 
@@ -213,6 +215,9 @@ func (a *CheckpointingApplier) checkpoint(ctx context.Context, timer *time.Timer
 	if err := a.makeDurable(ctx); err != nil {
 		return err
 	}
+	if err := replayCheckpointTestBarrier(ctx, a.progress); err != nil {
+		return err
+	}
 	a.checkpointDue = false
 	timer.Reset(a.interval)
 	return nil
@@ -229,12 +234,16 @@ func (a *CheckpointingApplier) makeDurable(ctx context.Context) error {
 	if !a.dirty {
 		return nil
 	}
-	if err := a.db.Fsync(ctx); err != nil {
-		return fmt.Errorf("can not fsync oplog replay at %s: %w", a.lastAppliedTS, err)
-	}
 	opTime, ok := a.applier.LastAppliedOpTime()
 	if !ok || !models.Equal(opTime.TS, a.lastAppliedTS) {
 		opTime = models.OpTime{TS: a.lastAppliedTS}
+	}
+	if a.finalizeCatchUp {
+		if err := a.db.ChangeOplogLastTimestamp(ctx, opTime); err != nil {
+			return fmt.Errorf("can not finalize oplog replay checkpoint at %s: %w", a.lastAppliedTS, err)
+		}
+	} else if err := a.db.Fsync(ctx); err != nil {
+		return fmt.Errorf("can not fsync oplog replay at %s: %w", a.lastAppliedTS, err)
 	}
 	a.progress.MarkDurable(opTime)
 	a.dirty = false
