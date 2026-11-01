@@ -42,6 +42,12 @@ sleep 1
 
 wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST
 
+# The symlink must be restored with its original target, not as a symlink to itself.
+if [ "$(readlink "${PGDATA}/postgresql.auto.conf")" != "/dev/null" ]; then
+  echo "postgresql.auto.conf was restored as symlink to '$(readlink "${PGDATA}/postgresql.auto.conf")' instead of '/dev/null'"
+  exit 1
+fi
+
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" | write_recovery_settings
 
 pg_ctl -D ${PGDATA} -w -t 100500 start
