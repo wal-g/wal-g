@@ -149,6 +149,11 @@ Removing a sentinel also does not protect a restore that has already read it.
   finalization. On upload errors, close source files and compression pipe readers
   so producers cannot remain blocked. See `prefetch.go`, `uploader.go`,
   `compress_and_encrypt.go` and their failure-path tests.
+- MongoDB binary-backup paths remain protected only while the original
+  `$backupCursor` is alive. Treat a cursor error or zero cursor ID as fatal,
+  cancel file packing, and recheck the cursor after the last file is copied;
+  a `mongod` restart cannot continue from the cached file list. See
+  `internal/databases/mongo/binary/backup_cursor.go` and `backup.go`.
 
 ## Validation and handoff
 
