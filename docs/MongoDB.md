@@ -403,3 +403,19 @@ it logs a warning message and continues the replay.
 
 So, the oplog will be successfully replayed, but the specified index will remain and might be 
 dropped manually.
+
+### MongoDB 9.0 oplog entries
+
+- `dropIdent` entries are skipped. MongoDB logs them only on storage with schema epochs, not on the default
+  attached storage. They remove the storage of a collection or index that an earlier oplog entry has already
+  dropped, and the restored `mongod` removes such storage itself.
+- `upgradeDowngradeViewlessTimeseries` entries are applied with their collection UUID, even when other entries
+  are applied without UUIDs. `setFeatureCompatibilityVersion` logs them when it converts timeseries collections
+  between the 8.x and 9.0 formats. `mongod` applies the entry only if the collection has the same UUID as on the
+  source. This holds for a restored binary backup, but not after a logical restore without `--preserveUUID`
+  or for a timeseries collection created inside the replayed window. In those cases the replay fails: choose a
+  point in time before the FCV change, or restore from a backup taken after it. With authorization enabled,
+  applying the entry requires the `internal` privilege.
+- `initReplicatedFastCount` entries stop the replay with an error. MongoDB logs them only when container writes
+  are enabled (`featureFlagContainerWrites`, off by default), and the container writes that follow can not be
+  replayed.
