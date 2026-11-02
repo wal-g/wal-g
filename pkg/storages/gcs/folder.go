@@ -97,7 +97,7 @@ func (folder *Folder) createTimeoutContext(ctx context.Context) (context.Context
 
 func (folder *Folder) DeleteObjects(ctx context.Context, objectsWithRelativePaths []storage.Object) error {
 	for _, object := range objectsWithRelativePaths {
-		objPath := folder.joinPath(folder.path, object.GetName())
+		objPath := storage.AddDelimiterToPath(folder.path) + strings.TrimLeft(object.GetName(), "/")
 		object := folder.BuildObjectHandle(objPath)
 		tracelog.DebugLogger.Printf("Delete %v\n", objPath)
 		opCtx, ctxCancel := folder.createTimeoutContext(ctx)

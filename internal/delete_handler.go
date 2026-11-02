@@ -187,7 +187,7 @@ func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector B
 	}
 
 	folderFilter := func(name string) bool { return true }
-	err = h.DeleteTarget(ctx, target, confirmed, findFull, folderFilter)
+	err = h.DeleteTargetCopies(ctx, target, confirmed, findFull, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	return target
@@ -417,28 +417,120 @@ func (h *DeleteHandler) DeleteWhere(
 
 func (h *DeleteHandler) DeleteTarget(ctx context.Context, target BackupObject, confirmed, findFull bool,
 	folderFilter func(name string) bool) error {
-	var backupsToDelete []BackupObject
-	if findFull {
-		// delete all backups with the same base backup as the target
-		backupsToDelete = h.findRelatedBackups(target)
-	} else {
-		// delete all dependant backups
-		backupsToDelete = h.findDependantBackups(target)
-	}
-	tracelog.DebugLogger.Printf("backupsToDelete: %v", backupsToDelete)
+	return h.deleteTargets(ctx, []BackupObject{target}, confirmed, findFull, folderFilter)
+}
 
-	backupNamesToDelete := make(map[string]bool)
-	for _, bTarget := range backupsToDelete {
-		if h.isPermanent(bTarget) {
-			tracelog.ErrorLogger.Fatalf("Unable to delete permanent backup %s\n", bTarget.GetName())
+func (h *DeleteHandler) TargetCopies(target BackupObject) []BackupObject {
+	targets := []BackupObject{target}
+	for _, backup := range h.backups {
+		if backup.GetBackupName() == target.GetBackupName() && backup.GetStorage() != target.GetStorage() {
+			targets = append(targets, backup)
 		}
-		backupNamesToDelete[bTarget.GetBackupName()] = true
 	}
+	return targets
+}
 
-	return DeleteObjectsWhere(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath),
-		confirmed, func(object storage.Object) bool {
-			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object)
-		}, h.filterFolders(folderFilter))
+func (h *DeleteHandler) DeleteTargetCopies(ctx context.Context, target BackupObject, confirmed, findFull bool,
+	folderFilter func(string) bool) error {
+	return h.deleteTargets(ctx, h.TargetCopies(target), confirmed, findFull, folderFilter)
+}
+
+type targetDeletion struct {
+	folder      storage.Folder
+	storageName string
+	backupNames map[string]bool
+}
+
+type TargetDeletionPlan struct {
+	Backups      []BackupObject
+	handler      *DeleteHandler
+	destinations []targetDeletion
+	folderFilter func(string) bool
+}
+
+func (h *DeleteHandler) PrepareDeleteTargets(ctx context.Context, targets []BackupObject, findFull bool,
+	folderFilter func(string) bool) (*TargetDeletionPlan, error) {
+	if err := ValidateBackupDependencies(h.backups); err != nil {
+		return nil, err
+	}
+	plan := &TargetDeletionPlan{handler: h, folderFilter: folderFilter}
+	indexes := map[string]int{}
+	for _, target := range targets {
+		destination := target.GetStorage()
+		index, exists := indexes[destination]
+		if !exists {
+			folder, err := multistorage.UseSpecificStorage(ctx, destination, h.Folder)
+			if err != nil {
+				return nil, err
+			}
+			index = len(plan.destinations)
+			indexes[destination] = index
+			plan.destinations = append(plan.destinations, targetDeletion{
+				folder.GetSubFolder(utility.BaseBackupPath), destination, map[string]bool{},
+			})
+		}
+		var backups []BackupObject
+		if findFull {
+			backups = h.findRelatedBackups(target)
+		} else {
+			backups = h.findDependantBackups(target)
+		}
+		for _, backup := range backups {
+			if h.isPermanent(deletionBackupObject{backup}) {
+				return nil, fmt.Errorf("unable to delete permanent backup %s", backup.GetName())
+			}
+			names := plan.destinations[index].backupNames
+			if !names[backup.GetBackupName()] {
+				names[backup.GetBackupName()] = true
+				plan.Backups = append(plan.Backups, backup)
+			}
+		}
+	}
+	return plan, nil
+}
+
+func (p *TargetDeletionPlan) Execute(ctx context.Context, confirmed bool) error {
+	for _, destination := range p.destinations {
+		err := DeleteObjectsWhere(ctx, destination.folder, confirmed, func(object storage.Object) bool {
+			return multistorage.GetStorage(object) == destination.storageName &&
+				destination.backupNames[utility.StripLeftmostBackupName(object.GetName())] && !p.handler.isPermanent(object)
+		}, p.handler.filterFolders(p.folderFilter))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *DeleteHandler) deleteTargets(ctx context.Context, targets []BackupObject, confirmed, findFull bool,
+	folderFilter func(string) bool) error {
+	plan, err := h.PrepareDeleteTargets(ctx, targets, findFull, folderFilter)
+	if err != nil {
+		return err
+	}
+	return plan.Execute(ctx, confirmed)
+}
+
+func (h *DeleteHandler) TargetBackupNames(target BackupObject, findFull bool) []string {
+	backups := h.findDependantBackups(target)
+	if findFull {
+		backups = h.findRelatedBackups(target)
+	}
+	result := make([]string, 0, len(backups))
+	for _, b := range backups {
+		result = append(result, b.GetBackupName())
+	}
+	return result
+}
+
+func (h *DeleteHandler) BackupNamesBefore(target BackupObject, storageName string) []string {
+	var result []string
+	for _, b := range h.backups {
+		if b.GetStorage() == storageName && h.less(b, target) && !h.isPermanent(deletionBackupObject{b}) {
+			result = append(result, b.GetBackupName())
+		}
+	}
+	return result
 }
 
 // TODO: unit tests
@@ -467,7 +559,7 @@ func (h *DeleteHandler) findRelatedBackups(target BackupObject) []BackupObject {
 	}
 
 	for _, backup := range h.backups {
-		if related(target, backup) {
+		if backup.GetStorage() == target.GetStorage() && related(target, backup) {
 			relatedBackups = append(relatedBackups, backup)
 		}
 	}
@@ -483,6 +575,9 @@ func (h *DeleteHandler) findDependantBackups(target BackupObject) []BackupObject
 
 	incrementsByBackup := make(map[string][]BackupObject)
 	for _, backup := range h.backups {
+		if backup.GetStorage() != target.GetStorage() {
+			continue
+		}
 		if !backup.IsFullBackup() {
 			incrementFrom := backup.GetIncrementFromName()
 			incrementsByBackup[incrementFrom] = append(incrementsByBackup[incrementFrom], backup)
@@ -490,9 +585,14 @@ func (h *DeleteHandler) findDependantBackups(target BackupObject) []BackupObject
 	}
 
 	queue := []BackupObject{target}
+	visited := map[string]bool{}
 	var curr BackupObject
 	for len(queue) > 0 {
 		curr, queue = queue[0], queue[1:]
+		if visited[curr.GetBackupName()] {
+			continue
+		}
+		visited[curr.GetBackupName()] = true
 		dependantBackups = append(dependantBackups, curr)
 		queue = append(queue, incrementsByBackup[curr.GetBackupName()]...)
 	}
@@ -507,7 +607,7 @@ func DeleteObjectsWhere(
 	folderFilter func(name string) bool,
 ) error {
 	// if folder has uncurrent versions we need to clean them as well
-	storage.SetShowAllVersions(folder, true)
+	folder = storage.WithAllVersions(folder)
 	relativePathObjects, err := multistorage.ListFolderRecursivelyWithFilter(ctx, folder, folderFilter)
 	if err != nil {
 		return err
@@ -528,7 +628,7 @@ func DeleteObjectsWhere(
 		return nil
 	}
 	if confirm {
-		err := folder.DeleteObjects(ctx, markedForDeletion)
+		err := deleteObjectsPhased(ctx, folder, markedForDeletion)
 		if err == nil {
 			tracelog.InfoLogger.Printf("Objects deleted successfully: count=%d\n", deletionCount)
 		}

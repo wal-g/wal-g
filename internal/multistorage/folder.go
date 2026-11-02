@@ -107,6 +107,32 @@ func UsedStorages(folder storage.Folder) []string {
 	return storageNames
 }
 
+func PinStorage(ctx context.Context, folder storage.Folder, name string) (storage.Folder, string, error) {
+	mf, ok := folder.(Folder)
+	if !ok {
+		if name != "" && name != consts.DefaultStorage {
+			return nil, "", fmt.Errorf("unknown storage %q", name)
+		}
+		return folder, consts.DefaultStorage, nil
+	}
+	if name == "" {
+		if len(mf.configuredRootFolders) != 1 {
+			return nil, "", fmt.Errorf("recovery deletion requires --target-storage when several storages are configured")
+		}
+		for configured := range mf.configuredRootFolders {
+			name = configured
+		}
+	}
+	root, exists := mf.configuredRootFolders[name]
+	if !exists {
+		return nil, "", fmt.Errorf("unknown storage %q", name)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	return root.GetSubFolder(mf.path), name, nil
+}
+
 func EnsureSingleStorageIsUsed(folder storage.Folder) error {
 	storages := UsedStorages(folder)
 	if len(storages) != 1 {
@@ -751,6 +777,19 @@ func (mf Folder) SetShowAllVersions(show bool) {
 	for _, folder := range mf.configuredRootFolders {
 		storage.SetShowAllVersions(folder, show)
 	}
+}
+
+func (mf Folder) WithAllVersions() storage.Folder {
+	roots := make(map[string]storage.Folder, len(mf.configuredRootFolders))
+	for name, folder := range mf.configuredRootFolders {
+		roots[name] = storage.WithAllVersions(folder)
+	}
+	used := make([]NamedFolder, len(mf.usedFolders))
+	for i, folder := range mf.usedFolders {
+		used[i] = NamedFolder{Folder: storage.WithAllVersions(folder.Folder), StorageName: folder.StorageName}
+	}
+	mf.configuredRootFolders, mf.usedFolders = roots, used
+	return mf
 }
 
 var (

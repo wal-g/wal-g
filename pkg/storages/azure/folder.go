@@ -174,7 +174,7 @@ func (folder *Folder) CopyObject(ctx context.Context, srcPath string, dstPath st
 func (folder *Folder) DeleteObjects(ctx context.Context, objectsWithRelativePaths []storage.Object) error {
 	for _, object := range objectsWithRelativePaths {
 		//Delete blob using blobClient obtained from full path to blob
-		path := storage.JoinPath(folder.path, object.GetName())
+		path := storage.AddDelimiterToPath(folder.path) + strings.TrimLeft(object.GetName(), "/")
 		blobClient := folder.containerClient.NewBlockBlobClient(path)
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
 		deleteOption := blob.DeleteSnapshotsOptionTypeInclude

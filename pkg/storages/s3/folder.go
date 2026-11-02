@@ -31,11 +31,12 @@ const (
 
 // TODO: Unit tests
 type Folder struct {
-	s3API    API
-	uploader *Uploader
-	bucket   *string
-	path     string
-	config   *Config
+	s3API       API
+	uploader    *Uploader
+	bucket      *string
+	path        string
+	config      *Config
+	allVersions bool
 }
 
 func NewFolder(
@@ -203,6 +204,7 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 		storage.JoinPath(folder.path, subFolderRelativePath)+"/",
 		folder.config,
 	)
+	subFolder.allVersions = folder.allVersions
 	return subFolder
 }
 
@@ -214,7 +216,24 @@ func (folder *Folder) GetPath() string {
 // (objects where the latest version is a delete marker) when versioning is enabled.
 func (folder *Folder) SetShowAllVersions(show bool) {
 	tracelog.DebugLogger.Printf("setting all versions %t for folder %s", show, folder.path)
+	folder.config.listingMu.Lock()
+	defer folder.config.listingMu.Unlock()
 	folder.config.showAllVersions = show
+}
+
+func (folder *Folder) WithAllVersions() storage.Folder {
+	view := *folder
+	view.allVersions = true
+	return &view
+}
+
+func (folder *Folder) showsAllVersions() bool {
+	if folder.allVersions {
+		return true
+	}
+	folder.config.listingMu.Lock()
+	defer folder.config.listingMu.Unlock()
+	return folder.config.showAllVersions
 }
 
 func (folder *Folder) ListFolder(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
@@ -229,7 +248,7 @@ func (folder *Folder) ListFolder(ctx context.Context) (objects []storage.Object,
 	} else {
 		listFunc := func(commonPrefixes []types.CommonPrefix, contents []types.Object) bool {
 			for _, prefix := range commonPrefixes {
-				subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
+				subFolder := folder.GetSubFolder(strings.TrimPrefix(*prefix.Prefix, folder.path))
 				subFolders = append(subFolders, subFolder)
 			}
 			for _, object := range contents {
@@ -273,7 +292,7 @@ func (folder *Folder) ListFolderSegment(
 	listFunc := func(commonPrefixes []types.CommonPrefix, contents []types.Object) bool {
 		cont := true
 		for _, prefix := range commonPrefixes {
-			subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
+			subFolder := folder.GetSubFolder(strings.TrimPrefix(*prefix.Prefix, folder.path))
 			subFolders = append(subFolders, subFolder)
 		}
 		for _, object := range contents {
@@ -319,7 +338,7 @@ type versionInfo struct {
 // These handles are used by callers (e.g. `st ls` non-recursive output, or recursive listing via subfolders).
 func (folder *Folder) addListedSubfolders(subFolders *[]storage.Folder, commonPrefixes []types.CommonPrefix) {
 	for _, p := range commonPrefixes {
-		subFolder := NewFolder(folder.s3API, folder.uploader, *p.Prefix, folder.config)
+		subFolder := folder.GetSubFolder(strings.TrimPrefix(*p.Prefix, folder.path))
 		*subFolders = append(*subFolders, subFolder)
 	}
 }
@@ -378,13 +397,13 @@ func (folder *Folder) buildObjectsFromVersions(allVersions []versionInfo, delete
 	objects := make([]storage.Object, 0, len(allVersions))
 	for _, v := range allVersions {
 		// Skip objects where the LATEST version is a delete marker (unless showing all versions)
-		if deletedKeys[v.relativePath] && !folder.config.showAllVersions {
+		if deletedKeys[v.relativePath] && !folder.showsAllVersions() {
 			continue
 		}
 		// Without showAllVersions, behave like a non-versioned listing and return only the current
 		// version of each key. Returning superseded versions here makes an overwritten object appear
 		// several times, which breaks callers that assume unique names (e.g. `st ls`, journal counting).
-		if !v.isLatest && !folder.config.showAllVersions {
+		if !v.isLatest && !folder.showsAllVersions() {
 			continue
 		}
 		isLatest := ""
@@ -441,7 +460,7 @@ func (folder *Folder) listVersions(ctx context.Context, prefix *string, delimite
 	objects := folder.buildObjectsFromVersions(allVersions, deletedKeys)
 
 	// If showing all versions, also include delete markers themselves
-	if folder.config.showAllVersions {
+	if folder.showsAllVersions() {
 		tracelog.DebugLogger.Println("adding delete markers")
 		for _, marker := range deleteMarkers {
 			objects = append(objects, storage.NewLocalObjectWithVersion(
@@ -497,18 +516,26 @@ func (folder *Folder) DeleteObjects(ctx context.Context, objects []storage.Objec
 			}
 			input.Delete.Objects = append(input.Delete.Objects, objectIdentifier)
 		}
-		_, err := folder.s3API.DeleteObjects(ctx, input, withContentMD5)
+		output, err := folder.s3API.DeleteObjects(ctx, input, withContentMD5)
 		if err != nil {
 			for _, obj := range part {
 				tracelog.DebugLogger.Printf("object %s version %s", obj.GetName(), obj.GetVersionID())
 			}
 			return errors.Wrapf(err, "failed to delete s3 object: '%s'", part)
 		}
+		if output != nil && len(output.Errors) > 0 {
+			failure := output.Errors[0]
+			return fmt.Errorf("S3 refused deletion of %s version %s: %s: %s (%d object failures)",
+				aws.ToString(failure.Key), aws.ToString(failure.VersionId),
+				aws.ToString(failure.Code), aws.ToString(failure.Message), len(output.Errors))
+		}
 	}
 	return nil
 }
 
 func (folder *Folder) isVersioningEnabled(ctx context.Context) bool {
+	folder.config.listingMu.Lock()
+	defer folder.config.listingMu.Unlock()
 	switch folder.config.EnableVersioning {
 	case VersioningEnabled:
 		return true
@@ -549,7 +576,10 @@ func (folder *Folder) Validate(ctx context.Context) error {
 }
 
 func (folder *Folder) SetVersioningEnabled(ctx context.Context, enable bool) {
-	if enable && folder.isVersioningEnabled(ctx) {
+	enabled := enable && folder.isVersioningEnabled(ctx)
+	folder.config.listingMu.Lock()
+	defer folder.config.listingMu.Unlock()
+	if enabled {
 		folder.config.EnableVersioning = VersioningEnabled
 	} else {
 		folder.config.EnableVersioning = VersioningDisabled

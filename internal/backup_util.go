@@ -280,12 +280,13 @@ func DeleteBackups(ctx context.Context, folder storage.Folder, backups []string)
 			return err
 		}
 		for _, obj := range dataObjects {
-			keys = append(keys, storage.NewLocalObject(path.Join(backupName, obj.GetName()), time.Time{}, 0))
+			keys = append(keys, storage.NewLocalObjectWithVersion(path.Join(backupName, obj.GetName()),
+				obj.GetLastModified(), obj.GetSize(), obj.GetVersionID(), obj.GetAdditionalInfo()))
 		}
 	}
 
 	tracelog.DebugLogger.Printf("Backup keys will be deleted: %+v\n", keys)
-	if err := folder.DeleteObjects(ctx, keys); err != nil {
+	if err := deleteObjectsPhased(ctx, folder, keys); err != nil {
 		return err
 	}
 	return nil

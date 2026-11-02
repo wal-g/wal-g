@@ -2,6 +2,7 @@ package greenplum
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/multistorage"
@@ -69,6 +70,17 @@ func getIncrementInfo(ctx context.Context, folder storage.Folder, object storage
 	sentinel, err := backup.GetSentinel(ctx)
 	if err != nil {
 		return "", "", true, err
+	}
+	if err := internal.ValidateDeletionIncrement(backup.Name, sentinel.IncrementFrom, sentinel.IncrementFullName,
+		sentinel.IncrementCount, false, false); err != nil {
+		return "", "", false, err
+	}
+	doc, readErr := internal.ReadDeletionMetadata(ctx, backup.Folder, backup.Name+utility.SentinelSuffix, nil)
+	if readErr != nil {
+		return "", "", false, readErr
+	}
+	if _, known := doc.Bool("is_permanent"); doc.Problem != nil || !known {
+		return "", "", false, fmt.Errorf("unknown protection metadata for %s", backup.Name)
 	}
 	if !sentinel.IsIncremental() {
 		return "", "", true, nil

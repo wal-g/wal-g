@@ -41,7 +41,7 @@ func TestCleanupDoesNotListReservations(t *testing.T) {
 	const oldName = "base_000000010000000000000001"
 	const newName = "base_000000010000000000000003"
 	for _, backend := range []string{"memory", "fs"} {
-		for _, operation := range []string{"before", "retain", "garbage", "garbage-no-backups", "everything"} {
+		for _, operation := range []string{"before", "retain", "target", "recovery", "garbage", "garbage-no-backups", "everything"} {
 			t.Run(backend+"/"+operation, func(t *testing.T) {
 				var folder storage.Folder = memory.NewFolder("repository/", memory.NewKVS())
 				if backend == "fs" {
@@ -54,9 +54,13 @@ func TestCleanupDoesNotListReservations(t *testing.T) {
 				require.NoError(t, folder.PutObject(t.Context(), data, strings.NewReader("data")))
 				if operation != "garbage-no-backups" {
 					require.NoError(t, folder.PutObject(t.Context(),
-						path.Join(utility.BaseBackupPath, newName+utility.SentinelSuffix), strings.NewReader("{}")))
+						path.Join(utility.BaseBackupPath, newName+utility.SentinelSuffix), strings.NewReader(`{"LSN":1,"FinishLSN":2}`)))
 					require.NoError(t, folder.PutObject(t.Context(),
-						path.Join(utility.BaseBackupPath, newName, "metadata.json"), strings.NewReader("{}")))
+						path.Join(utility.BaseBackupPath, newName, "metadata.json"), strings.NewReader(`{"start_lsn":1,"finish_lsn":2,"is_permanent":false}`)))
+				}
+				if operation == "target" {
+					require.NoError(t, folder.PutObject(t.Context(),
+						path.Join(utility.BaseBackupPath, oldName+utility.SentinelSuffix), strings.NewReader("{}")))
 				}
 				wrapped := reservationListErrorFolder{folder,
 					strings.TrimRight(folder.GetSubFolder(backupReservationsPath).GetPath(), "/")}
@@ -76,6 +80,20 @@ func TestCleanupDoesNotListReservations(t *testing.T) {
 					}
 					require.NoError(t, err)
 					require.NoError(t, handler.DeleteBeforeTarget(t.Context(), backup, true))
+				} else if operation == "target" {
+					backup, err := handler.FindTargetByName(oldName)
+					require.NoError(t, err)
+					require.NoError(t, handler.DeleteTarget(t.Context(), backup, true, false, func(string) bool { return true }))
+				} else if operation == "recovery" {
+					plan, err := PlanRecoveryDeletion(t.Context(), wrapped, "default", []string{oldName}, false)
+					require.NoError(t, err)
+					defer plan.Close()
+					require.NoError(t, plan.Execute(t.Context(), false))
+					exists, err := folder.Exists(t.Context(), data)
+					require.NoError(t, err)
+					require.True(t, exists)
+					require.NoError(t, plan.Execute(t.Context(), true))
+					require.NoError(t, plan.Execute(t.Context(), true))
 				} else {
 					require.NoError(t, handler.HandleDeleteGarbage(t.Context(), nil, true, true))
 				}
@@ -85,6 +103,23 @@ func TestCleanupDoesNotListReservations(t *testing.T) {
 				exists, err = folder.Exists(t.Context(), marker)
 				require.NoError(t, err)
 				require.Equal(t, operation != "everything", exists)
+			})
+		}
+	}
+}
+
+func TestIsPermanentNormalizesPathsAndPreservesReservations(t *testing.T) {
+	const backup = "base_000000010000000000000001"
+	const wal = "000000010000000000000001"
+	backups := map[PermanentObject]bool{{backup, "s1"}: true}
+	wals := map[PermanentObject]bool{{wal, "s1"}: true}
+	for _, prefix := range []string{"", "/"} {
+		for _, storageName := range []string{"s1", "s2"} {
+			t.Run(prefix+storageName, func(t *testing.T) {
+				require.True(t, IsPermanent(prefix+path.Join(backupReservationsPath, utility.BaseBackupPath, backup+".json"), storageName, backups, wals))
+				require.False(t, IsPermanent(prefix+backupReservationsPath+"_other/"+backup, storageName, backups, wals))
+				require.Equal(t, storageName == "s1", IsPermanent(prefix+utility.BaseBackupPath+backup+"/metadata.json", storageName, backups, wals))
+				require.Equal(t, storageName == "s1", IsPermanent(prefix+utility.WalPath+wal+".lz4", storageName, backups, wals))
 			})
 		}
 	}

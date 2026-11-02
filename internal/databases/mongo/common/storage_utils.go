@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -34,13 +35,38 @@ func DownloadSentinel(ctx context.Context, folder storage.Folder, backupName str
 	if err := backup.FetchSentinel(ctx, &sentinel); err != nil {
 		return nil, err
 	}
+	return canonicalSentinel(&sentinel, backup.Name)
+}
+
+func DownloadSentinelForDeletion(ctx context.Context, folder storage.Folder, name string) (*models.Backup, error) {
+	backup, err := internal.GetBackupByName(ctx, name, "", folder)
+	if err != nil {
+		return nil, err
+	}
+	var sentinel models.Backup
+	doc, err := internal.ReadDeletionMetadata(ctx, backup.Folder, backup.Name+utility.SentinelSuffix, &sentinel)
+	if err != nil {
+		return nil, err
+	}
+	if doc.Problem != nil {
+		return nil, doc.Problem
+	}
+	if _, known := doc.Bool("Permanent"); !known {
+		return nil, fmt.Errorf("unknown protection in sentinel for %s", backup.Name)
+	}
+	return canonicalSentinel(&sentinel, backup.Name)
+}
+
+func canonicalSentinel(sentinel *models.Backup, name string) (*models.Backup, error) {
 	if sentinel.BackupName == "" {
-		sentinel.BackupName = backupName
+		sentinel.BackupName = name
+	} else if sentinel.BackupName != name {
+		return nil, fmt.Errorf("sentinel for %s contains conflicting backup name %s", name, sentinel.BackupName)
 	}
 	if sentinel.BackupType == "" {
 		sentinel.BackupType = LogicalBackupType
 	}
-	return &sentinel, nil
+	return sentinel, nil
 }
 
 func GetBackupFolder(ctx context.Context) (backupFolder storage.Folder, err error) {
