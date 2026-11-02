@@ -19,7 +19,7 @@ import (
 var backupStartWALPattern = regexp.MustCompile(`(?m)^START WAL LOCATION: [0-9A-Fa-f]+/[0-9A-Fa-f]+ \(file ([0-9A-Fa-f]{24})\)\r?$`)
 
 // WithWALFetch fetches WAL for the selected backup after either unpack implementation finishes.
-// Delta ancestors supply data files, but recovery starts at the selected backup's label.
+// Delta ancestors supply data files, but recovery uses the selected backup's LSN range.
 func WithWALFetch(fetcher internal.Fetcher, dbDataDirectory string) internal.Fetcher {
 	return func(ctx context.Context, rootFolder storage.Folder, backup internal.Backup) {
 		fetcher(ctx, rootFolder, backup)
@@ -37,7 +37,7 @@ func FetchBackupWAL(ctx context.Context, rootFolder storage.Folder, backup Backu
 	}
 	label, err := os.ReadFile(filepath.Join(dbDataDirectory, BackupLabelFilename))
 	if err != nil {
-		return fmt.Errorf("read backup label for required WAL range: %w", err)
+		return fmt.Errorf("read backup label for required WAL timeline: %w", err)
 	}
 	timeline, first, last, err := backupWALRange(sentinel, label)
 	if err != nil {
@@ -71,34 +71,22 @@ func FetchBackupWAL(ctx context.Context, rootFolder storage.Folder, backup Backu
 }
 
 func backupWALRange(sentinel BackupSentinelDto, label []byte) (uint32, WalSegmentNo, WalSegmentNo, error) {
-	// The label is authoritative, including when START WAL LOCATION is exactly
-	// a segment boundary. Older sentinels do not contain WAL filenames.
 	match := backupStartWALPattern.FindSubmatch(label)
 	if match == nil {
 		return 0, 0, 0, fmt.Errorf("backup label has no valid START WAL LOCATION")
 	}
-	timeline, first, err := ParseWALFilename(string(match[1]))
+	timeline, _, err := ParseWALFilename(string(match[1]))
 	if err != nil || timeline == 0 {
 		return 0, 0, 0, fmt.Errorf("invalid backup start WAL filename %q", match[1])
 	}
-	var last uint64
-	if sentinel.EndWalFileName != "" {
-		var endTimeline uint32
-		endTimeline, last, err = ParseWALFilename(sentinel.EndWalFileName)
-		if err != nil || endTimeline != timeline {
-			return 0, 0, 0, fmt.Errorf("invalid backup end WAL filename %q for timeline %d", sentinel.EndWalFileName, timeline)
-		}
-	} else {
-		if sentinel.BackupFinishLSN == nil || *sentinel.BackupFinishLSN == 0 {
-			return 0, 0, 0, fmt.Errorf("backup metadata has no WAL end filename or finish LSN")
-		}
-		// BackupFinishLSN points just after the last required record.
-		last = GetSegmentNoFromLsn(*sentinel.BackupFinishLSN - 1)
+	if sentinel.BackupStartLSN == nil || sentinel.BackupFinishLSN == nil {
+		return 0, 0, 0, fmt.Errorf("backup metadata has no valid LSN boundaries")
 	}
-	if first > last {
-		return 0, 0, 0, fmt.Errorf("backup WAL range ends before it starts")
-	}
-	return timeline, WalSegmentNo(first), WalSegmentNo(last), nil
+	// The start LSN is inclusive, even at an exact segment boundary. The finish
+	// LSN points just after the last required record.
+	first := NewWalSegmentNo(*sentinel.BackupStartLSN)
+	last := NewWalSegmentNo(*sentinel.BackupFinishLSN - 1)
+	return timeline, first, last, nil
 }
 
 func fetchBackupWALFile(ctx context.Context, reader internal.StorageFolderReader, name, walDir string, expectedSize int64) error {
