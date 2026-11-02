@@ -26,7 +26,7 @@ func generateAndUploadWalFile(t *testing.T, fileFormat string) (postgres.WalUplo
 	addTestDataFile(t, dirName, fileFormat)
 	viper.Set(conf.PgDataSetting, dir)
 	testFileName := testFilename(fileFormat)
-	uploader := testtools.NewMockWalDirUploader(false, false)
+	uploader := testtools.NewMockWalDirUploader(t, false, false)
 	fakeASM := asm.NewFakeASM()
 	uploader.ArchiveStatusManager = fakeASM
 	postgres.HandleWALPush(t.Context(), uploader, path.Join(dirName, testFileName))
@@ -36,7 +36,7 @@ func generateAndUploadWalFile(t *testing.T, fileFormat string) (postgres.WalUplo
 func TestWalPush_HandleWALPush(t *testing.T) {
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer testtools.Cleanup(t, dir)
-	// ".mock" suffix is the MockCompressor file extension
+	// ".mock" suffix is the testtools.NewMockCompressor file extension
 	_, err := uploader.Folder().ReadObject(t.Context(), testFileName+".mock")
 	assert.NoError(t, err)
 }

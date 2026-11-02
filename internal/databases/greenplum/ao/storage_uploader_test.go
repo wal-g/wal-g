@@ -484,7 +484,7 @@ func TestAoUpload_NotExistFile(t *testing.T) {
 	baseFiles := ao.BackupFiles{}
 	bundleFiles := &internal.RegularBundleFiles{}
 	deduplicationAgeLimit := 720 * time.Hour
-	uploader := newStorageUploader(baseFiles, bundleFiles, true, deduplicationAgeLimit)
+	uploader := newStorageUploader(t, baseFiles, bundleFiles, true, deduplicationAgeLimit)
 	meta := ao.NewRelFileMetadata("md5summock", ao.ColumnOriented, 70, 4)
 	location := walparser.BlockLocation{
 		RelationFileNode: walparser.RelFileNode{
@@ -523,7 +523,7 @@ func TestAoUpload_NotExistFile(t *testing.T) {
 func runSingleTest(t *testing.T, baseFiles ao.BackupFiles,
 	bundleFiles *internal.RegularBundleFiles, testFiles map[string]TestFileInfo, expectedResults map[string]ExpectedResult,
 	deduplicationAgeLimit time.Duration, isAploaderIncremental bool) {
-	uploader := newStorageUploader(baseFiles, bundleFiles, isAploaderIncremental, deduplicationAgeLimit)
+	uploader := newStorageUploader(t, baseFiles, bundleFiles, isAploaderIncremental, deduplicationAgeLimit)
 	testDir, testFiles := generateData("data", testFiles, t)
 	defer os.RemoveAll(testDir)
 
@@ -559,11 +559,11 @@ func runSingleTest(t *testing.T, baseFiles ao.BackupFiles,
 }
 
 func newStorageUploader(
-	baseFiles ao.BackupFiles, bundleFiles internal.BundleFiles, isIncremental bool,
+	t *testing.T, baseFiles ao.BackupFiles, bundleFiles internal.BundleFiles, isIncremental bool,
 	deduplicationAgeLimit time.Duration,
 ) *ao.StorageUploader {
 	storage := memory.NewKVS()
-	mockUploader := testtools.NewStoringMockUploader(storage)
+	mockUploader := testtools.NewStoringMockUploader(t, storage)
 	crypter := openpgp.CrypterFromKeyPath(PrivateKeyFilePath, func() (string, bool) {
 		return "", false
 	})

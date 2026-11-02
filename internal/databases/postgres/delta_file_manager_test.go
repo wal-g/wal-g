@@ -204,7 +204,7 @@ func TestFlushDeltaFiles_CompleteFile(t *testing.T) {
 	assert.NoError(t, err)
 	manager.DeltaFileWriters.Store(DeltaFilename, postgres.NewDeltaFileChanWriter(deltaFile))
 	storage := memory.NewKVS()
-	manager.FlushDeltaFiles(t.Context(), testtools.NewStoringMockUploader(storage), map[string]bool{
+	manager.FlushDeltaFiles(t.Context(), testtools.NewStoringMockUploader(t, storage), map[string]bool{
 		postgres.ToPartFilename(DeltaFilename): true,
 	})
 

@@ -37,7 +37,7 @@ func TestEmptyBundleQueue(t *testing.T) {
 		},
 	}
 
-	uploader := testtools.NewMockUploader(false, false)
+	uploader := testtools.NewMockUploader(t, false, false)
 	tarBallMaker := internal.NewStorageTarBallMaker("mockBackup", uploader)
 
 	err := bundle.StartQueue(tarBallMaker)
@@ -68,7 +68,7 @@ func queueTest(t *testing.T) {
 			TarSizeThreshold: 100,
 		},
 	}
-	uploader := testtools.NewMockUploader(false, false)
+	uploader := testtools.NewMockUploader(t, false, false)
 	tarBallMaker := internal.NewStorageTarBallMaker("mockBackup", uploader)
 
 	// For tests there must be at least 3 workers

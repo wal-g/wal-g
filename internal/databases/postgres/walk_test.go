@@ -429,7 +429,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 	}
 
 	// Re-use generated data to test uploading WAL.
-	uploader := testtools.NewMockUploader(false, false)
+	uploader := testtools.NewMockUploader(t, false, false)
 	walFileName := filepath.Join(data, "1")
 	walFile, err := os.Open(walFileName)
 	assert.NoError(t, err)

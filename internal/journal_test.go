@@ -103,10 +103,10 @@ func NewEmptyTestJournal(
 	}
 }
 
-func initTestS3() (storage.Folder, internal.Uploader) {
+func initTestS3(t *testing.T) (storage.Folder, internal.Uploader) {
 	root := memory.NewFolder("", memory.NewKVS())
 	mockUploader := internal.NewRegularUploader(
-		&testtools.MockCompressor{},
+		testtools.NewMockCompressor(t),
 		root,
 	)
 	return root, mockUploader
@@ -202,14 +202,14 @@ func CreateThreeJournals(
 }
 
 func TestCreateThreeJournals(t *testing.T) {
-	folder, uploader := initTestS3()
+	folder, uploader := initTestS3(t)
 	generateAndUploadData(t, uploader)
 
 	CreateThreeJournals(t, folder)
 }
 
 func TestDeleteJournalInMiddle(t *testing.T) {
-	folder, uploader := initTestS3()
+	folder, uploader := initTestS3(t)
 	generateAndUploadData(t, uploader)
 
 	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
@@ -222,7 +222,7 @@ func TestDeleteJournalInMiddle(t *testing.T) {
 }
 
 func TestDeleteJournalInMiddleWithStaleDeletedObjectListing(t *testing.T) {
-	baseFolder, uploader := initTestS3()
+	baseFolder, uploader := initTestS3(t)
 	generateAndUploadData(t, uploader)
 	folder := newStaleDeletedObjectFolder(baseFolder)
 
@@ -236,7 +236,7 @@ func TestDeleteJournalInMiddleWithStaleDeletedObjectListing(t *testing.T) {
 }
 
 func TestDeleteJournalDoesNotIgnoreOtherReadErrors(t *testing.T) {
-	baseFolder, uploader := initTestS3()
+	baseFolder, uploader := initTestS3(t)
 	generateAndUploadData(t, uploader)
 	folder := newStaleDeletedObjectFolder(baseFolder)
 
@@ -248,7 +248,7 @@ func TestDeleteJournalDoesNotIgnoreOtherReadErrors(t *testing.T) {
 }
 
 func TestDeleteJournalDoesNotIgnoreNotFoundFromUnversionedListing(t *testing.T) {
-	baseFolder, uploader := initTestS3()
+	baseFolder, uploader := initTestS3(t)
 	generateAndUploadData(t, uploader)
 	folder := newStaleDeletedObjectFolder(baseFolder)
 	folder.state.listedVersionID = ""
@@ -261,7 +261,7 @@ func TestDeleteJournalDoesNotIgnoreNotFoundFromUnversionedListing(t *testing.T) 
 }
 
 func TestDeleteJournalInBegin(t *testing.T) {
-	folder, uploader := initTestS3()
+	folder, uploader := initTestS3(t)
 	generateAndUploadData(t, uploader)
 
 	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
@@ -274,7 +274,7 @@ func TestDeleteJournalInBegin(t *testing.T) {
 }
 
 func TestDeleteJournalInEnd(t *testing.T) {
-	folder, uploader := initTestS3()
+	folder, uploader := initTestS3(t)
 	generateAndUploadData(t, uploader)
 
 	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
@@ -290,7 +290,7 @@ func TestDeleteJournalInEnd(t *testing.T) {
 // An empty journal directory means the size was not measured, not that it is zero: overwriting a
 // previously computed SizeToNextBackup with 0 would silently lose it.
 func TestEmptyJournalDirectoryKeepsPreviousSize(t *testing.T) {
-	folder, uploader := initTestS3()
+	folder, uploader := initTestS3(t)
 	generateAndUploadData(t, uploader)
 
 	ji1, _, ji3 := CreateThreeJournals(t, folder)
@@ -306,7 +306,7 @@ func TestEmptyJournalDirectoryKeepsPreviousSize(t *testing.T) {
 }
 
 func TestSafetyOfRepeatingMethodCalls(t *testing.T) {
-	folder, uploader := initTestS3()
+	folder, uploader := initTestS3(t)
 	generateAndUploadData(t, uploader)
 
 	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
