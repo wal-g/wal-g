@@ -209,7 +209,6 @@ func (h *DeleteHandler) HandleDeleteEverything(ctx context.Context, args []strin
 	h.DeleteEverything(ctx, confirmed)
 }
 
-// TODO: unit tests
 func (h *DeleteHandler) FindTargetBefore(beforeStr string, modifier int) (BackupObject, error) {
 	timeLine, err := time.Parse(time.RFC3339, beforeStr)
 	if err == nil {
@@ -227,7 +226,6 @@ func (h *DeleteHandler) FindTargetBeforeName(name string, modifier int) (BackupO
 	return findTarget(h.backups, h.greater, choiceFunc)
 }
 
-// TODO: unit tests
 func (h *DeleteHandler) FindTargetBeforeTime(timeLine time.Time, modifier int) (BackupObject, error) {
 	potentialTarget, err := findTarget(h.backups, h.less, func(object BackupObject) bool {
 		backupTime := object.GetBackupTime()
