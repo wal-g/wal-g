@@ -165,7 +165,33 @@ func uploadExtendBackupCursorFiles(cursor *BackupCursor, uploader *internal.Conc
 	return nil
 }
 
+func preferBackupCursorError(ctx context.Context, cursor *BackupCursor, backupErr error) error {
+	cursorErr := cursor.StopKeepAliveAndValidate(ctx)
+	if cursorErr == nil {
+		return backupErr
+	}
+	return errors.Wrapf(cursorErr, "backup failed with %v", backupErr)
+}
+
+func finalizeBackupFiles(
+	ctx context.Context,
+	cursor *BackupCursor,
+	uploader *internal.ConcurrentUploader,
+) (internal.TarFileSets, error) {
+	tarFileSets, err := uploader.Finalize()
+	if err != nil {
+		return nil, preferBackupCursorError(ctx, cursor, err)
+	}
+	if err = cursor.StopKeepAliveAndValidate(ctx); err != nil {
+		return nil, err
+	}
+	return tarFileSets, nil
+}
+
 func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupArgs) error {
+	backupCtx, cancelBackup := context.WithCancelCause(ctx)
+	defer cancelBackup(nil)
+
 	err := backupService.InitializeMongodBackupMeta(args.BackupName, args.Permanent, args.UserData)
 	if err != nil {
 		return err
@@ -173,9 +199,7 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 
 	var metadataCollector *StorageMetadataCollector
 	if !args.SkipMetadata {
-		bgCtx, cancel := context.WithCancel(ctx)
-		defer cancel()
-		metadataCollector, err = backupService.BackgroundMetadata(bgCtx, args.SkipMetadata)
+		metadataCollector, err = backupService.BackgroundMetadata(backupCtx, args.SkipMetadata)
 		if err != nil {
 			return err
 		}
@@ -193,7 +217,7 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 		return errors.Wrapf(err, "unable to load data from backup cursor")
 	}
 
-	backupCursor.StartKeepAlive()
+	backupCursor.StartKeepAlive(cancelBackup)
 
 	mongodDBPath := backupCursor.BackupCursorMeta.DBPath
 	composerMaker, err := newTarBallComposerMaker()
@@ -201,7 +225,7 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 		return err
 	}
 	concurrentUploader, err := internal.CreateConcurrentUploader(
-		ctx,
+		backupCtx,
 		internal.CreateConcurrentUploaderArgs{
 			Uploader:             backupService.Uploader,
 			BackupName:           args.BackupName,
@@ -214,7 +238,7 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 
 	err = concurrentUploader.UploadBackupFiles(backupFiles)
 	if err != nil {
-		return errors.Wrapf(err, "unable to upload backup files")
+		return preferBackupCursorError(backupCtx, backupCursor, errors.Wrapf(err, "unable to upload backup files"))
 	}
 
 	extendBackupCursor, err := conf.GetBoolSettingDefault(conf.MongoDBExtendBackupCursor, true)
@@ -224,24 +248,24 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 
 	if extendBackupCursor {
 		if err = uploadExtendBackupCursorFiles(backupCursor, concurrentUploader); err != nil {
-			return err
+			return preferBackupCursorError(backupCtx, backupCursor, err)
 		}
 	}
 
-	tarFileSets, err := concurrentUploader.Finalize()
+	tarFileSets, err := finalizeBackupFiles(backupCtx, backupCursor, concurrentUploader)
 	if err != nil {
 		return err
 	}
 	backupService.Sentinel.FileParts = composerMaker.FileParts()
 
 	if !args.SkipMetadata {
-		if err = metadataCollector.Complete(ctx, tarFileSets); err != nil {
+		if err = metadataCollector.Complete(backupCtx, tarFileSets); err != nil {
 			return err
 		}
 		backupService.Sentinel.Top100Namespaces = *metadataCollector.top100Ns
 		backupService.Sentinel.NamespacesCount = metadataCollector.counter
 	}
-	return backupService.Finalize(ctx, concurrentUploader, backupCursor.BackupCursorMeta, args.CountJournals)
+	return backupService.Finalize(backupCtx, concurrentUploader, backupCursor.BackupCursorMeta, args.CountJournals)
 }
 
 func (backupService *BackupService) InitializeMongodBackupMeta(backupName string, permanent bool, userData interface{}) error {
