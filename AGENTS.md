@@ -105,9 +105,12 @@ Removing a sentinel also does not protect a restore that has already read it.
   and computes its WAL range from the sentinel's inclusive start LSN and exclusive
   finish LSN. At an exact start boundary, use the segment starting there, even if
   the name or `StartWalFileName` refers to the preceding segment. Both LSNs are
-  required; delta ancestors do not extend the range. Downloads must reach decoder
-  EOF before publication, even after a WAL-sized payload; see
-  `backup_fetch_wal.go` and its regression tests.
+  required; delta ancestors do not extend the range. WAL reads are delegated to
+  `HandleWALFetch` with `NopPrefetcher` and a reader rooted above `wal_005`; see
+  `backup_fetch_wal.go` and its regression tests. The current handler writes
+  directly to the destination and may leave output on failure. Size validation
+  and safe publication remain deferred handler fixes; backup-fetch tests check
+  error propagation rather than promising those guarantees.
 
 - Keep one `pgproto3.Backend` per `wal-send` connection, including startup and
   COPY: it can buffer the next query while reading CopyDone. Hand reading back

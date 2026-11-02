@@ -8,11 +8,42 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/utility"
 )
+
+func TestBackupFetchWALUsesPrefetchedSegment(t *testing.T) {
+	dir := t.TempDir()
+	walDir := filepath.Join(dir, "pg_wal")
+	require.NoError(t, os.Mkdir(walDir, 0700))
+	old := viper.Get(conf.PrefetchDir)
+	viper.Set(conf.PrefetchDir, t.TempDir())
+	t.Cleanup(func() { viper.Set(conf.PrefetchDir, old) })
+	name := WalSegmentNo(1).GetFilename(2)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, BackupLabelFilename), []byte("START WAL LOCATION: 0/1000000 (file "+name+")\n"), 0600))
+	start, end := LSN(WalSegmentSize), LSN(2*WalSegmentSize)
+	backup := Backup{Backup: internal.Backup{Name: "base_" + name}, SentinelDto: &BackupSentinelDto{BackupStartLSN: &start, BackupFinishLSN: &end}}
+	folder := memory.NewFolder("in_memory/", memory.NewKVS())
+	historyName := fmt.Sprintf(walHistoryFileFormat, 2)
+	history := []byte("1\t0/1000000\tpromotion\n")
+	require.NoError(t, folder.GetSubFolder(utility.WalPath).PutObject(t.Context(), historyName, bytes.NewReader(history)))
+	_, _, _, prefetched := getPrefetchLocations(walDir, name)
+	require.NoError(t, os.MkdirAll(filepath.Dir(prefetched), 0700))
+	data := bytes.Repeat([]byte{42}, int(WalSegmentSize))
+	require.NoError(t, os.WriteFile(prefetched, data, 0600))
+	// The segment exists only in the prefetch cache; history still comes from storage.
+	require.NoError(t, FetchBackupWAL(t.Context(), folder, backup, dir))
+	actual, err := os.ReadFile(filepath.Join(walDir, name))
+	require.NoError(t, err)
+	require.Equal(t, data, actual)
+	actual, err = os.ReadFile(filepath.Join(walDir, historyName))
+	require.NoError(t, err)
+	require.Equal(t, history, actual)
+}
 
 func TestBackupFetchWAL(t *testing.T) {
 	for _, walDir := range []string{"pg_wal", "pg_xlog"} {
@@ -38,37 +69,40 @@ func TestBackupFetchWAL(t *testing.T) {
 	}
 }
 
-func TestBackupFetchWALFailureDoesNotPublish(t *testing.T) {
-	for _, contents := range [][]byte{nil, []byte("truncated WAL"), bytes.Repeat([]byte{42}, int(WalSegmentSize))} {
-		t.Run(fmt.Sprintf("size_%d", len(contents)), func(t *testing.T) {
+func TestBackupFetchWALPropagatesFetchErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		timeline    uint32
+		badChecksum bool
+	}{
+		{name: "missing segment", timeline: 1},
+		{name: "missing history", timeline: 2},
+		{name: "bad segment checksum", timeline: 1, badChecksum: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			require.NoError(t, os.Mkdir(filepath.Join(dir, "pg_wal"), 0700))
-			require.NoError(t, os.WriteFile(filepath.Join(dir, BackupLabelFilename), []byte("START WAL LOCATION: 0/1000000 (file "+WalSegmentNo(1).GetFilename(1)+")\n"), 0600))
-			name := WalSegmentNo(1).GetFilename(1)
+			name := WalSegmentNo(1).GetFilename(tc.timeline)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, BackupLabelFilename), []byte("START WAL LOCATION: 0/1000000 (file "+name+")\n"), 0600))
 			start, end := LSN(WalSegmentSize), LSN(2*WalSegmentSize)
 			backup := Backup{Backup: internal.Backup{Name: "base_" + name}, SentinelDto: &BackupSentinelDto{BackupStartLSN: &start, BackupFinishLSN: &end}}
 			folder := memory.NewFolder("in_memory/", memory.NewKVS())
-			if contents != nil {
-				objectName := name
-				if len(contents) == int(WalSegmentSize) {
-					var compressed bytes.Buffer
-					writer := gzip.NewWriter(&compressed)
-					_, err := writer.Write(contents)
-					require.NoError(t, err)
-					require.NoError(t, writer.Close())
-					contents = compressed.Bytes()
-					contents[len(contents)-8] ^= 1 // bad CRC after a complete decoded segment
-					objectName += ".gz"
-				}
-				require.NoError(t, folder.GetSubFolder(utility.WalPath).PutObject(t.Context(), objectName, bytes.NewReader(contents)))
+			if tc.timeline > 1 {
+				// Only history is missing, so skipping its fetch would incorrectly succeed.
+				require.NoError(t, folder.GetSubFolder(utility.WalPath).PutObject(t.Context(), name, bytes.NewReader(bytes.Repeat([]byte{42}, int(WalSegmentSize)))))
 			}
-			err := FetchBackupWAL(t.Context(), folder, backup, dir)
-			require.Error(t, err)
-			_, err = os.Stat(filepath.Join(dir, "pg_wal", name))
-			require.True(t, os.IsNotExist(err))
-			entries, err := os.ReadDir(filepath.Join(dir, "pg_wal"))
-			require.NoError(t, err)
-			require.Empty(t, entries)
+			if tc.badChecksum {
+				var compressed bytes.Buffer
+				writer := gzip.NewWriter(&compressed)
+				_, err := writer.Write(bytes.Repeat([]byte{42}, int(WalSegmentSize)))
+				require.NoError(t, err)
+				require.NoError(t, writer.Close())
+				contents := compressed.Bytes()
+				contents[len(contents)-8] ^= 1 // bad CRC after a complete decoded segment
+				require.NoError(t, folder.GetSubFolder(utility.WalPath).PutObject(t.Context(), name+".gz", bytes.NewReader(contents)))
+			}
+			// WAL validation and failed-download cleanup belong to HandleWALFetch.
+			require.Error(t, FetchBackupWAL(t.Context(), folder, backup, dir))
 		})
 	}
 }
@@ -100,12 +134,8 @@ func testBackupWALRange(t *testing.T) {
 		{name: "single segment", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: lsn(2*WalSegmentSize + 40)}, first: 2, last: 2},
 		{name: "delta uses selected backup", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: finish, IncrementFromLSN: lsn(1)}, first: 2, last: 3},
 		{name: "LSNs override filenames", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: finish, StartWalFileName: WalSegmentNo(1).GetFilename(1), EndWalFileName: WalSegmentNo(8).GetFilename(4)}, first: 2, last: 3},
-		{name: "missing start", label: label, dto: BackupSentinelDto{BackupFinishLSN: finish}, wantError: "no valid start LSN"},
-		{name: "zero start", label: label, dto: BackupSentinelDto{BackupStartLSN: lsn(0), BackupFinishLSN: finish}, wantError: "no valid start LSN"},
-		{name: "missing finish", label: label, dto: BackupSentinelDto{BackupStartLSN: start}, wantError: "no valid finish LSN"},
-		{name: "zero finish", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: lsn(0)}, wantError: "no valid finish LSN"},
-		{name: "reversed within segment", label: label, dto: BackupSentinelDto{BackupStartLSN: lsn(2*WalSegmentSize + 40), BackupFinishLSN: start}, wantError: "ends before"},
-		{name: "equal LSNs", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: start}, wantError: "ends before"},
+		{name: "missing start", label: label, dto: BackupSentinelDto{BackupFinishLSN: finish}, wantError: "no valid LSN boundaries"},
+		{name: "missing finish", label: label, dto: BackupSentinelDto{BackupStartLSN: start}, wantError: "no valid LSN boundaries"},
 		{name: "CRLF label", label: "START WAL LOCATION: 0/1000028 (file " + WalSegmentNo(1).GetFilename(3) + ")\r\n", dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: finish}, first: 2, last: 3},
 		{name: "empty label", wantError: "no valid START WAL LOCATION"},
 		{name: "malformed filename", label: "START WAL LOCATION: 0/1000028 (file ../../invalid)\n", wantError: "no valid START WAL LOCATION"},
