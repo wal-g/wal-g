@@ -54,9 +54,9 @@ func TestReadXtrabackupInfo(t *testing.T) {
 
 	info, err := readXtrabackupInfo(dir)
 	require.NoError(t, err)
-	assert.Equal(t, ParseLSN("0"), info.FromLSN)
-	assert.Equal(t, ParseLSN("3738001"), info.ToLSN)
-	assert.Equal(t, ParseLSN("3738068"), info.LastLSN)
+	assert.Equal(t, new(LSN(0)), info.FromLSN)
+	assert.Equal(t, new(LSN(3738001)), info.ToLSN)
+	assert.Equal(t, new(LSN(3738068)), info.LastLSN)
 	assert.Equal(t, "mysql-bin.000123", info.BinlogPos.FileName)
 	assert.Equal(t, int64(456), info.BinlogPos.FilePosition)
 	assert.Equal(t, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:1-110,"+
@@ -151,9 +151,9 @@ encrypted = N`
 
 func TestParseBinlogPosFromXtrabackupInfo(t *testing.T) {
 	info := NewXtrabackupInfo(xtrabackup_checkpoints_example, xtrabackup_info_example)
-	assert.Equal(t, ParseLSN("0"), info.FromLSN)
-	assert.Equal(t, ParseLSN("3738001"), info.ToLSN)
-	assert.Equal(t, ParseLSN("3738068"), info.LastLSN)
+	assert.Equal(t, new(LSN(0)), info.FromLSN)
+	assert.Equal(t, new(LSN(3738001)), info.ToLSN)
+	assert.Equal(t, new(LSN(3738068)), info.LastLSN)
 	assert.Equal(t, "mysql-bin-log-example-com.000406", info.BinlogPos.FileName)
 	assert.Equal(t, int64(197), info.BinlogPos.FilePosition)
 	assert.Equal(t, "3f6cd603-8d0b-11f1-8432-d00dc21b3e49:1-2647395", info.BinlogPos.LastGTID)
@@ -184,9 +184,9 @@ encrypted = N`
 func TestParseBinlogPosFromXtrabackupInfoMultilineGTIDCRLF(t *testing.T) {
 	info := NewXtrabackupInfo(xtrabackup_checkpoints_example,
 		strings.ReplaceAll(xtrabackup_info_multiline_gtid_example, "\n", "\r\n"))
-	assert.Equal(t, ParseLSN("0"), info.FromLSN)
-	assert.Equal(t, ParseLSN("3738001"), info.ToLSN)
-	assert.Equal(t, ParseLSN("3738068"), info.LastLSN)
+	assert.Equal(t, new(LSN(0)), info.FromLSN)
+	assert.Equal(t, new(LSN(3738001)), info.ToLSN)
+	assert.Equal(t, new(LSN(3738068)), info.LastLSN)
 	assert.Equal(t, "mysql-bin.000123", info.BinlogPos.FileName)
 	assert.Equal(t, int64(456), info.BinlogPos.FilePosition)
 	assert.Equal(t, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:1-110,"+
@@ -213,9 +213,9 @@ compressed = N`
 
 func TestParseBinlogPosFromMariaDBBackupInfo(t *testing.T) {
 	info := NewXtrabackupInfo(xtrabackup_checkpoints_example, mariadb_backup_info_example)
-	assert.Equal(t, ParseLSN("0"), info.FromLSN)
-	assert.Equal(t, ParseLSN("3738001"), info.ToLSN)
-	assert.Equal(t, ParseLSN("3738068"), info.LastLSN)
+	assert.Equal(t, new(LSN(0)), info.FromLSN)
+	assert.Equal(t, new(LSN(3738001)), info.ToLSN)
+	assert.Equal(t, new(LSN(3738068)), info.LastLSN)
 	assert.Equal(t, "mariadb-bin.000001", info.BinlogPos.FileName)
 	assert.Equal(t, int64(1298), info.BinlogPos.FilePosition)
 	assert.Equal(t, "0-1-6", info.BinlogPos.LastGTID)
