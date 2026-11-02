@@ -194,7 +194,7 @@ func GetS3Folder(networkErrorAfterByteSize int) (storage.Folder, func() error, e
 }
 
 func checkSplitPush(t *testing.T, partitions, blockSize, maxFileSize, s3errorAfterByteSize, sampleSize int) {
-	compressor := &testtools.MockCompressor{}
+	compressor := testtools.NewMockCompressor(t)
 	folder, clearer, err := GetS3Folder(s3errorAfterByteSize)
 	defer clearer()
 	if err != nil {

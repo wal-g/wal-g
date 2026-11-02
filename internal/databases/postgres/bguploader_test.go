@@ -94,7 +94,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 			defer testtools.Cleanup(t, dir)
 
 			// Setup BgUploader
-			tu := testtools.NewMockWalUploader(false, false)
+			tu := testtools.NewMockWalUploader(t, false, false)
 			fakeASM := asm.NewFakeASM()
 			tu.ArchiveStatusManager = fakeASM
 			bu := postgres.NewBgUploader(t.Context(), a, int32(tt.maxParallelism), int32(tt.maxNumFilesUploaded), tu, false, false)

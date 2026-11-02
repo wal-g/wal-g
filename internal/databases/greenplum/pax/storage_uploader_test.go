@@ -39,9 +39,9 @@ type expected struct {
 	BlockID     int64
 }
 
-func newUploader(baseFiles pax.BackupFiles, bundleFiles internal.BundleFiles) *pax.StorageUploader {
+func newUploader(t *testing.T, baseFiles pax.BackupFiles, bundleFiles internal.BundleFiles) *pax.StorageUploader {
 	storage := memory.NewKVS()
-	mockUploader := testtools.NewStoringMockUploader(storage)
+	mockUploader := testtools.NewStoringMockUploader(t, storage)
 	crypter := openpgp.CrypterFromKeyPath(privateKeyFilePath, func() (string, bool) {
 		return "", false
 	})
@@ -82,7 +82,7 @@ func generateData(t *testing.T, files map[string]testFile) (string, map[string]t
 
 func runUpload(t *testing.T, base pax.BackupFiles, bundleFiles *internal.RegularBundleFiles,
 	files map[string]testFile, want map[string]expected) {
-	uploader := newUploader(base, bundleFiles)
+	uploader := newUploader(t, base, bundleFiles)
 	testDir, files := generateData(t, files)
 	defer os.RemoveAll(testDir)
 
@@ -251,7 +251,7 @@ func TestRegularUpload_IdentityMismatch(t *testing.T) {
 }
 
 func TestUpload_FileDeletedBetweenWalkAndOpen(t *testing.T) {
-	uploader := newUploader(pax.BackupFiles{}, &internal.RegularBundleFiles{})
+	uploader := newUploader(t, pax.BackupFiles{}, &internal.RegularBundleFiles{})
 
 	name := "missing_file"
 	f, err := os.Create(name)

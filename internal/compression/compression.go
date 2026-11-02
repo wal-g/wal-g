@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal/ioextensions"
 )
 
+//go:generate mockgen -destination=../../test/mocks/mock_compressor.go -package mocks -build_flags -mod=readonly github.com/wal-g/wal-g/internal/compression Compressor
 type Compressor interface {
 	NewWriter(writer io.Writer) ioextensions.WriteFlushCloser
 	FileExtension() string
