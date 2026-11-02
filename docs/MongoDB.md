@@ -193,7 +193,8 @@ Unless `--skip-mongo-reconfig` is set, the command reconfigures restored data us
      `config.shards` (from `--mongo-shard-conn-str`), and cleans `config.cache.*` and `config.system.sessions`.
 
 Sharding metadata is fixed last, because oplog applied in steps 2 and 3 can bring back the values of the source cluster.
-If a node is restored as a shard (`--mongo-sh-name` is set) and the `shardIdentity` document is missing, the command fails.
+If a node is restored as a shard (`--mongo-sh-name` is set) and the `shardIdentity` document is missing, the command
+logs a warning and does not create the document.
 
 For more information see article
 [Experimental Feature: $backupCursorExtend in Percona Server for MongoDB](https://www.percona.com/blog/2021/06/07/experimental-feature-backupcursorextend-in-percona-server-for-mongodb/)

@@ -302,8 +302,9 @@ func (mongodService *MongodService) FixShardIdentity(shConfig ShConfig) error {
 		return errors.Wrap(err, "unable to update shardIdentity in admin.system.version")
 	}
 	if result.MatchedCount == 0 {
-		return errors.Errorf("shardIdentity is not found in admin.system.version, "+
-			"the restored node would not be a member of shard '%s'", shConfig.ShardName)
+		tracelog.WarningLogger.Printf("Unable to find shardIdentity in admin.system.version, "+
+			"skipping shardIdentity fix for shard '%s'", shConfig.ShardName)
+		return nil
 	}
 
 	var shardIdentity bson.M
