@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -48,9 +49,16 @@ type XtrabackupExtInfo struct {
 	ServerArch string
 }
 
-func NewXtrabackupInfo(content string) XtrabackupInfo {
-	result := XtrabackupInfo{}
-	for _, line := range strings.Split(content, "\n") {
+var (
+	binlogPosFieldRegexp = regexp.MustCompile(`(?m)^[ \t]*binlog_pos[ \t]*=[ \t]*`)
+	// GTIDs may span lines; excluding '=' prevents an unclosed quote from consuming the next metadata field.
+	binlogPosRegexp = regexp.MustCompile(`^filename '([^'\r\n]*)', position '([^'\r\n]*)'(?:, GTID of the last change '([^'=]*)')?`)
+)
+
+func NewXtrabackupInfo(checkpointsContent, infoContent string) XtrabackupInfo {
+	result := XtrabackupInfo{BinlogPos: parseBinlogPosFromXtrabackupInfo(infoContent)}
+
+	for _, line := range strings.Split(checkpointsContent, "\n") {
 		pair := strings.SplitN(line, "=", 2)
 		if len(pair) != 2 {
 			continue
@@ -64,11 +72,17 @@ func NewXtrabackupInfo(content string) XtrabackupInfo {
 			result.ToLSN = ParseLSN(value)
 		case "last_lsn":
 			result.LastLSN = ParseLSN(value)
-		case "binlog_pos":
-			result.BinlogPos = parseBinlogPos(value)
 		}
 	}
 	return result
+}
+
+// parseBinlogPosFromXtrabackupInfo finds binlog_pos in xtrabackup_info or mariadb_backup_info.
+func parseBinlogPosFromXtrabackupInfo(content string) BinlogPos {
+	if loc := binlogPosFieldRegexp.FindStringIndex(content); loc != nil {
+		return parseBinlogPos(content[loc[1]:])
+	}
+	return BinlogPos{}
 }
 
 // parseBinlogPos extracts binlog filename, position and GTID from the binlog_pos field
@@ -79,31 +93,19 @@ func NewXtrabackupInfo(content string) XtrabackupInfo {
 //
 //	"filename 'mysql-bin.000002', position '607', GTID of the last change '0-1-7'" (with GTID)
 //	"filename 'mysql-bin.000003', position '154'" (no GTID recorded)
+//	"filename 'mysql-bin.000123', position '456', GTID of the last change 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:1-110,
+//	bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb:1-200'"
 func parseBinlogPos(value string) BinlogPos {
-	var binlogPos BinlogPos
-
-	if idx := strings.Index(value, "filename '"); idx >= 0 {
-		rest := value[idx+len("filename '"):]
-		if end := strings.Index(rest, "'"); end >= 0 {
-			binlogPos.FileName = rest[:end]
-		}
+	match := binlogPosRegexp.FindStringSubmatch(value)
+	if match == nil {
+		return BinlogPos{}
 	}
-
-	if idx := strings.Index(value, "position '"); idx >= 0 {
-		rest := value[idx+len("position '"):]
-		if end := strings.Index(rest, "'"); end >= 0 {
-			binlogPos.FilePosition, _ = strconv.ParseInt(rest[:end], 10, 64)
-		}
+	position, _ := strconv.ParseInt(match[2], 10, 64)
+	return BinlogPos{
+		FileName:     match[1],
+		FilePosition: position,
+		LastGTID:     strings.ReplaceAll(strings.ReplaceAll(match[3], "\r", ""), "\n", ""),
 	}
-
-	if idx := strings.Index(value, "GTID of the last change '"); idx >= 0 {
-		rest := value[idx+len("GTID of the last change '"):]
-		if end := strings.Index(rest, "'"); end >= 0 {
-			binlogPos.LastGTID = rest[:end]
-		}
-	}
-
-	return binlogPos
 }
 
 func isXtrabackup(cmd *exec.Cmd) bool {
@@ -153,8 +155,6 @@ func readXtrabackupInfo(xtrabackupExtraDirectory string) (XtrabackupInfo, error)
 	if err != nil {
 		return XtrabackupInfo{}, err
 	}
-	result := NewXtrabackupInfo(string(checkpointsRaw))
-
 	infoRaw, err := readFileWithFallback(
 		xtrabackupExtraDirectory,
 		"xtrabackup_info",
@@ -162,12 +162,9 @@ func readXtrabackupInfo(xtrabackupExtraDirectory string) (XtrabackupInfo, error)
 	)
 	if err != nil {
 		tracelog.WarningLogger.Printf("Could not read backup info file for binlog position: %v", err)
-		return result, nil
+		infoRaw = nil
 	}
-	infoResult := NewXtrabackupInfo(string(infoRaw))
-	result.BinlogPos = infoResult.BinlogPos
-
-	return result, nil
+	return NewXtrabackupInfo(string(checkpointsRaw), string(infoRaw)), nil
 }
 
 func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFullBackup bool, prevBackupInfo *PrevBackupInfo) {
