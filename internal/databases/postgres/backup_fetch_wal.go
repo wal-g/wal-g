@@ -58,7 +58,12 @@ func FetchBackupWAL(ctx context.Context, rootFolder storage.Folder, backup Backu
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if err := HandleWALFetch(ctx, reader, segment.GetFilename(timeline), fmt.Sprintf("%s/%s", walDir, segment.GetFilename(timeline)), NopPrefetcher{}); err != nil {
+		err := HandleWALFetch(ctx,
+			reader,
+			segment.GetFilename(timeline),
+			fmt.Sprintf("%s/%s", walDir, segment.GetFilename(timeline)),
+			NopPrefetcher{})
+		if err != nil {
 			return err
 		}
 		if segment == last {
