@@ -5,5 +5,5 @@ package internal
 import "github.com/wal-g/wal-g/pkg/storages/sh"
 
 func init() {
-	registerStorageAdapter(StorageAdapter{"SSH", sh.SettingList, sh.ConfigureStorage})
+	registerStorageAdapter(StorageAdapter{storageType: "SSH", settingNames: sh.SettingList, configure: sh.ConfigureStorage})
 }

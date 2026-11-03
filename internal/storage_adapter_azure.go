@@ -5,5 +5,5 @@ package internal
 import "github.com/wal-g/wal-g/pkg/storages/azure"
 
 func init() {
-	registerStorageAdapter(StorageAdapter{"AZ", azure.SettingList, azure.ConfigureStorage})
+	registerStorageAdapter(StorageAdapter{storageType: "AZ", settingNames: azure.SettingList, configure: azure.ConfigureStorage})
 }

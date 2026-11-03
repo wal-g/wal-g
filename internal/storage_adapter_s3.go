@@ -5,5 +5,10 @@ package internal
 import "github.com/wal-g/wal-g/pkg/storages/s3"
 
 func init() {
-	registerStorageAdapter(StorageAdapter{"S3", s3.SettingList, s3.ConfigureStorage})
+	registerStorageAdapter(StorageAdapter{
+		storageType:       "S3",
+		settingNames:      s3.SettingList,
+		configure:         s3.ConfigureStorage,
+		configureFailover: s3.ConfigureStorageWithFailover,
+	})
 }

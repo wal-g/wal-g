@@ -11,9 +11,10 @@ import (
 )
 
 type StorageAdapter struct {
-	storageType  string
-	settingNames []string
-	configure    ConfigureStorageFunc
+	storageType       string
+	settingNames      []string
+	configure         ConfigureStorageFunc
+	configureFailover ConfigureStorageFunc
 }
 
 type ConfigureStorageFunc func(

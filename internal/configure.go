@@ -29,7 +29,6 @@ import (
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/stats/cache"
-	"github.com/wal-g/wal-g/pkg/storages/s3"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/time/rate"
@@ -201,9 +200,8 @@ func configureStorageForSpecificConfig(
 
 		settings := adapter.loadSettings(config)
 		configure := adapter.configure
-		// Never alter primary discovery, even when failover storages are configured.
-		if adapter.storageType == "S3" && isFailover {
-			configure = s3.ConfigureStorageWithFailover
+		if isFailover && adapter.configureFailover != nil {
+			configure = adapter.configureFailover
 		}
 		st, err := configure(ctx, prefix, settings, rootWraps...)
 		if err != nil {
