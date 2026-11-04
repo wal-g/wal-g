@@ -50,6 +50,7 @@ const (
 	UseReverseUnpackSetting       = "WALG_USE_REVERSE_UNPACK"
 	SkipRedundantTarsSetting      = "WALG_SKIP_REDUNDANT_TARS"
 	VerifyPageChecksumsSetting    = "WALG_VERIFY_PAGE_CHECKSUMS"
+	MaxChecksumRetriesSetting     = "WALG_MAX_CHECKSUM_RETRIES"
 	StoreAllCorruptBlocksSetting  = "WALG_STORE_ALL_CORRUPT_BLOCKS"
 	UseRatingComposerSetting      = "WALG_USE_RATING_COMPOSER"
 	UseCopyComposerSetting        = "WALG_USE_COPY_COMPOSER"
@@ -287,6 +288,7 @@ var (
 		UseReverseUnpackSetting:      "false",
 		SkipRedundantTarsSetting:     "false",
 		VerifyPageChecksumsSetting:   "false",
+		MaxChecksumRetriesSetting:    "0",
 		StoreAllCorruptBlocksSetting: "false",
 		UseRatingComposerSetting:     "false",
 		UseCopyComposerSetting:       "false",
@@ -419,6 +421,7 @@ var (
 		UseReverseUnpackSetting:       true,
 		SkipRedundantTarsSetting:      true,
 		VerifyPageChecksumsSetting:    true,
+		MaxChecksumRetriesSetting:     true,
 		StoreAllCorruptBlocksSetting:  true,
 		UseRatingComposerSetting:      true,
 		UseCopyComposerSetting:        true,
@@ -1156,4 +1159,14 @@ func GetOplogBackupAdditionalSavingTimeSetting() (*time.Duration, error) {
 		return nil, fmt.Errorf("duration expected for %s setting but given '%s': %w", OplogBackupAdditionalSavingInterval, durStr, err)
 	}
 	return &dur, nil
+}
+
+// GetMaxChecksumRetries returns the number of extra reads allowed after a page checksum mismatch.
+func GetMaxChecksumRetries() (int, error) {
+	value := viper.GetString(MaxChecksumRetriesSetting)
+	retries, err := strconv.Atoi(value)
+	if err != nil || retries < 0 {
+		return 0, fmt.Errorf("%s must be a nonnegative integer, got %q", MaxChecksumRetriesSetting, value)
+	}
+	return retries, nil
 }
