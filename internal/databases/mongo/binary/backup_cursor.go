@@ -13,6 +13,11 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
+const (
+	backupCursorKeepAliveInterval = time.Minute
+	backupCursorPingTimeout       = time.Minute
+)
+
 type BackupCursor struct {
 	*mongo.Cursor
 
@@ -44,22 +49,33 @@ func CreateBackupCursor(mongodService *MongodService) (*BackupCursor, error) {
 	return backupCursor, nil
 }
 
-func (backupCursor *BackupCursor) StartKeepAlive() {
+func (backupCursor *BackupCursor) StartKeepAlive(cancelBackup context.CancelCauseFunc) {
 	backupContext, stopPingBackupCursor := context.WithCancel(backupCursor.mongodService.Context)
 	backupCursor.keepAliveStopFunction = stopPingBackupCursor
 	backupCursor.closeBackupCursorWg.Add(1)
 	go func() {
 		defer backupCursor.closeBackupCursorWg.Done()
-		ticker := time.NewTicker(time.Minute * 1)
+		defer tracelog.InfoLogger.Printf("stop process with ping the backup cursor")
+		ticker := time.NewTicker(backupCursorKeepAliveInterval)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-backupContext.Done():
-				tracelog.InfoLogger.Printf("stop process with ping the backup cursor")
 				return
 			case <-ticker.C:
-				hasNext := backupCursor.TryNext(backupContext)
-				tracelog.InfoLogger.Printf("ping the backup cursor (has next = %v", hasNext)
+				if backupContext.Err() != nil {
+					return
+				}
+				err := backupCursor.ping(backupCursor.mongodService.Context)
+				if backupContext.Err() != nil {
+					return
+				}
+				if err != nil {
+					err = errors.Wrap(err, "backup cursor keepalive failed")
+					tracelog.ErrorLogger.Printf("%+v", err)
+					cancelBackup(err)
+					return
+				}
 			}
 		}
 	}()
@@ -79,6 +95,9 @@ func (backupCursor *BackupCursor) LoadBackupCursorFiles() (backupFiles []*intern
 		}
 
 		backupFiles = append(backupFiles, backupFileMeta)
+	}
+	if err := backupCursor.cursorStateError(); err != nil {
+		return nil, errors.Wrap(err, "backup cursor failed while listing files")
 	}
 
 	return backupFiles, nil
@@ -115,14 +134,51 @@ func (backupCursor *BackupCursor) LoadExtendedBackupCursorFiles() (backupFiles [
 }
 
 func (backupCursor *BackupCursor) Close() {
-	if backupCursor.keepAliveStopFunction != nil { // If we start keep live
-		backupCursor.keepAliveStopFunction()
-	}
-	backupCursor.closeBackupCursorWg.Wait()
+	backupCursor.stopKeepAlive()
 	closeErr := backupCursor.Cursor.Close(backupCursor.mongodService.Context)
 	if closeErr != nil {
 		tracelog.ErrorLogger.Printf("Unable to close backup cursor: %+v", closeErr)
 	}
+}
+
+func (backupCursor *BackupCursor) StopKeepAliveAndValidate(backupContext context.Context) error {
+	backupCursor.stopKeepAlive()
+	if err := context.Cause(backupContext); err != nil {
+		return err
+	}
+	if err := backupCursor.ping(backupCursor.mongodService.Context); err != nil {
+		return errors.Wrap(err, "backup cursor final check failed")
+	}
+	return nil
+}
+
+func (backupCursor *BackupCursor) ping(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	pingContext, cancel := context.WithTimeout(ctx, backupCursorPingTimeout)
+	defer cancel()
+	hasNext := backupCursor.TryNext(pingContext)
+	tracelog.InfoLogger.Printf("ping the backup cursor (has next = %v)", hasNext)
+	return backupCursor.cursorStateError()
+}
+
+func (backupCursor *BackupCursor) stopKeepAlive() {
+	if backupCursor.keepAliveStopFunction != nil {
+		backupCursor.keepAliveStopFunction()
+	}
+	backupCursor.closeBackupCursorWg.Wait()
+}
+
+func (backupCursor *BackupCursor) cursorStateError() error {
+	if err := backupCursor.Err(); err != nil {
+		return err
+	}
+	if backupCursor.ID() == 0 {
+		return errors.New("backup cursor is closed")
+	}
+	return nil
 }
 
 func (backupCursor *BackupCursor) loadMetadata() error {
