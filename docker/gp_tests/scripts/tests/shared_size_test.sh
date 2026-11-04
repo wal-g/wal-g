@@ -11,7 +11,7 @@ source /tmp/tests/test_functions/util.sh
 # test pushes backups without --count-journals, so there are no journals to derive them from.
 get_backup_name() {
     wal-g --config=${TMP_CONFIG} st ls basebackups_005/ 2>&1 \
-        | awk '{ print $NF }' | grep _backup_stop_sentinel.json \
+        | grep -o '[^[:space:]]*_backup_stop_sentinel.json' \
         | sed 's/_backup_stop_sentinel.json//' | sort | awk "FNR == $1 {print}"
 }
 
