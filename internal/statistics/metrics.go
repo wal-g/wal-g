@@ -3,6 +3,7 @@ package statistics
 import (
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/cactus/go-statsd-client/v5/statsd"
@@ -17,6 +18,7 @@ import (
 type metrics struct {
 	UploadedFilesTotal       prometheus.Counter
 	UploadedFilesFailedTotal prometheus.Counter
+	WalPushSkippedTotal      prometheus.Counter
 
 	S3Codes        prometheus.GaugeVec
 	S3BytesWritten prometheus.Gauge
@@ -40,6 +42,12 @@ var (
 			prometheus.CounterOpts{
 				Name: WalgMetricsPrefix + "uploader_uploaded_files_failed_total",
 				Help: "Number of file upload failures.",
+			},
+		),
+		WalPushSkippedTotal: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: WalgMetricsPrefix + "wal_push_skipped_total",
+				Help: "Number of WAL files acknowledged without archiving.",
 			},
 		),
 		S3Codes: *prometheus.NewGaugeVec(
@@ -68,6 +76,11 @@ var (
 			},
 		),
 	}
+
+	// A daemon pushes repeatedly, while statsd adds up every counter value it receives and
+	// records every timer value as a sample: remember what has already been sent.
+	pushMu       sync.Mutex
+	pushedValues = make(map[string]float64)
 )
 
 func init() {
@@ -78,6 +91,7 @@ func init() {
 
 	prometheus.MustRegister(WalgMetrics.UploadedFilesTotal)
 	prometheus.MustRegister(WalgMetrics.UploadedFilesFailedTotal)
+	prometheus.MustRegister(WalgMetrics.WalPushSkippedTotal)
 	prometheus.MustRegister(WalgMetrics.S3Codes)
 	prometheus.MustRegister(WalgMetrics.S3BytesWritten)
 	prometheus.MustRegister(WalgMetrics.S3BytesRead)
@@ -107,6 +121,13 @@ func WriteS3UploadTimeMetric(d time.Duration) {
 }
 
 func pushMetrics(address string, extraTags map[string]string) error {
+	// A push stuck resolving the address must not make later requests queue up, each holding
+	// its connection: the next push sends what this one skips.
+	if !pushMu.TryLock() {
+		return nil
+	}
+	defer pushMu.Unlock()
+
 	config := &statsd.ClientConfig{
 		Address:       address,
 		UseBuffered:   true,
@@ -140,9 +161,11 @@ func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily, extr
 	metricType := in.GetType()
 
 	for _, metric := range in.Metric {
+		key := name
 		tags := make([]statsd.Tag, 0, len(metric.Label)+len(extraTags))
 		for _, lp := range metric.Label {
 			tags = append(tags, statsd.Tag{lp.GetName(), lp.GetValue()})
+			key += "," + lp.GetName() + "=" + lp.GetValue()
 		}
 		for k, v := range extraTags {
 			tags = append(tags, statsd.Tag{k, v})
@@ -153,25 +176,20 @@ func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily, extr
 			if metric.Counter == nil {
 				return fmt.Errorf("expected counter in metric %s %s", name, metric)
 			}
-			err := client.Inc(name, int64(metric.Counter.GetValue()), 1.0, tags...)
+			value := metric.Counter.GetValue()
+			err := client.Inc(name, int64(value-pushedValues[key]), 1.0, tags...)
 			if err != nil {
 				return err
 			}
+			pushedValues[key] = value
 		case dto.MetricType_GAUGE:
 			if metric.Gauge == nil {
 				return fmt.Errorf("expected gauge in metric %s %s", name, metric)
 			}
 			tracelog.DebugLogger.Printf("writing metric: %s", metric.String())
-			if name == s3UploadTimeMetricName {
-				err := client.Timing(name, int64(metric.Gauge.GetValue()), 1.0, tags...)
-				if err != nil {
-					return err
-				}
-			} else {
-				err := client.Gauge(name, int64(metric.Gauge.GetValue()), 1.0, tags...)
-				if err != nil {
-					return err
-				}
+			err := writeGaugeToStatsd(client, name, key, metric.Gauge.GetValue(), tags)
+			if err != nil {
+				return err
 			}
 		case dto.MetricType_UNTYPED:
 			return fmt.Errorf("expected untyped in metric %s %s", name, metric)
@@ -185,4 +203,15 @@ func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily, extr
 	}
 
 	return nil
+}
+
+func writeGaugeToStatsd(client statsd.Statter, name, key string, value float64, tags []statsd.Tag) error {
+	if name != s3UploadTimeMetricName {
+		return client.Gauge(name, int64(value), 1.0, tags...)
+	}
+	if pushedValues[key] == value {
+		return nil
+	}
+	pushedValues[key] = value
+	return client.Timing(name, int64(value), 1.0, tags...)
 }

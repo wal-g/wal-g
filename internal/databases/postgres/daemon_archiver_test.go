@@ -10,11 +10,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	dto "github.com/prometheus/client_model/go"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal"
@@ -26,6 +28,7 @@ import (
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/stats"
+	"github.com/wal-g/wal-g/internal/statistics"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -44,6 +47,8 @@ func (u archiveTestUploader) Upload(ctx context.Context, name string, body io.Re
 func (u archiveTestUploader) UploadFile(ctx context.Context, file ioextensions.NamedReader) error {
 	return u.upload(ctx, file)
 }
+
+func (archiveTestUploader) Folder() storage.Folder { return memory.NewFolder("", memory.NewKVS()) }
 
 func archiveTestConfig(t *testing.T) {
 	t.Helper()
@@ -457,6 +462,31 @@ func TestDaemonArchiverMarkerFailureBacksOff(t *testing.T) {
 	require.True(t, retryAt.After(time.Now()), "missing ASM marker must not cause a tight re-upload loop")
 }
 
+// archiveTestListener tells when the daemon is done with a connection: it reads settings
+// after replying, which must not overlap with a test restoring them.
+type archiveTestListener struct {
+	net.Listener
+	closed chan struct{}
+}
+
+func (l archiveTestListener) Accept() (net.Conn, error) {
+	c, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return archiveTestConn{Conn: c, closed: l.closed}, nil
+}
+
+type archiveTestConn struct {
+	net.Conn
+	closed chan struct{}
+}
+
+func (c archiveTestConn) Close() error {
+	defer func() { c.closed <- struct{}{} }()
+	return c.Conn.Close()
+}
+
 func TestDaemonArchiverServeAndClient(t *testing.T) {
 	archiveTestConfig(t)
 	files := archiveTestFiles(t, 8)
@@ -488,7 +518,8 @@ func TestDaemonArchiverServeAndClient(t *testing.T) {
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
-	go func() { done <- serve(ctx, l, multi) }()
+	closed := make(chan struct{}, len(files))
+	go func() { done <- serve(ctx, archiveTestListener{Listener: l, closed: closed}, multi) }()
 	defer func() {
 		cancel()
 		select {
@@ -496,6 +527,11 @@ func TestDaemonArchiverServeAndClient(t *testing.T) {
 			require.NoError(t, err)
 		case <-time.After(5 * time.Second):
 			t.Error("daemon failed to stop")
+		}
+	}()
+	defer func() {
+		for range files {
+			archiveTestWait(t, closed)
 		}
 	}()
 	for _, file := range files {
@@ -515,4 +551,330 @@ func TestDaemonArchiverServeAndClient(t *testing.T) {
 		require.NoError(t, r.Close())
 		require.Equal(t, "test WAL", string(body))
 	}
+}
+
+func archiveTestSettings(t *testing.T, settings map[string]any) {
+	t.Helper()
+	for key, value := range settings {
+		old := viper.Get(key)
+		viper.Set(key, value)
+		t.Cleanup(func() { viper.Set(key, old) })
+	}
+}
+
+// archiveTestSkipList configures a skip list last modified age ago.
+func archiveTestSkipList(t *testing.T, age time.Duration, names ...string) {
+	t.Helper()
+	listPath := filepath.Join(t.TempDir(), "skip_list")
+	require.NoError(t, os.WriteFile(listPath, []byte(strings.Join(names, "\n")+"\n"), 0640))
+	modified := time.Now().Add(-age)
+	require.NoError(t, os.Chtimes(listPath, modified, modified))
+	archiveTestSettings(t, map[string]any{conf.PgArchiveSkipList: listPath})
+}
+
+func archiveTestSkippedCount(t *testing.T) float64 {
+	t.Helper()
+	var metric dto.Metric
+	require.NoError(t, statistics.WalgMetrics.WalPushSkippedTotal.Write(&metric))
+	return metric.GetCounter().GetValue()
+}
+
+func TestDaemonArchiverSkipList(t *testing.T) {
+	const (
+		segment = "000000010000000000000000" // the file archiveTestFiles creates first
+		partial = segment + ".partial"
+		history = "00000002.history"
+	)
+	listed := func(age time.Duration, names ...string) func(*testing.T) {
+		return func(t *testing.T) { archiveTestSkipList(t, age, names...) }
+	}
+	for _, test := range []struct {
+		name    string
+		pushed  string // segment if empty
+		prepare func(*testing.T)
+		skipped bool
+	}{
+		{name: "fresh list", prepare: listed(0, segment), skipped: true},
+		{name: "among other names", prepare: listed(0, "000000010000000000000009", segment, history), skipped: true},
+		{name: "partial file", pushed: partial, prepare: listed(0, partial), skipped: true},
+		{name: "history file", pushed: history, prepare: listed(0, history), skipped: true},
+		{name: "history file not listed", pushed: history, prepare: listed(0, segment)},
+		{name: "within default ttl", prepare: listed(30*time.Second, segment), skipped: true},
+		{name: "beyond default ttl", prepare: listed(2*time.Minute, segment)},
+		{name: "within configured ttl", skipped: true, prepare: func(t *testing.T) {
+			archiveTestSkipList(t, 2*time.Minute, segment)
+			archiveTestSettings(t, map[string]any{conf.PgArchiveSkipListTTL: "5m"})
+		}},
+		{name: "other name", prepare: listed(0, "000000010000000000000009")},
+		{name: "name extending the pushed one", prepare: listed(0, partial)},
+		{name: "name extended by the pushed one", pushed: partial, prepare: listed(0, segment)},
+		{name: "no list configured", prepare: func(*testing.T) {}},
+		{name: "missing list", prepare: func(t *testing.T) {
+			archiveTestSettings(t, map[string]any{conf.PgArchiveSkipList: filepath.Join(t.TempDir(), "absent")})
+		}},
+		{name: "unreadable list", prepare: func(t *testing.T) {
+			archiveTestSettings(t, map[string]any{conf.PgArchiveSkipList: t.TempDir()})
+		}},
+		{name: "invalid ttl", prepare: func(t *testing.T) {
+			archiveTestSkipList(t, 0, segment)
+			archiveTestSettings(t, map[string]any{conf.PgArchiveSkipListTTL: "soon"})
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			archiveTestConfig(t)
+			test.prepare(t)
+			files := archiveTestFiles(t, 1)
+			pushed := files[0]
+			if test.pushed != "" {
+				pushed = filepath.Join(filepath.Dir(files[0]), test.pushed)
+				require.NoError(t, os.WriteFile(pushed, []byte("test WAL"), 0600))
+			}
+			var uploads atomic.Int32
+			manager := asm.NewFakeASM()
+			a := newDaemonArchiver(t.Context(), 1, 0, time.Minute, manager, archiveTestFactory(
+				func(context.Context, ioextensions.NamedReader) error { uploads.Add(1); return nil }))
+			defer a.Close()
+			skippedBefore := archiveTestSkippedCount(t)
+
+			archiveTestPush(t, a, pushed)
+
+			if test.skipped {
+				require.Zero(t, uploads.Load())
+				require.Equal(t, skippedBefore+1, archiveTestSkippedCount(t))
+				require.False(t, manager.IsWalAlreadyUploaded(pushed), "a skipped file is not uploaded")
+			} else {
+				require.EqualValues(t, 1, uploads.Load())
+				require.Equal(t, skippedBefore, archiveTestSkippedCount(t))
+			}
+		})
+	}
+}
+
+// A hung upload must neither outlive the acknowledgement nor leave a marker behind, even when
+// it completes while being cancelled.
+func TestDaemonArchiverSkipListStopsRunningUpload(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 2)
+	manager := asm.NewFakeASM()
+	started := make(chan struct{})
+	var finished atomic.Bool
+	a := newDaemonArchiver(t.Context(), 2, 1, time.Minute, manager, archiveTestFactory(
+		func(ctx context.Context, file ioextensions.NamedReader) error {
+			if file.Name() == files[1] {
+				close(started)
+				<-ctx.Done()
+				finished.Store(true)
+			}
+			return nil
+		}))
+	defer a.Close()
+	archiveTestPush(t, a, files[0]) // the scan picks up files[1] in the background
+	archiveTestWait(t, started)
+	archiveTestSkipList(t, 0, filepath.Base(files[1]))
+
+	archiveTestPush(t, a, files[1])
+
+	require.True(t, finished.Load(), "the upload must be over before PostgreSQL gets the file back")
+	require.False(t, manager.IsWalAlreadyUploaded(files[1]), "the marker of the cancelled upload must go")
+}
+
+func TestDaemonArchiverSkipListDropsMarkerOfUploadedFile(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 1)
+	archiveTestSkipList(t, 0, filepath.Base(files[0]))
+	manager := asm.NewFakeASM()
+	require.NoError(t, manager.MarkWalUploaded(files[0]))
+	var uploads atomic.Int32
+	a := newDaemonArchiver(t.Context(), 1, 0, time.Minute, manager, archiveTestFactory(
+		func(context.Context, ioextensions.NamedReader) error { uploads.Add(1); return nil }))
+	defer a.Close()
+
+	archiveTestPush(t, a, files[0])
+
+	require.Zero(t, uploads.Load())
+	require.False(t, manager.IsWalAlreadyUploaded(files[0]))
+}
+
+// A request abandoned by its client holds the foreground slot until the upload times out.
+func TestDaemonArchiverSkipListNeedsNoForegroundSlot(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 2)
+	archiveTestSkipList(t, 0, filepath.Base(files[0]))
+	a := newDaemonArchiver(t.Context(), 1, 0, time.Minute, asm.NewFakeASM(), archiveTestFactory(
+		func(context.Context, ioextensions.NamedReader) error { return nil }))
+	defer a.Close()
+	a.foreground <- struct{}{}
+	defer func() { <-a.foreground }()
+
+	archiveTestPush(t, a, files[0])
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
+	defer cancel()
+	require.ErrorIs(t, a.Push(ctx, files[1]), context.DeadlineExceeded, "an unlisted file does wait for the slot")
+}
+
+// The retry behind an abandoned request must not upload a file acknowledged in the meantime.
+func TestDaemonArchiverSkipListAppearingWhileWaitingForSlot(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 1)
+	listPath := filepath.Join(t.TempDir(), "skip_list")
+	archiveTestSettings(t, map[string]any{conf.PgArchiveSkipList: listPath})
+	var uploads atomic.Int32
+	a := newDaemonArchiver(t.Context(), 1, 0, time.Minute, asm.NewFakeASM(), archiveTestFactory(
+		func(context.Context, ioextensions.NamedReader) error { uploads.Add(1); return nil }))
+	defer a.Close()
+	a.foreground <- struct{}{}
+	pushed := make(chan error, 1)
+	go func() { pushed <- a.Push(t.Context(), files[0]) }()
+	time.Sleep(50 * time.Millisecond) // let the request pass the first check and park on the slot
+
+	require.NoError(t, os.WriteFile(listPath, []byte(filepath.Base(files[0])+"\n"), 0640))
+	<-a.foreground
+
+	require.NoError(t, <-pushed)
+	require.Zero(t, uploads.Load())
+}
+
+// A scan holds a batch of candidates while PostgreSQL moves on: it must not start uploading
+// a file that may be acknowledged already.
+func TestDaemonArchiverBackgroundJobsStayAheadOfAnchor(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 3)
+	a := newDaemonArchiver(t.Context(), 2, 0, time.Minute, asm.NewFakeASM(), archiveTestFactory(
+		func(context.Context, ioextensions.NamedReader) error { return nil }))
+	defer a.Close()
+	a.mu.Lock()
+	a.anchor = files[1]
+	a.mu.Unlock()
+	for _, behind := range files[:2] {
+		job, err := a.startJob(t.Context(), behind, true)
+		require.NoError(t, err)
+		require.Nil(t, job, behind)
+	}
+	// The only background slot must have survived the refusals.
+	job, err := a.startJob(t.Context(), files[2], true)
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	archiveTestWait(t, job.done)
+}
+
+func TestDaemonArchiverSkipListWithoutAliveStorage(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 2)
+	archiveTestSkipList(t, 0, filepath.Base(files[0]))
+	selector := &archiveTestStorageSelector{}
+	selector.choice.Store(2)
+	root := multistorage.NewFolder(map[string]storage.Folder{"primary": memory.NewFolder("", memory.NewKVS())}, selector)
+	a := newDaemonArchiver(t.Context(), 1, 0, time.Minute, asm.NewFakeASM(), func(ctx context.Context) (*WalUploader, error) {
+		return PrepareMultiStorageWalUploader(ctx, root, "")
+	})
+	defer a.Close()
+	archiveTestPush(t, a, files[0])
+	require.ErrorIs(t, a.Push(t.Context(), files[1]), multistorage.ErrNoAliveStorages)
+}
+
+type archiveTestStorage struct {
+	storage.Storage
+	root storage.Folder
+}
+
+func (s archiveTestStorage) RootFolder() storage.Folder { return s.root }
+
+// WAL delta mode has no archiver: the handler must not need a live storage for a listed file.
+func TestArchiveMessageHandlerSkipList(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 2)
+	listed, unlisted := filepath.Base(files[0]), filepath.Base(files[1])
+	pgdata := t.TempDir()
+	require.NoError(t, os.Symlink(filepath.Dir(files[0]), filepath.Join(pgdata, "pg_wal")))
+	archiveTestSettings(t, map[string]any{
+		conf.PgDataSetting: pgdata, conf.PgDaemonWALUploadTimeout: "3s",
+		conf.CompressionMethodSetting: "none", conf.UseWalDeltaSetting: false,
+		conf.TotalBgUploadedLimit: 1, // the scan goroutine would outlive HandleWALPush and read these settings
+	})
+	archiveTestSkipList(t, 0, listed)
+	primary := memory.NewFolder("", memory.NewKVS())
+	selector := &archiveTestStorageSelector{}
+	st := archiveTestStorage{root: multistorage.NewFolder(map[string]storage.Folder{"primary": primary}, selector)}
+	handle := func(name string) error {
+		t.Helper()
+		server, client := net.Pipe()
+		defer client.Close()
+		defer server.Close()
+		h, err := NewMessageHandler(t.Context(), daemon.WalPushType, server, st)
+		require.NoError(t, err)
+		go func() { _, _ = io.Copy(io.Discard, client) }()
+		return h.Handle(t.Context(), []byte(name))
+	}
+	archived := func(name string) bool {
+		t.Helper()
+		exists, err := primary.GetSubFolder(utility.WalPath).Exists(t.Context(), name)
+		require.NoError(t, err)
+		return exists
+	}
+
+	selector.choice.Store(2)
+	require.NoError(t, handle(listed))
+	require.ErrorIs(t, handle(unlisted), multistorage.ErrNoAliveStorages)
+
+	selector.choice.Store(0)
+	require.NoError(t, handle(listed))
+	require.False(t, archived(listed), "a listed file is skipped even when storage is alive")
+	require.NoError(t, handle(unlisted))
+	require.True(t, archived(unlisted))
+}
+
+func TestDaemonArchiverPublishesMetricsAfterEachRequest(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 2)
+	listed, failing := filepath.Base(files[0]), filepath.Base(files[1])
+	pgdata := t.TempDir()
+	require.NoError(t, os.Symlink(filepath.Dir(files[0]), filepath.Join(pgdata, "pg_wal")))
+	conn, err := net.ListenPacket("udp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer conn.Close()
+	archiveTestSettings(t, map[string]any{
+		conf.PgDataSetting: pgdata, conf.PgDaemonWALUploadTimeout: "3s",
+		conf.StatsdAddressSetting: conn.LocalAddr().String(),
+	})
+	archiveTestSkipList(t, 0, listed)
+	a := newDaemonArchiver(t.Context(), 1, 0, time.Minute, asm.NewFakeASM(), archiveTestFactory(
+		func(context.Context, ioextensions.NamedReader) error { return errors.New("injected S3 failure") }))
+	defer a.Close()
+	receive := func(want string) {
+		t.Helper()
+		buf := make([]byte, 65536)
+		require.NoError(t, conn.SetReadDeadline(time.Now().Add(3*time.Second)))
+		for {
+			n, _, err := conn.ReadFrom(buf)
+			require.NoError(t, err, "no statsd datagram with %s", want)
+			if strings.Contains(string(buf[:n]), want) {
+				return
+			}
+		}
+	}
+	request := func(name string) []byte {
+		t.Helper()
+		server, client := net.Pipe()
+		defer client.Close()
+		done := make(chan struct{})
+		go func() { defer close(done); processConnection(t.Context(), server, nil, a) }()
+		defer archiveTestWait(t, done)
+		require.NoError(t, client.SetDeadline(time.Now().Add(3*time.Second)))
+		_, err := client.Write(append(binary.BigEndian.AppendUint16(daemon.WalPushType.ToBytes(), uint16(len(name)+3)), []byte(name)...))
+		require.NoError(t, err)
+		reply := make([]byte, 1)
+		_, err = io.ReadFull(client, reply)
+		require.NoError(t, err)
+		return reply
+	}
+	// Earlier tests in this process have moved the counter already.
+	statistics.PushMetrics()
+	receive("walg_wal_push_skipped_total:")
+
+	require.Equal(t, daemon.OkType.ToBytes(), request(listed))
+	receive("walg_wal_push_skipped_total:1|c")
+
+	require.Equal(t, daemon.ErrorType.ToBytes(), request(failing))
+	receive("walg_wal_push_skipped_total:0|c")
 }

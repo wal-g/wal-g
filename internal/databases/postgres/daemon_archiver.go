@@ -22,6 +22,7 @@ import (
 
 type daemonArchiveJob struct {
 	done       chan struct{}
+	cancel     context.CancelFunc
 	uploader   *WalUploader
 	err        error
 	markFailed bool
@@ -120,6 +121,16 @@ func (a *daemonArchiver) notify() {
 }
 
 func (a *daemonArchiver) Push(ctx context.Context, filename string) error {
+	filename = filepath.Clean(filename)
+	if isWalFilename(filepath.Base(filename)) {
+		a.mu.Lock()
+		a.anchor = filename
+		a.mu.Unlock()
+		a.notify() // Establish the directory/lower bound, even on an ASM hit.
+	}
+	if SkipListedWAL(filename) {
+		return a.forget(ctx, filename)
+	}
 	select {
 	case a.foreground <- struct{}{}:
 	case <-ctx.Done():
@@ -128,12 +139,9 @@ func (a *daemonArchiver) Push(ctx context.Context, filename string) error {
 		return a.ctx.Err()
 	}
 	defer func() { <-a.foreground }()
-	filename = filepath.Clean(filename)
-	if isWalFilename(filepath.Base(filename)) {
-		a.mu.Lock()
-		a.anchor = filename
-		a.mu.Unlock()
-		a.notify() // Establish the directory/lower bound, even on an ASM hit.
+	// The list may have appeared while this request waited behind an abandoned one.
+	if SkipListedWAL(filename) {
+		return a.forget(ctx, filename)
 	}
 	started := time.Now()
 	job, err := a.startJob(ctx, filename, false)
@@ -153,13 +161,36 @@ func (a *daemonArchiver) Push(ctx context.Context, filename string) error {
 	if err := uploadLocalWalMetadata(ctx, filename, job.uploader.Uploader); err != nil {
 		return err
 	}
-	if isWalFilename(filepath.Base(filename)) {
-		if err := a.manager.UnmarkWalFile(filename); err != nil && !os.IsNotExist(err) {
-			tracelog.ErrorLogger.Printf("unmark wal-g status for %s: %v", filename, err)
-		}
-	}
+	a.unmark(filename)
 	statistics.WriteS3UploadTimeMetric(time.Since(started))
 	return nil // No wait for unrelated speculative uploads.
+}
+
+// forget stops any upload of a file about to be acknowledged: PostgreSQL may then unlink it
+// or recycle its inode as a future segment, so a job must not keep reading it.
+func (a *daemonArchiver) forget(ctx context.Context, filename string) error {
+	a.mu.Lock()
+	job := a.jobs[filename]
+	a.mu.Unlock()
+	if job != nil {
+		job.cancel()
+		select {
+		case <-job.done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	a.unmark(filename)
+	return nil
+}
+
+func (a *daemonArchiver) unmark(filename string) {
+	if !isWalFilename(filepath.Base(filename)) {
+		return
+	}
+	if err := a.manager.UnmarkWalFile(filename); err != nil && !os.IsNotExist(err) {
+		tracelog.ErrorLogger.Printf("unmark wal-g status for %s: %v", filename, err)
+	}
 }
 
 func (a *daemonArchiver) startJob(ctx context.Context, filename string, background bool) (*daemonArchiveJob, error) {
@@ -204,14 +235,19 @@ func (a *daemonArchiver) startJob(ctx context.Context, filename string, backgrou
 		release()
 		return job, nil
 	}
-	job = &daemonArchiveJob{done: make(chan struct{})}
+	if background && filename <= a.anchor { // PostgreSQL has reached it since the scan.
+		a.mu.Unlock()
+		release()
+		return nil, nil
+	}
+	uploadCtx, cancel := context.WithTimeout(a.ctx, a.timeout)
+	job = &daemonArchiveJob{done: make(chan struct{}), cancel: cancel}
 	a.jobs[filename] = job
 	a.wg.Add(1)
 	a.mu.Unlock()
 	go func() {
 		defer a.wg.Done()
-		ctx, cancel := context.WithTimeout(a.ctx, a.timeout)
-		job.err = a.upload(ctx, filename, job, background)
+		job.err = a.upload(uploadCtx, filename, job, background)
 		cancel()
 		if job.err != nil {
 			tracelog.ErrorLogger.Printf("WAL upload %s: %v", filename, job.err)
@@ -296,7 +332,7 @@ func (a *daemonArchiver) refill(anchor string, scan *daemonArchiveScan) {
 		if filename > anchor && a.needsUpload(filename) {
 			job, err := a.startJob(a.ctx, filename, true)
 			if err != nil || job == nil {
-				break // Keep this candidate until a worker becomes available.
+				break // Keep this candidate for the next pass.
 			}
 		}
 		scan.pending = scan.pending[1:]
