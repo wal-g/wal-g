@@ -5,5 +5,5 @@ package internal
 import "github.com/wal-g/wal-g/pkg/storages/gcs"
 
 func init() {
-	registerStorageAdapter(StorageAdapter{"GS", gcs.SettingList, gcs.ConfigureStorage})
+	registerStorageAdapter(StorageAdapter{storageType: "GS", settingNames: gcs.SettingList, configure: gcs.ConfigureStorage})
 }

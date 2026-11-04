@@ -149,6 +149,30 @@ func TestConfigureStorageForSpecificConfig_CompiledStorageWins(t *testing.T) {
 	assert.NotNil(t, st)
 }
 
+func TestConfigureStorageForSpecificConfig_UsesFailoverConfigurer(t *testing.T) {
+	primaryCalled := false
+	failoverCalled := false
+	adapter := fakeStorageAdapter("S3")
+	adapter.configure = func(context.Context, string, map[string]string, ...storage.WrapRootFolder) (storage.HashableStorage, error) {
+		primaryCalled = true
+		return memory.NewStorage("", memory.NewKVS()), nil
+	}
+	adapter.configureFailover = func(context.Context, string, map[string]string, ...storage.WrapRootFolder) (storage.HashableStorage, error) {
+		failoverCalled = true
+		return memory.NewStorage("", memory.NewKVS()), nil
+	}
+	setStorageAdapters(t, adapter)
+	config := viper.New()
+	config.Set("WALG_S3_PREFIX", "s3://bucket/path")
+
+	st, err := configureStorageForSpecificConfig(t.Context(), config, true)
+
+	require.NoError(t, err)
+	require.NotNil(t, st)
+	assert.False(t, primaryCalled)
+	assert.True(t, failoverCalled)
+}
+
 func TestConfigureStorageForSpecificConfig_NothingConfigured(t *testing.T) {
 	setStorageAdapters(t, fakeStorageAdapter("S3"))
 

@@ -5,5 +5,5 @@ package internal
 import "github.com/wal-g/wal-g/pkg/storages/swift"
 
 func init() {
-	registerStorageAdapter(StorageAdapter{"SWIFT", swift.SettingList, swift.ConfigureStorage})
+	registerStorageAdapter(StorageAdapter{storageType: "SWIFT", settingNames: swift.SettingList, configure: swift.ConfigureStorage})
 }

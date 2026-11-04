@@ -5,5 +5,5 @@ package internal
 import "github.com/wal-g/wal-g/pkg/storages/oss"
 
 func init() {
-	registerStorageAdapter(StorageAdapter{"OSS", oss.SettingList, oss.ConfigureStorage})
+	registerStorageAdapter(StorageAdapter{storageType: "OSS", settingNames: oss.SettingList, configure: oss.ConfigureStorage})
 }
