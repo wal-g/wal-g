@@ -185,6 +185,17 @@ Then user should run command with parameters:
 After successful command execution user should start mongod process (```service mongodb start```) 
 and re-initiate replset (```rs.initiate()```) because of command remove replset config.
 
+Unless `--skip-mongo-reconfig` is set, the command reconfigures restored data using temporary `mongod` processes:
+  1. fixes the replica set config and `local.replset.minvalid`;
+  2. applies the oplog contained in the backup (`recoverFromOplogAsStandalone`);
+  3. replays oplog archives, if `--pitr-since` and `--pitr-until` are set;
+  4. fixes sharding metadata: `shardIdentity` in `admin.system.version` (from `--mongo-sh-name` and `--mongo-cfg-conn-str`),
+     `config.shards` (from `--mongo-shard-conn-str`), and cleans `config.cache.*` and `config.system.sessions`.
+
+Sharding metadata is fixed last, because oplog applied in steps 2 and 3 can bring back the values of the source cluster.
+If a node is restored as a shard (`--mongo-sh-name` is set) and the `shardIdentity` document is missing, the command
+logs a warning and does not create the document.
+
 For more information see article
 [Experimental Feature: $backupCursorExtend in Percona Server for MongoDB](https://www.percona.com/blog/2021/06/07/experimental-feature-backupcursorextend-in-percona-server-for-mongodb/)
 

@@ -125,20 +125,47 @@ func (restoreService *RestoreService) reconfigMongo(
 	rsConfig RsConfig, shConfig ShConfig, replyOplogConfig ReplyOplogConfig,
 	mongoCfgConfig MongoCfgConfig, sentinel *models.Backup, partial bool,
 ) error {
-	if err := restoreService.fixSystemData(ctx, rsConfig, shConfig, mongoCfgConfig, partial); err != nil {
+	return runReconfigPhases(reconfigPhases{
+		fixReplicationState: func() error {
+			return restoreService.fixReplicationState(ctx, rsConfig, partial)
+		},
+		recoverFromOplog: func() error {
+			return restoreService.recoverFromOplogAsStandalone(ctx, sentinel, partial)
+		},
+		replayOplog: func() error {
+			return restoreService.oplogReply(ctx, replyOplogConfig, partial)
+		},
+		fixShardingMetadata: func() error {
+			return restoreService.fixShardingMetadata(ctx, shConfig, mongoCfgConfig, partial)
+		},
+	}, replyOplogConfig.HasPitr)
+}
+
+type reconfigPhases struct {
+	fixReplicationState func() error
+	recoverFromOplog    func() error
+	replayOplog         func() error
+	fixShardingMetadata func() error
+}
+
+// runReconfigPhases fixes sharding metadata last: oplog entries applied by the recovery and by the PITR replay
+// can write the source cluster's shardIdentity, config.shards and config.cache.* documents back.
+func runReconfigPhases(phases reconfigPhases, hasPitr bool) error {
+	if err := phases.fixReplicationState(); err != nil {
 		return err
 	}
 
-	if err := restoreService.recoverFromOplogAsStandalone(ctx, sentinel, partial); err != nil {
+	if err := phases.recoverFromOplog(); err != nil {
 		return err
 	}
 
-	if replyOplogConfig.HasPitr {
-		if err := restoreService.oplogReply(ctx, replyOplogConfig, partial); err != nil {
+	if hasPitr {
+		if err := phases.replayOplog(); err != nil {
 			return err
 		}
 	}
-	return nil
+
+	return phases.fixShardingMetadata()
 }
 
 func (restoreService *RestoreService) downloadFromTarArchives(ctx context.Context,
@@ -149,12 +176,39 @@ func (restoreService *RestoreService) downloadFromTarArchives(ctx context.Contex
 	return downloader.DownloadWithTarInterpreter(ctx, backupName, directory, filter, interpreter)
 }
 
-func (restoreService *RestoreService) fixSystemData(
-	ctx context.Context,
-	rsConfig RsConfig, shConfig ShConfig, mongocfgConfig MongoCfgConfig, partial bool,
+func (restoreService *RestoreService) fixReplicationState(
+	ctx context.Context, rsConfig RsConfig, partial bool,
 ) error {
-	mongodProcess := Mongod(restoreService.minimalConfigPath).
-		WithParams(DisableLogicalSessionCacheRefresh, SkipShardingConfigurationChecks)
+	return restoreService.runOnStandaloneMongod(ctx, partial, func(mongodService *MongodService) error {
+		if err := mongodService.FixReplset(rsConfig); err != nil {
+			return err
+		}
+		return mongodService.ClearMinvalid()
+	})
+}
+
+func (restoreService *RestoreService) fixShardingMetadata(
+	ctx context.Context, shConfig ShConfig, mongocfgConfig MongoCfgConfig, partial bool,
+) error {
+	fix := func(mongodService *MongodService) error {
+		if err := mongodService.FixShardIdentity(shConfig); err != nil {
+			return err
+		}
+		if err := mongodService.FixMongoCfg(mongocfgConfig); err != nil {
+			return err
+		}
+		return mongodService.CleanCacheAndSessions(shConfig)
+	}
+	// The data is already at the top of the oplog. Keep the checkpoint unstable, as the recovery and the PITR replay
+	// leave it, so that the first replica set start does not apply the oplog over these fixes again.
+	return restoreService.runOnStandaloneMongod(ctx, partial, fix, TakeUnstableCheckpointOnShutdown)
+}
+
+func (restoreService *RestoreService) runOnStandaloneMongod(
+	ctx context.Context, partial bool, fix func(*MongodService) error, extraParams ...string,
+) error {
+	params := append([]string{DisableLogicalSessionCacheRefresh, SkipShardingConfigurationChecks}, extraParams...)
+	mongodProcess := Mongod(restoreService.minimalConfigPath).WithParams(params...)
 
 	if partial {
 		mongodProcess.WithRestore()
@@ -175,23 +229,7 @@ func (restoreService *RestoreService) fixSystemData(
 		return errors.Wrap(err, "unable to create mongod service")
 	}
 
-	if err = mongodService.FixReplset(rsConfig); err != nil {
-		return err
-	}
-
-	if err = mongodService.FixShardIdentity(shConfig); err != nil {
-		return err
-	}
-
-	if err = mongodService.FixMongoCfg(mongocfgConfig); err != nil {
-		return err
-	}
-
-	if err = mongodService.CleanCacheAndSessions(shConfig); err != nil {
-		return err
-	}
-
-	if err = mongodService.ClearMinvalid(); err != nil {
+	if err = fix(mongodService); err != nil {
 		return err
 	}
 
