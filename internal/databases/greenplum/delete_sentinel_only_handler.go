@@ -38,8 +38,12 @@ func NewDeleteSentinelOnlyHandler(ctx context.Context, folder storage.Folder, ar
 		folder:  folder.GetSubFolder(utility.BaseBackupPath),
 		checked: make(map[string]bool),
 	}
+	// Same ordering as in NewDeleteHandler; DeleteTarget does not use it.
+	lessFunc := func(obj1, obj2 storage.Object) bool {
+		return obj1.GetLastModified().Before(obj2.GetLastModified())
+	}
 	return &DeleteSentinelOnlyHandler{
-		DeleteHandler: *internal.NewDeleteHandler(folder, backups, gpLessFunc,
+		DeleteHandler: *internal.NewDeleteHandler(folder, backups, lessFunc,
 			internal.IsPermanentFunc(permanence.isPermanent)),
 		args: args,
 	}, nil
