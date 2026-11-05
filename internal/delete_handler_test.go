@@ -10,10 +10,56 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/internal/multistorage/stats"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
+	"go.uber.org/mock/gomock"
 )
+
+type storedDeleteBackup struct {
+	DefaultBackupObject
+	storageName string
+}
+
+func (b storedDeleteBackup) GetStorage() string { return b.storageName }
+
+func TestDeleteTargetPreservesOtherStoragesAndSkippedFolders(t *testing.T) {
+	collector := stats.NewMockCollector(gomock.NewController(t))
+	collector.EXPECT().AllAliveStorages(gomock.Any()).Return([]string{"s1", "s2"}, nil)
+	collector.EXPECT().SpecificStorage(gomock.Any(), "s1").Return(true, nil)
+	collector.EXPECT().ReportOperationResult(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	const name = "base_001"
+	keys := []string{name + utility.SentinelSuffix, name + "/payload", name + "/protected/data", name + "/ignored/data"}
+	folders := map[string]storage.Folder{}
+	var backups []BackupObject
+	for _, destination := range []string{"s1", "s2"} {
+		folder := memory.NewFolder("repository/", memory.NewKVS())
+		folders[destination] = folder
+		for _, key := range keys {
+			require.NoError(t, folder.PutObject(t.Context(), utility.BaseBackupPath+key, strings.NewReader("data")))
+		}
+		backups = append(backups, storedDeleteBackup{
+			DefaultBackupObject{storage.NewLocalObject(name+utility.SentinelSuffix, time.Time{}, 0)}, destination,
+		})
+	}
+	folder := multistorage.SetPolicies(multistorage.NewFolder(folders, collector), policies.UniteAllStorages)
+	folder, err := multistorage.UseAllAliveStorages(t.Context(), folder)
+	require.NoError(t, err)
+	handler := NewDeleteHandler(folder, backups, func(a, b storage.Object) bool { return a.GetName() < b.GetName() },
+		SkipFolderFunc(func(name string) bool { return strings.HasSuffix(strings.TrimRight(name, "/"), "/protected") }))
+	require.NoError(t, handler.DeleteTarget(t.Context(), backups[0], true, false,
+		func(name string) bool { return !strings.HasSuffix(strings.TrimRight(name, "/"), "/ignored") }))
+	for destination, folder := range folders {
+		for i, key := range keys {
+			exists, err := folder.Exists(t.Context(), utility.BaseBackupPath+key)
+			require.NoError(t, err)
+			require.Equal(t, destination == "s2" || i >= 2, exists, "%s/%s", destination, key)
+		}
+	}
+}
 
 func CreateMockStorageFolder(ctx context.Context) storage.Folder {
 	var folder = memory.NewFolder("in_memory/", memory.NewKVS())

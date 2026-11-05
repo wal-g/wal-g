@@ -25,6 +25,8 @@ type GenericMetadata struct {
 	IsPermanent   bool
 	IsIncremental bool
 
+	NeedsPermanentReconciliation bool `json:"-"`
+
 	// need to use separate fetcher
 	// to avoid useless sentinel load (in Postgres)
 	IncrementDetails IncrementDetailsFetcher

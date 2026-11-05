@@ -243,7 +243,7 @@ func CreateMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
 			"finish_lsn":   33554433, // logSegNo = 2
 			"is_permanent": true,
 		},
-		"base_000000010000000000000006_D_000000010000000000000004": emptyData,
+		"base_000000010000000000000006_D_000000010000000000000004": map[string]interface{}{"start_lsn": 33554434, "finish_lsn": 50331648, "is_permanent": false},
 	}
 	walNames := map[string]interface{}{
 		"000000010000000000000001": emptyData,
@@ -251,8 +251,8 @@ func CreateMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
 		"000000010000000000000003": emptyData,
 	}
 	for backupName := range backupNames {
-		// empty sentinel
-		empty, err := json.Marshal(&emptyData)
+		meta := backupNames[backupName].(map[string]interface{})
+		empty, err := json.Marshal(map[string]interface{}{"LSN": meta["start_lsn"], "FinishLSN": meta["finish_lsn"]})
 		assert.NoError(t, err)
 		sentinelString := string(empty)
 		err = baseBackupFolder.PutObject(t.Context(), backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))

@@ -2,6 +2,7 @@ package multistorage
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +11,22 @@ import (
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
+
+func TestRecoveryPinRequiresDestinationAndPreservesPrefix(t *testing.T) {
+	folder := newTestFolder(t, "s1", "s2")
+	prefixed := folder.GetSubFolder("cluster/segment")
+	_, _, err := PinStorage(t.Context(), prefixed, "")
+	require.ErrorContains(t, err, "target-storage")
+	pinned, name, err := PinStorage(t.Context(), prefixed, "s2")
+	require.NoError(t, err)
+	require.Equal(t, "s2", name)
+	require.NoError(t, pinned.PutObject(t.Context(), "same-name", strings.NewReader("data")))
+	for _, destination := range []string{"s1", "s2"} {
+		exists, err := folder.configuredRootFolders[destination].Exists(t.Context(), "cluster/segment/same-name")
+		require.NoError(t, err)
+		require.Equal(t, destination == "s2", exists)
+	}
+}
 
 // TODO: Unit tests: check Folder.statsCollector.ReportOperationResult calls
 func TestDeleteObjects(t *testing.T) {

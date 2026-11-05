@@ -8,6 +8,8 @@ import (
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
+var recoveryDelete internal.RecoveryOptions
+
 var confirmed = false
 var forceDelete = false
 
@@ -47,8 +49,10 @@ var deleteEverythingCmd = &cobra.Command{
 var deleteTargetCmd = &cobra.Command{
 	Use:     internal.DeleteTargetUsageExample, // TODO : improve description
 	Example: internal.DeleteTargetExamples,
-	Args:    internal.DeleteTargetArgsValidator,
-	Run:     runDeleteTarget,
+	Args: func(cmd *cobra.Command, args []string) error {
+		return recoveryDelete.Validate(cmd, args, internal.DeleteTargetArgsValidator)
+	},
+	Run: runDeleteTarget,
 }
 
 var deleteGarbageCmd = &cobra.Command{
@@ -92,6 +96,12 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
+	if recoveryDelete.AllowBroken {
+		err := internal.RunRecoveryDeletion(cmd.Context(), recoveryDelete, args, confirmed, greenplum.PlanRecoveryDeletion)
+		tracelog.ErrorLogger.FatalOnError(err)
+		return
+	}
+
 	rootFolder, err := getMultistorageRootFolder(cmd.Context(), true, policies.UniteAllStorages)
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -127,6 +137,7 @@ func runDeleteGarbage(cmd *cobra.Command, args []string) {
 }
 
 func init() {
+	recoveryDelete.AddFlags(deleteTargetCmd)
 	cmd.AddCommand(deleteCmd)
 
 	deleteTargetCmd.Flags().StringVar(

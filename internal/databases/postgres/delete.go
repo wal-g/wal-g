@@ -49,6 +49,9 @@ func NewDeleteHandler(ctx context.Context, folder storage.Folder, permanentBacku
 		return nil, err
 	}
 
+	if err := internal.ValidateBackupDependencies(postgresBackups); err != nil {
+		return nil, err
+	}
 	deleteHandler :=
 		&DeleteHandler{
 			*internal.NewDeleteHandler(
@@ -219,6 +222,10 @@ func getIncrementInfo(ctx context.Context, folder storage.Folder, object storage
 	sentinel, err := backup.GetSentinel(ctx)
 	if err != nil {
 		return "", "", true, err
+	}
+	if err := internal.ValidateDeletionIncrement(backup.Name, sentinel.IncrementFrom, sentinel.IncrementFullName,
+		sentinel.IncrementCount, sentinel.IncrementFromLSN != nil, true); err != nil {
+		return "", "", false, err
 	}
 	if !sentinel.IsIncremental() {
 		return "", "", true, nil

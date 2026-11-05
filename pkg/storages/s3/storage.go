@@ -3,6 +3,7 @@ package s3
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -51,6 +52,7 @@ type Config struct {
 	EnableVersioning           string
 	DeleteBatchSize            int
 	showAllVersions            bool // When true, include deleted objects in listing (for st ls --all-versions)
+	listingMu                  sync.Mutex
 }
 
 type Secrets struct {

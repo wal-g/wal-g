@@ -142,7 +142,7 @@ func (folder *Folder) CopyObject(ctx context.Context, srcPath string, dstPath st
 
 func (folder *Folder) DeleteObjects(ctx context.Context, objectsWithRelativePaths []storage.Object) error {
 	for _, object := range objectsWithRelativePaths {
-		path := storage.JoinPath(folder.path, object.GetName())
+		path := storage.AddDelimiterToPath(folder.path) + strings.TrimLeft(object.GetName(), "/")
 		tracelog.DebugLogger.Printf("Delete object %v\n", path)
 		err := folder.connection.ObjectDelete(ctx, folder.container.Name, path)
 		if err == swift.ObjectNotFound {

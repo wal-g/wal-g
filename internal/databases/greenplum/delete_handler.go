@@ -40,13 +40,19 @@ func NewDeleteHandler(ctx context.Context, folder storage.Folder, args DeleteArg
 		return nil, err
 	}
 
+	if err := internal.ValidateBackupDependencies(backupObjects); err != nil {
+		return nil, err
+	}
 	// todo better lessfunc
 	gpLessFunc := func(obj1, obj2 storage.Object) bool {
 		return obj1.GetLastModified().Before(obj2.GetLastModified())
 	}
 
-	permanentBackups := internal.GetPermanentBackupsFromStorage(ctx, folder.GetSubFolder(utility.BaseBackupPath),
-		NewGenericMetaFetcher())
+	permanentBackups, err := internal.GetPermanentBackupsChecked(ctx, folder.GetSubFolder(utility.BaseBackupPath),
+		NewGenericMetaFetcher(), true)
+	if err != nil {
+		return nil, err
+	}
 	permanentBackupNames := make([]string, 0, len(permanentBackups))
 	for name := range permanentBackups {
 		permanentBackupNames = append(permanentBackupNames, name)
@@ -158,34 +164,7 @@ func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector i
 		// we didn't find the requested backup for deletion
 		tracelog.ErrorLogger.Fatal("Requested backup was not found")
 	}
-	backupsBefore, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	tracelog.InfoLogger.Println("Deleting the segments backups...")
-	err = h.dispatchDeleteCmd(ctx, target, SegDeleteTarget)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Failed to delete the segments backups: %v", err)
-	}
-	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
-
-	folderFilter := func(name string) bool { return true }
-	err = h.DeleteTarget(ctx, target, h.args.Confirmed, h.args.FindFull, folderFilter)
-	tracelog.ErrorLogger.FatalOnError(err)
-	backupsAfter, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	// Runs after dispatchDeleteCmd on purpose: the cluster-wide journal is recalculated from the
-	// segment journals, which the segment handlers above have just re-merged.
-	DeleteClusterJournalInfo(ctx, h.Folder, target.GetBackupName(), h.args.Confirmed)
-	// Segment cleanup has removed unreferenced AO/PAX objects. Recalculate ownership directly into
-	// the surviving cluster backups after their old cluster-level objects have been deleted.
-	err = ReassignSharedSizes(
-		ctx,
-		h.Folder,
-		backupsWithChangedPredecessor(backupsBefore, backupsAfter),
-		h.args.Confirmed,
-	)
-	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.ErrorLogger.FatalOnError(h.deleteTargetCopies(ctx, target))
 }
 
 func (h *DeleteHandler) dispatchDeleteCmd(ctx context.Context, target internal.BackupObject, delType SegDeleteType) error {
@@ -203,36 +182,52 @@ func (h *DeleteHandler) dispatchDeleteCmd(ctx context.Context, target internal.B
 		tracelog.WarningLogger.Printf("config error: %v", err)
 	}
 
-	errorGroup, _ := errgroup.WithContext(ctx)
-	errorGroup.SetLimit(deleteConcurrency)
-
-	// clean the segments
-	for i := range sentinel.Segments {
-		meta := sentinel.Segments[i]
-		tracelog.InfoLogger.Printf("Processing segment %d (backupId=%s)", meta.ContentID, meta.BackupID)
-
-		errorGroup.Go(func() error {
-			segHandler, err := NewSegDeleteHandler(ctx, h.Folder, meta.ContentID, h.args, delType)
-			if err != nil {
-				return err
+	plans := make([]*SegDeletionPlan, len(sentinel.Segments))
+	defer func() {
+		for _, p := range plans {
+			if p != nil {
+				p.Close()
 			}
-			segBackup, err := backup.GetSegmentBackup(ctx, meta.BackupID, meta.ContentID)
-			if err != nil {
-				if h.args.Force {
-					tracelog.ErrorLogger.Printf("Processing segment %d (backupId=%s): %v", meta.ContentID, meta.BackupID, err)
-					return nil // skip non-critical errors in garbage deletion
-				}
-				return err
-			}
-			deleteErr := segHandler.Delete(ctx, segBackup)
-			if deleteErr != nil {
-				return deleteErr
-			}
-			return nil
+		}
+	}()
+	preparation, preparationCtx := errgroup.WithContext(ctx)
+	preparation.SetLimit(max(1, deleteConcurrency))
+	for i, meta := range sentinel.Segments {
+		preparation.Go(func() error {
+			p, err := h.prepareSegmentDelete(preparationCtx, &backup, meta, delType)
+			plans[i] = p
+			return err
 		})
 	}
+	if err := preparation.Wait(); err != nil {
+		return err
+	}
+	execution, executionCtx := errgroup.WithContext(ctx)
+	execution.SetLimit(max(1, deleteConcurrency))
+	for _, p := range plans {
+		if p != nil {
+			execution.Go(func() error { return p.Execute(executionCtx) })
+		}
+	}
+	return execution.Wait()
+}
 
-	return errorGroup.Wait()
+func (h *DeleteHandler) prepareSegmentDelete(ctx context.Context, backup *Backup, meta SegmentMetadata,
+	delType SegDeleteType) (*SegDeletionPlan, error) {
+	tracelog.InfoLogger.Printf("Preparing segment %d (backupId=%s)", meta.ContentID, meta.BackupID)
+	handler, err := NewSegDeleteHandler(ctx, h.Folder, meta.ContentID, h.args, delType)
+	if err != nil {
+		return nil, err
+	}
+	segBackup, err := backup.GetSegmentBackup(ctx, meta.BackupID, meta.ContentID)
+	if err != nil {
+		if h.args.Force && ctx.Err() == nil {
+			tracelog.ErrorLogger.Printf("Processing segment %d (backupId=%s): %v", meta.ContentID, meta.BackupID, err)
+			return nil, nil
+		}
+		return nil, err
+	}
+	return handler.Prepare(ctx, segBackup)
 }
 
 // HandleDeleteGarbage delete outdated WAL archives and leftover backup files

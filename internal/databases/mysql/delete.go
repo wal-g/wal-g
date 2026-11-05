@@ -3,7 +3,6 @@ package mysql
 import (
 	"context"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -35,9 +34,18 @@ func NewDeleteHandler(ctx context.Context, folder storage.Folder) (*DeleteHandle
 	}
 
 	backupObjects, err := MakeMySQLBackupObjects(ctx, folder, backupSentinels)
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		return nil, err
+	}
 
-	permanentBackups := internal.GetPermanentBackups(ctx, folder.GetSubFolder(utility.BaseBackupPath), NewGenericMetaFetcher())
+	if err := internal.ValidateBackupDependencies(backupObjects); err != nil {
+		return nil, err
+	}
+	permanentBackups, err := internal.GetPermanentBackupsChecked(ctx, folder.GetSubFolder(utility.BaseBackupPath),
+		NewGenericMetaFetcher(), false)
+	if err != nil {
+		return nil, err
+	}
 	permanentBackupNames := make([]string, 0, len(permanentBackups))
 	for name := range permanentBackups {
 		permanentBackupNames = append(permanentBackupNames, name)

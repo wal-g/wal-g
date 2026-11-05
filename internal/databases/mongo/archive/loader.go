@@ -90,6 +90,10 @@ func (sd *StorageDownloader) BackupMeta(ctx context.Context, name string) (*mode
 	return common.DownloadSentinel(ctx, sd.backupsFolder, name)
 }
 
+func (sd *StorageDownloader) BackupMetaForDeletion(ctx context.Context, name string) (*models.Backup, error) {
+	return common.DownloadSentinelForDeletion(ctx, sd.backupsFolder, name)
+}
+
 // LoadBackups downloads backups metadata
 func (sd *StorageDownloader) LoadBackups(ctx context.Context, names []string) ([]*models.Backup, error) {
 	backups := make([]*models.Backup, 0, len(names))

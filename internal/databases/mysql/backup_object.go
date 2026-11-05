@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -61,9 +62,39 @@ func getIncrementInfo(ctx context.Context, folder storage.Folder, object storage
 	if err != nil {
 		return "", "", true, err
 	}
+	if err := validateDeletionIncrement(backup.Name, &sentinel); err != nil {
+		return "", "", false, err
+	}
+	doc, readErr := internal.ReadDeletionMetadata(ctx, backup.Folder, backup.Name+utility.SentinelSuffix, nil)
+	if readErr != nil {
+		return "", "", false, readErr
+	}
+	if _, known := doc.Bool("IsPermanent"); doc.Problem != nil || !known {
+		return "", "", false, fmt.Errorf("unknown protection metadata for %s", backup.Name)
+	}
 	if !sentinel.IsIncremental {
 		return "", "", true, nil
 	}
 
 	return *sentinel.IncrementFullName, *sentinel.IncrementFrom, false, nil
+}
+
+func validateDeletionIncrement(name string, sentinel *StreamSentinelDto) error {
+	count, fromLSN := sentinel.IncrementCount, sentinel.IncrementFromLSN
+	if !sentinel.IsIncremental {
+		if count != nil && *count == 0 {
+			count = nil
+		}
+		if fromLSN != nil && *fromLSN == 0 {
+			fromLSN = nil
+		}
+	}
+	if err := internal.ValidateDeletionIncrement(name, sentinel.IncrementFrom, sentinel.IncrementFullName,
+		count, fromLSN != nil, true); err != nil {
+		return err
+	}
+	if sentinel.IsIncremental != (sentinel.IncrementFrom != nil) {
+		return fmt.Errorf("inconsistent IsIncremental for %s", name)
+	}
+	return nil
 }

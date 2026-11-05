@@ -60,3 +60,11 @@ func (lf *LimitedFolder) CreateObject(ctx context.Context, name string, content 
 func (lf *LimitedFolder) SetShowAllVersions(show bool) {
 	storage.SetShowAllVersions(lf.Folder, show)
 }
+
+func (lf *LimitedFolder) WithAllVersions() storage.Folder {
+	return NewLimitedFolder(storage.WithAllVersions(lf.Folder), lf.limiter)
+}
+
+func (lf *LimitedFolder) WalkObjects(ctx context.Context, visit func(storage.Object) error) error {
+	return storage.WalkObjects(ctx, lf.Folder, visit)
+}

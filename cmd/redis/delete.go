@@ -11,14 +11,22 @@ const backupDeleteShortDescription = "Deletes backup data from storage"
 
 var (
 	confirmedBackupDelete bool
+	recoveryDelete        internal.RecoveryOptions
 )
 
 // backupDeleteCmd represents the backupDelete command
 var backupDeleteCmd = &cobra.Command{
 	Use:   "backup-delete <backup-name>",
 	Short: backupDeleteShortDescription,
-	Args:  cobra.ExactArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		return recoveryDelete.Validate(cmd, args, cobra.ExactArgs(1))
+	},
 	Run: func(cmd *cobra.Command, args []string) {
+		if recoveryDelete.AllowBroken {
+			err := internal.RunRecoveryDeletion(cmd.Context(), recoveryDelete, args, confirmedBackupDelete, redis.PlanRecoveryDeletion)
+			tracelog.ErrorLogger.FatalOnError(err)
+			return
+		}
 		backupName := args[0]
 
 		storage, err := internal.ConfigureStorage(cmd.Context())
@@ -29,6 +37,7 @@ var backupDeleteCmd = &cobra.Command{
 }
 
 func init() {
+	recoveryDelete.AddFlags(backupDeleteCmd)
 	backupDeleteCmd.Flags().BoolVar(&confirmedBackupDelete, internal.ConfirmFlag, false, "Confirms backup deletion")
 	cmd.AddCommand(backupDeleteCmd)
 }

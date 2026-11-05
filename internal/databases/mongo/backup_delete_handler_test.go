@@ -1,6 +1,7 @@
 package mongo
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -10,10 +11,16 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
+type deletionTestDownloader struct{ mocks.Downloader }
+
+func (d *deletionTestDownloader) BackupMetaForDeletion(ctx context.Context, name string) (*models.Backup, error) {
+	return d.BackupMeta(ctx, name)
+}
+
 func TestHandleBackupDelete(t *testing.T) {
 	type args struct {
 		backupName string
-		downloader *mocks.Downloader
+		downloader *deletionTestDownloader
 		purger     *mocks.Purger
 		dryRun     bool
 	}
@@ -26,8 +33,8 @@ func TestHandleBackupDelete(t *testing.T) {
 			name: "delete_first",
 			args: args{
 				backupName: "first",
-				downloader: func() *mocks.Downloader {
-					dl := &mocks.Downloader{}
+				downloader: func() *deletionTestDownloader {
+					dl := &deletionTestDownloader{}
 					dl.On("BackupMeta", mock.Anything, mock.MatchedBy(func(backupName string) bool { return backupName == "first" })).
 						Return(&models.Backup{BackupName: "first"}, nil).Once()
 					return dl
@@ -46,8 +53,8 @@ func TestHandleBackupDelete(t *testing.T) {
 			name: "delete_first_dryrun",
 			args: args{
 				backupName: "first",
-				downloader: func() *mocks.Downloader {
-					dl := &mocks.Downloader{}
+				downloader: func() *deletionTestDownloader {
+					dl := &deletionTestDownloader{}
 					dl.On("BackupMeta", mock.Anything, mock.MatchedBy(func(backupName string) bool { return backupName == "first" })).
 						Return(&models.Backup{BackupName: "first"}, nil).Once()
 					return dl
@@ -61,8 +68,8 @@ func TestHandleBackupDelete(t *testing.T) {
 			name: "delete_nonexistent",
 			args: args{
 				backupName: "nonexistent",
-				downloader: func() *mocks.Downloader {
-					dl := &mocks.Downloader{}
+				downloader: func() *deletionTestDownloader {
+					dl := &deletionTestDownloader{}
 					dl.On("BackupMeta", mock.Anything, mock.MatchedBy(func(backupName string) bool { return backupName == "nonexistent" })).
 						Return(nil, fmt.Errorf("can not fetch stream sentinel: test")).Once()
 					return dl

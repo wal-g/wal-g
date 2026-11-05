@@ -38,6 +38,9 @@ func (folder *Folder) GetPath() string {
 func (folder *Folder) ListFolder(_ context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	dirPath := path.Join(folder.rootPath, folder.subPath)
 	files, err := os.ReadDir(dirPath)
+	if os.IsNotExist(err) {
+		return nil, nil, nil
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to list FS folder %q: %w", dirPath, err)
 	}
@@ -53,7 +56,10 @@ func (folder *Folder) ListFolder(_ context.Context) (objects []storage.Object, s
 			continue // Do not list objects that have not been written yet, like S3.
 		}
 
-		info, _ := fileInfo.Info()
+		info, err := fileInfo.Info()
+		if err != nil {
+			return nil, nil, err
+		}
 		objects = append(objects, storage.NewLocalObject(fileInfo.Name(), info.ModTime(), info.Size()))
 	}
 	return

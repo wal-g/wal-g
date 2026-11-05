@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -13,8 +14,10 @@ func HandleBackupDelete(ctx context.Context, folder storage.Folder, backupName s
 	// processing possible LATEST backupName, that's why existence check
 	backup, err := archive.SentinelWithExistenceCheck(ctx, folder, backupName)
 	if err != nil {
-		tracelog.InfoLogger.Printf("Backup %s does not exist, nothing done: %+v", backupName, err)
-		return nil
+		return err
+	}
+	if backup.Permanent {
+		return fmt.Errorf("cannot delete permanent backup %s", backup.Name())
 	}
 
 	if dryRun {

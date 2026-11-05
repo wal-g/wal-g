@@ -12,18 +12,13 @@ import (
 )
 
 func FatalOnUnrecoverableMetadataError(backupTime BackupTime, err error) {
-	if _, ok := err.(storage.ObjectNotFoundError); ok {
-		tracelog.InfoLogger.Printf("Backup %s lacks metadata to check if it's permanent, ignoring...",
-			backupTime.BackupName)
-	} else {
-		tracelog.ErrorLogger.Fatalf("failed to fetch backup meta for backup %s with error %s",
-			backupTime.BackupName, err.Error())
-	}
+	tracelog.ErrorLogger.Fatalf("cannot establish protection of backup %s: %s", backupTime.BackupName, err)
 }
 
 // IsPermanent is a generic function to determine if the storage object is permanent.
 // It does not support permanent WALs or binlogs.
 func IsPermanent(objectName string, permanentBackups map[string]bool, backupNameLength int) bool {
+	objectName = strings.TrimLeft(objectName, "/")
 	if strings.HasPrefix(objectName, utility.BaseBackupPath) &&
 		len(objectName) >= len(utility.BaseBackupPath)+backupNameLength {
 		backup := objectName[len(utility.BaseBackupPath) : len(utility.BaseBackupPath)+backupNameLength]

@@ -2,10 +2,13 @@ package postgres
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -16,57 +19,49 @@ type PermanentObject struct {
 }
 
 func GetPermanentBackupsAndWals(ctx context.Context, folder storage.Folder) (map[PermanentObject]bool, map[PermanentObject]bool) {
-	tracelog.InfoLogger.Println("retrieving permanent objects")
-	backupTimes, err := internal.GetBackups(ctx, folder.GetSubFolder(utility.BaseBackupPath))
-	if err != nil {
-		return map[PermanentObject]bool{}, map[PermanentObject]bool{}
+	backups, wals, err := GetPermanentBackupsAndWalsChecked(ctx, folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+	return backups, wals
+}
+
+func GetPermanentBackupsAndWalsChecked(ctx context.Context, folder storage.Folder,
+) (map[PermanentObject]bool, map[PermanentObject]bool, error) {
+	times, err := internal.GetBackups(ctx, folder.GetSubFolder(utility.BaseBackupPath))
+	var empty internal.NoBackupsFoundError
+	if err != nil && !errors.As(err, &empty) {
+		return nil, nil, err
 	}
-
-	backupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
-
-	permanentBackups := map[PermanentObject]bool{}
-	permanentWals := map[PermanentObject]bool{}
-	for _, backupTime := range backupTimes {
-		backup, err := NewBackupInStorage(ctx, backupsFolder, backupTime.BackupName, backupTime.StorageName)
+	backups, wals := map[PermanentObject]bool{}, map[PermanentObject]bool{}
+	for _, item := range times {
+		selected, err := multistorage.UseSpecificStorage(ctx, item.StorageName, folder)
 		if err != nil {
-			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
+			return nil, nil, err
+		}
+		b, err := LoadDeletionBackup(ctx, selected, item.BackupName)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !b.ProtectionKnown || b.Problem != nil {
+			return nil, nil, fmt.Errorf("cannot establish protection of %s: %v", item.BackupName, b.Problem)
+		}
+		if !b.Permanent {
 			continue
 		}
-		meta, err := backup.FetchMeta(ctx)
+		data := b.Metadata.(DeletionBackupMetadata)
+		if !data.LogsKnown {
+			return nil, nil, fmt.Errorf("unknown WAL interval for permanent backup %s", item.BackupName)
+		}
+		timeline, err := ParseTimelineFromBackupName(item.BackupName)
 		if err != nil {
-			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
-			continue
+			return nil, nil, err
 		}
-		if meta.IsPermanent {
-			timelineID, err := ParseTimelineFromBackupName(backup.Name)
-			if err != nil {
-				tracelog.ErrorLogger.Printf("failed to parse backup timeline for backup %s with error %s, ignoring...",
-					backupTime.BackupName, err.Error())
-				continue
-			}
-
-			startWalSegmentNo := NewWalSegmentNo(meta.StartLsn - 1)
-			endWalSegmentNo := NewWalSegmentNo(meta.FinishLsn - 1)
-
-			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.Next() {
-				walObj := PermanentObject{
-					Name:        walSegmentNo.GetFilename(timelineID),
-					StorageName: backupTime.StorageName,
-				}
-				permanentWals[walObj] = true
-			}
-			backupObj := PermanentObject{
-				Name:        backupTime.BackupName,
-				StorageName: backupTime.StorageName,
-			}
-			permanentBackups[backupObj] = true
+		first, last := NewWalSegmentNo(data.Meta.StartLsn-1), NewWalSegmentNo(data.Meta.FinishLsn-1)
+		for segment := first; segment <= last; segment++ {
+			wals[PermanentObject{segment.GetFilename(timeline), item.StorageName}] = true
 		}
+		backups[PermanentObject{item.BackupName, item.StorageName}] = true
 	}
-	if len(permanentBackups) > 0 {
-		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
-			permanentBackups, permanentWals)
-	}
-	return permanentBackups, permanentWals
+	return backups, wals, nil
 }
 
 func isBackupReservationFolder(folderPath string) bool {
@@ -78,7 +73,8 @@ func isBackupReservationFolder(folderPath string) bool {
 func IsPermanent(objectName, storageName string, permanentBackups, permanentWals map[PermanentObject]bool) bool {
 	// Recursive listings of filesystem subfolders can prepend a slash to
 	// relative names, including when deleting a Greenplum segment's backups.
-	if strings.HasPrefix(strings.TrimLeft(objectName, "/"), backupReservationsPath+"/") {
+	objectName = strings.TrimLeft(objectName, "/")
+	if strings.HasPrefix(objectName, backupReservationsPath+"/") {
 		return true
 	}
 	if strings.HasPrefix(objectName, utility.WalPath) && len(objectName) >= len(utility.WalPath)+24 {
