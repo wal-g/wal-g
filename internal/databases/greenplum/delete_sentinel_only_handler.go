@@ -14,7 +14,7 @@ import (
 
 const deltaBackupNameDelimiter = "_D_"
 
-// DeleteSentinelOnlyHandler implements "delete target --allow-broken". It deletes only the cluster sentinels
+// DeleteSentinelOnlyHandler implements "delete target --sentinel-only". It deletes only the cluster sentinels
 // of the target backup and of its incremental descendants, so the backups disappear from the backup list.
 // Segment backups and the other leftovers are removed later by "delete garbage" or by retention.
 //

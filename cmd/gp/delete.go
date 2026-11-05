@@ -10,7 +10,7 @@ import (
 
 var confirmed = false
 var forceDelete = false
-var allowBroken = false
+var sentinelOnly = false
 
 var deleteTargetUserData = ""
 
@@ -109,7 +109,7 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	delArgs := greenplum.DeleteArgs{Confirmed: confirmed, FindFull: findFullBackup, Force: forceDelete}
-	if allowBroken {
+	if sentinelOnly {
 		deleteHandler, err := greenplum.NewDeleteSentinelOnlyHandler(cmd.Context(), rootFolder, delArgs)
 		tracelog.ErrorLogger.FatalOnError(err)
 		deleteHandler.HandleDeleteTarget(cmd.Context(), targetBackupSelector)
@@ -138,7 +138,7 @@ func init() {
 
 	deleteTargetCmd.Flags().StringVar(
 		&deleteTargetUserData, internal.DeleteTargetUserDataFlag, "", internal.DeleteTargetUserDataDescription)
-	deleteTargetCmd.Flags().BoolVar(&allowBroken, "allow-broken", false,
+	deleteTargetCmd.Flags().BoolVar(&sentinelOnly, "sentinel-only", false,
 		"Delete only the cluster sentinels of the target backup and its increments without reading "+
 			"the metadata of other backups; run 'delete garbage' afterwards to clean up the rest")
 
