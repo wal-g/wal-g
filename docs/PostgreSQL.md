@@ -139,11 +139,11 @@ Examples:
 Usage
 -----
 
-Live terminal progress is disabled by default for `backup-push` and `backup-fetch`.
-Pass `--progress` (or `--progress=true`) to enable it on an interactive stderr terminal.
-Even when enabled, animation is disabled when stderr is redirected or `TERM=dumb`;
-stdout, including `--json` output, is unchanged. File snapshots remain a separate
-opt-in through `--progress-dir`.
+Live terminal progress is enabled by default for `backup-push` and `backup-fetch`
+when stderr is connected to an interactive terminal. Animation is disabled when
+stderr is redirected or `TERM=dumb`; stdout, including `--json` output, is unchanged.
+Pass `--progress=false` to disable it explicitly, including in scripts that inherit
+a terminal. File snapshots remain a separate opt-in through `--progress-dir`.
 
 The moving bar shows bytes consumed from the compressed upload/download streams,
 current throughput, elapsed time, and the current stage. After five seconds

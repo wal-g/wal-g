@@ -17,9 +17,17 @@ import (
 
 // Use a real terminal to exercise detection and log coordination together.
 func TestInteractiveProgress(t *testing.T) {
-	for _, disabled := range []bool{false, true} {
-		t.Run(fmt.Sprintf("disabled=%t", disabled), func(t *testing.T) {
-			t.Setenv("TERM", "xterm")
+	for _, tc := range []struct {
+		name, term, flag string
+		disabled         bool
+	}{
+		{name: "default", term: "xterm"},
+		{name: "enabled", term: "xterm", flag: "true"},
+		{name: "disabled", term: "xterm", flag: "false", disabled: true},
+		{name: "dumb terminal", term: "dumb", disabled: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("TERM", tc.term)
 			master, terminal := openProgressTerminal(t)
 			info, warning, errorLog, debug := tracelog.InfoLogger, tracelog.WarningLogger, tracelog.ErrorLogger, tracelog.DebugLogger
 			t.Cleanup(func() {
@@ -28,9 +36,8 @@ func TestInteractiveProgress(t *testing.T) {
 			require.NoError(t, tracelog.Setup(terminal, tracelog.NormalLogLevel))
 			cmd := &cobra.Command{Use: "backup-push"}
 			addProgressFlag(cmd)
-			// Without an explicit flag, even a terminal must retain the old output.
-			if !disabled {
-				require.NoError(t, cmd.Flags().Set(progressFlag, "true"))
+			if tc.flag != "" {
+				require.NoError(t, cmd.Flags().Set(progressFlag, tc.flag))
 			}
 			ctx := context.Background()
 			cmd.SetContext(ctx)
@@ -54,7 +61,7 @@ func TestInteractiveProgress(t *testing.T) {
 			}
 			got := output.String()
 			assert.Contains(t, got, "backup message\r\n")
-			if disabled {
+			if tc.disabled {
 				assert.NotContains(t, got, "\x1b")
 			} else {
 				assert.Contains(t, got, "backup-push [")

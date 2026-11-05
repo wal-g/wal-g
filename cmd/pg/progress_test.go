@@ -21,7 +21,7 @@ import (
 func TestProgressSkipsRedirectedStderr(t *testing.T) {
 	for _, fileOutput := range []bool{false, true} {
 		cmd := &cobra.Command{Use: "backup-push"}
-		cmd.Flags().Bool("progress", true, "")
+		addProgressFlag(cmd)
 		ctx := context.Background()
 		cmd.SetContext(ctx)
 		var out bytes.Buffer
