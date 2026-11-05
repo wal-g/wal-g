@@ -26,7 +26,7 @@ type contextKey struct{}
 type Tracker struct {
 	bytes         atomic.Int64
 	failed        atomic.Bool
-	stage         atomic.Pointer[string]
+	stage         string // Protected by mu, like stageStarted and download.
 	download      *download
 	mu            sync.Mutex
 	out           io.Writer
@@ -199,13 +199,6 @@ func (p *Tracker) render(now time.Time) {
 	}
 }
 
-// formatLine is used by deterministic rendering tests; production samples once
-// per tick and shares the same snapshot across both outputs.
-func (p *Tracker) formatLine(now time.Time, width int) string {
-	s := p.snapshot(now)
-	return p.formatSnapshot(&s, width)
-}
-
 func (p *Tracker) formatSnapshot(s *Snapshot, width int) string {
 	bar := []byte("            ")
 	position := p.frame % (2 * (len(bar) - 3))
@@ -280,10 +273,10 @@ func SetStage(ctx context.Context, stage string) {
 	if p, _ := ctx.Value(contextKey{}).(*Tracker); p != nil {
 		p.mu.Lock()
 		defer p.mu.Unlock()
-		if old := p.stage.Load(); old == nil || *old != stage {
+		if p.stage != stage {
 			p.stageStarted = time.Now()
 		}
-		p.stage.Store(&stage)
+		p.stage = stage
 		p.download = nil
 		if p.file != nil {
 			select {

@@ -57,7 +57,8 @@ func TestDownloadETAUnknownSizesRetriesAndOverrun(t *testing.T) {
 	for _, total := range []int64{0, -1} {
 		p := newTracker(io.Discard, "backup-fetch", 160)
 		BeginDownload(WithTracker(t.Context(), p), total)
-		assert.NotContains(t, p.formatLine(p.started.Add(time.Second), 160), "ETA")
+		s := p.snapshot(p.started.Add(time.Second))
+		assert.NotContains(t, p.formatSnapshot(&s, 160), "ETA")
 	}
 	for _, retry := range []bool{false, true} {
 		var out bytes.Buffer

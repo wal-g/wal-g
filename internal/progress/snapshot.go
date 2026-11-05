@@ -41,9 +41,7 @@ func (p *Tracker) snapshot(now time.Time) Snapshot {
 		Version: 1, Operation: p.label, Status: "running", StartedAt: p.started.UTC(), UpdatedAt: now.UTC(),
 		ElapsedSeconds: now.Sub(p.started).Seconds(), StageElapsedSeconds: now.Sub(p.stageStarted).Seconds(),
 		IdleSeconds: now.Sub(p.lastProgress).Seconds(), TransferredBytes: current, BytesPerSecond: rate,
-	}
-	if stage := p.stage.Load(); stage != nil {
-		s.Stage = *stage
+		Stage: p.stage,
 	}
 	if current > 0 {
 		last := p.lastProgress.UTC()
