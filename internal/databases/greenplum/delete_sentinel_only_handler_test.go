@@ -136,11 +136,11 @@ func TestSentinelPermanence(t *testing.T) {
 		return storage.NewLocalObject(name+utility.SentinelSuffix, time.Time{}, 0)
 	}
 
-	permanence := &sentinelPermanence{ctx: t.Context(), folder: folder, checked: map[string]bool{}}
-	require.True(t, permanence.isPermanent(sentinel(sentinelOnlyDelta3)))
-	require.False(t, permanence.isPermanent(sentinel(sentinelOnlyDelta2)))
-	require.False(t, permanence.isPermanent(sentinel(sentinelOnlyFull1)), "a malformed sentinel is considered impermanent")
-	require.False(t, permanence.isPermanent(sentinel(sentinelOnlyFull4)), "an unreadable sentinel is considered impermanent")
+	isPermanent := makeSentinelPermanentFunc(t.Context(), folder)
+	require.True(t, isPermanent(sentinel(sentinelOnlyDelta3)))
+	require.False(t, isPermanent(sentinel(sentinelOnlyDelta2)))
+	require.False(t, isPermanent(sentinel(sentinelOnlyFull1)), "a malformed sentinel is considered impermanent")
+	require.False(t, isPermanent(sentinel(sentinelOnlyFull4)), "an unreadable sentinel is considered impermanent")
 }
 
 func TestParseClusterBackupName(t *testing.T) {

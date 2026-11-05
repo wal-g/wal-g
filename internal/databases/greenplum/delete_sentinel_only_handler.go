@@ -33,18 +33,14 @@ func NewDeleteSentinelOnlyHandler(ctx context.Context, folder storage.Folder, ar
 		return nil, err
 	}
 	backups := makeBackupObjectsFromNames(sentinels)
-	permanence := &sentinelPermanence{
-		ctx:     ctx,
-		folder:  folder.GetSubFolder(utility.BaseBackupPath),
-		checked: make(map[string]bool),
-	}
+	isPermanent := makeSentinelPermanentFunc(ctx, folder.GetSubFolder(utility.BaseBackupPath))
 	// Same ordering as in NewDeleteHandler; DeleteTarget does not use it.
 	lessFunc := func(obj1, obj2 storage.Object) bool {
 		return obj1.GetLastModified().Before(obj2.GetLastModified())
 	}
 	return &DeleteSentinelOnlyHandler{
 		DeleteHandler: *internal.NewDeleteHandler(folder, backups, lessFunc,
-			internal.IsPermanentFunc(permanence.isPermanent)),
+			internal.IsPermanentFunc(isPermanent)),
 		args: args,
 	}, nil
 }
@@ -145,26 +141,23 @@ func parseClusterBackupName(name string) (backupTime, baseTime string, ok bool) 
 	return backupTime, baseTime, true
 }
 
-// sentinelPermanence reads the permanence flag only from the sentinels of the backups being deleted:
+// makeSentinelPermanentFunc reads the permanence flag only from the sentinels of the backups being deleted:
 // DeleteTarget checks only them. A backup whose sentinel cannot be read is considered impermanent.
-type sentinelPermanence struct {
-	ctx     context.Context
-	folder  storage.Folder
-	checked map[string]bool
-}
-
-func (p *sentinelPermanence) isPermanent(object storage.Object) bool {
-	name := utility.StripRightmostBackupName(object.GetName())
-	storageName := multistorage.GetStorage(object)
-	key := storageName + "/" + name
-	if permanent, checked := p.checked[key]; checked {
-		return permanent
+func makeSentinelPermanentFunc(ctx context.Context, folder storage.Folder) func(storage.Object) bool {
+	checked := make(map[string]bool)
+	return func(object storage.Object) bool {
+		name := utility.StripRightmostBackupName(object.GetName())
+		storageName := multistorage.GetStorage(object)
+		key := storageName + "/" + name
+		if permanent, ok := checked[key]; ok {
+			return permanent
+		}
+		meta, err := NewGenericMetaFetcher().FetchFromStorage(ctx, name, folder, storageName)
+		if err != nil {
+			tracelog.WarningLogger.Printf("Cannot read the sentinel of %s in storage %s, considering it impermanent: %v",
+				name, storageName, err)
+		}
+		checked[key] = err == nil && meta.IsPermanent
+		return checked[key]
 	}
-	meta, err := NewGenericMetaFetcher().FetchFromStorage(p.ctx, name, p.folder, storageName)
-	if err != nil {
-		tracelog.WarningLogger.Printf("Cannot read the sentinel of %s in storage %s, considering it impermanent: %v",
-			name, storageName, err)
-	}
-	p.checked[key] = err == nil && meta.IsPermanent
-	return p.checked[key]
 }
