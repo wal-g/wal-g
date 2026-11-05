@@ -32,13 +32,13 @@ type fileReporter struct {
 	done    chan struct{}
 }
 
-func startFileReporter(write func(Snapshot) error, onError func(error)) *fileReporter {
+func startFileReporter(write func(*Snapshot) error, onError func(error)) *fileReporter {
 	r := &fileReporter{pending: make(chan Snapshot, 1), done: make(chan struct{})}
 	go func() {
 		defer close(r.done)
 		reported := false
 		for s := range r.pending {
-			if err := write(s); err != nil && !reported {
+			if err := write(&s); err != nil && !reported {
 				reported = true
 				if onError != nil {
 					onError(err)
@@ -54,9 +54,10 @@ func startFileReporter(write func(Snapshot) error, onError func(error)) *fileRep
 
 // submit is called under Tracker.mu. Replace an obsolete pending snapshot;
 // neither a slow writer nor a slow error logger can block the tracker.
-func (r *fileReporter) submit(s Snapshot) {
+// The channel owns a copy so the caller can reuse its snapshot after submission.
+func (r *fileReporter) submit(s *Snapshot) {
 	select {
-	case r.pending <- s:
+	case r.pending <- *s:
 		return
 	default:
 	}
@@ -65,7 +66,7 @@ func (r *fileReporter) submit(s Snapshot) {
 	default:
 	}
 	select {
-	case r.pending <- s:
+	case r.pending <- *s:
 	default:
 	}
 }
@@ -93,13 +94,14 @@ func newStateFile(options FileOptions) *stateFile {
 // write runs only on the file worker. All filesystem work, including startup and
 // cleanup, stays off the backup path. UpdatedAt is the sampling time, so a delayed
 // write cannot make an old snapshot appear fresh.
-func (f *stateFile) write(s Snapshot) error {
+func (f *stateFile) write(snapshot *Snapshot) error {
 	if !f.initialized {
 		if err := os.MkdirAll(f.options.Directory, 0700); err != nil {
 			return err
 		}
 		f.initialized = true
 	}
+	s := *snapshot // File metadata and text limits must not modify the sampled state.
 	s.Version, s.RunID, s.PID = 1, f.runID, os.Getpid()
 	s.Operation, s.Stage = fitText(s.Operation, 128), fitText(s.Stage, 1024)
 	data, err := json.Marshal(s)
@@ -197,7 +199,12 @@ func removeExpiredSnapshot(path, runID string, before time.Time) error {
 	if len(data) >= maxSnapshotSize || json.Unmarshal(data, &s) != nil {
 		return nil
 	}
-	if s.Version != 1 || s.RunID != runID || (s.Status != "completed" && s.Status != "canceled" && s.Status != "failed") ||
+	switch s.Status {
+	case "completed", "canceled", "failed":
+	default:
+		return nil
+	}
+	if s.Version != 1 || s.RunID != runID ||
 		s.FinishedAt == nil || s.FinishedAt.IsZero() || !s.FinishedAt.Before(before) {
 		return nil
 	}

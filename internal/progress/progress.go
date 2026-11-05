@@ -135,7 +135,7 @@ func (p *Tracker) finish(status string) {
 		}
 		s.Status = status
 		s.FinishedAt = &s.UpdatedAt
-		p.file.submit(s)
+		p.file.submit(&s)
 	}
 }
 
@@ -189,12 +189,12 @@ func (p *Tracker) render(now time.Time) {
 				width = columns
 			}
 		}
-		line := fitText(p.formatSnapshot(s, width-1), width-1)
+		line := fitText(p.formatSnapshot(&s, width-1), width-1)
 		_, _ = fmt.Fprintf(p.out, "\r\x1b[2K%s", line)
 		p.visible = true
 	}
 	if p.file != nil && (p.out == nil || p.fileLast.IsZero() || s.Stage != p.fileStage || now.Sub(p.fileLast) >= time.Second) {
-		p.file.submit(s)
+		p.file.submit(&s)
 		p.fileLast, p.fileStage = now, s.Stage
 	}
 }
@@ -202,10 +202,11 @@ func (p *Tracker) render(now time.Time) {
 // formatLine is used by deterministic rendering tests; production samples once
 // per tick and shares the same snapshot across both outputs.
 func (p *Tracker) formatLine(now time.Time, width int) string {
-	return p.formatSnapshot(p.snapshot(now), width)
+	s := p.snapshot(now)
+	return p.formatSnapshot(&s, width)
 }
 
-func (p *Tracker) formatSnapshot(s Snapshot, width int) string {
+func (p *Tracker) formatSnapshot(s *Snapshot, width int) string {
 	bar := []byte("            ")
 	position := p.frame % (2 * (len(bar) - 3))
 	if position > len(bar)-3 {

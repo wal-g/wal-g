@@ -118,12 +118,12 @@ func TestFileReporterDoesNotBlockTracker(t *testing.T) {
 	unblock := sync.OnceFunc(func() { close(release) })
 	t.Cleanup(unblock)
 	var writes []Snapshot
-	r := startFileReporter(func(s Snapshot) error {
+	r := startFileReporter(func(s *Snapshot) error {
 		if len(writes) == 0 {
 			close(entered)
 			<-release
 		}
-		writes = append(writes, s)
+		writes = append(writes, *s)
 		return nil
 	}, nil)
 	p := newTracker(nil, "backup-push", 80)
@@ -153,12 +153,12 @@ func TestFileReporterDoesNotBlockTracker(t *testing.T) {
 func TestFileReporterErrorsAreNonFatalAndReportedOnce(t *testing.T) {
 	attempts := make(chan struct{}, 1)
 	count := 0
-	r := startFileReporter(func(Snapshot) error {
+	r := startFileReporter(func(*Snapshot) error {
 		attempts <- struct{}{}
 		return errors.New("disk full")
 	}, func(error) { count++ })
 	for _, status := range []string{"running", "running", "completed"} {
-		r.submit(Snapshot{Status: status})
+		r.submit(&Snapshot{Status: status})
 		waitForSignal(t, attempts) // Prevent coalescing: each write must actually fail.
 	}
 	waitForSignal(t, r.done)
@@ -178,12 +178,12 @@ func TestProgressFileRetentionPreservesRunningAndUnrelatedFiles(t *testing.T) {
 		} else {
 			running = f.path
 		}
-		require.NoError(t, f.write(s))
+		require.NoError(t, f.write(&s))
 	}
 	unrelated := filepath.Join(dir, "other.json")
 	require.NoError(t, os.WriteFile(unrelated, []byte(`{"status":"completed"}`), 0600))
 	f := newStateFile(FileOptions{Directory: dir, Retention: 24 * time.Hour})
-	require.NoError(t, f.write(Snapshot{Version: 1, Status: "running", UpdatedAt: time.Now()}))
+	require.NoError(t, f.write(&Snapshot{Version: 1, Status: "running", UpdatedAt: time.Now()}))
 	assert.NoFileExists(t, completed)
 	assert.FileExists(t, running)
 	assert.FileExists(t, unrelated)
@@ -204,7 +204,7 @@ func TestFileOnlyHeartbeatAfterStageChange(t *testing.T) {
 func TestSnapshotReplacementStaysBoundedAndReadable(t *testing.T) {
 	f := newStateFile(FileOptions{Directory: t.TempDir()})
 	s := Snapshot{Status: "running", Stage: strings.Repeat("x", maxSnapshotSize), UpdatedAt: time.Now()}
-	require.NoError(t, f.write(s))
+	require.NoError(t, f.write(&s))
 	done := make(chan struct{})
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -229,7 +229,7 @@ func TestSnapshotReplacementStaysBoundedAndReadable(t *testing.T) {
 	}()
 	for i := 0; i < 50; i++ {
 		s.TransferredBytes++
-		assert.NoError(t, f.write(s))
+		assert.NoError(t, f.write(&s))
 	}
 	close(done)
 	wg.Wait()
