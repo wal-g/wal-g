@@ -40,8 +40,13 @@ func (t FilesToExtractProviderImpl) Get(ctx context.Context, backup Backup, file
 	needPgControl := IsPgControlRequired(backup)
 	for _, object := range objects {
 		tarName := object.GetName()
-		// Extract pg_control and the generated backup_label last: they mark a
-		// consistent backup and must override any older label from the data directory.
+		// Separate pg_control from the regular archives and extract it last to
+		// prevent server startup with an incomplete backup restoration. WAL-E
+		// backups may not have a separate pg_control archive; keep that compatible.
+		//
+		// WAL-G creates backup_label.tar at the end of backup using pg_stop_backup
+		// values. Extract it after regular archives to overwrite any backup_label
+		// from an older exclusive backup and use the correct end-of-backup point.
 		sequential := pgControlRe.MatchString(tarName) || backupLabelRe.MatchString(tarName)
 		if !sequential && skipRedundantTars && !shouldUnwrapTar(tarName, filesMeta, filesToUnwrap) {
 			continue
