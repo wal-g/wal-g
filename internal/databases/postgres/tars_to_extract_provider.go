@@ -2,10 +2,12 @@ package postgres
 
 import (
 	"context"
+	"math"
 	"regexp"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/progress"
 )
 
 type FilesToExtractProvider interface {
@@ -23,17 +25,32 @@ func (t FilesToExtractProviderImpl) Get(ctx context.Context, backup Backup, file
 		return nil, nil, err
 	}
 
-	tarNames, err := backup.GetTarNames(ctx)
+	objects, err := backup.getTarObjects(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	tracelog.DebugLogger.Printf("Tars to extract: '%+v'\n", tarNames)
-	concurrentTarsToExtract = make([]internal.ReaderMaker, 0, len(tarNames))
+	tracelog.DebugLogger.Printf("Found %d tar archives to consider for extraction", len(objects))
+	concurrentTarsToExtract = make([]internal.ReaderMaker, 0, len(objects))
 	sequentialTarsToExtract = make([]internal.ReaderMaker, 0, 2)
 
 	pgControlRe := regexp.MustCompile(`^.*?pg_control\.tar(\..+$|$)`)
 	backupLabelRe := regexp.MustCompile(`^.*?backup_label\.tar(\..+$|$)`)
-	for _, tarName := range tarNames {
+	var total int64
+	knownSize := true
+	addSize := func(size int64, willRead bool) {
+		if !willRead {
+			return
+		}
+		if size <= 0 || total > math.MaxInt64-size {
+			knownSize = false
+		} else {
+			total += size
+		}
+	}
+	// Legacy WAL-E restores may skip the sequential archives entirely.
+	needPgControl := IsPgControlRequired(backup)
+	for _, object := range objects {
+		tarName := object.GetName()
 		// Separate the pg_control tarName from the others to
 		// extract it at the end, as to prevent server startup
 		// with incomplete backup restoration.  But only if it
@@ -42,6 +59,7 @@ func (t FilesToExtractProviderImpl) Get(ctx context.Context, backup Backup, file
 		if pgControlRe.MatchString(tarName) {
 			tarToExtract := internal.NewStorageReaderMaker(backup.GetTarPartitionFolder(), tarName)
 			sequentialTarsToExtract = append(sequentialTarsToExtract, tarToExtract)
+			addSize(object.GetSize(), needPgControl)
 			continue
 		}
 
@@ -53,6 +71,7 @@ func (t FilesToExtractProviderImpl) Get(ctx context.Context, backup Backup, file
 		if backupLabelRe.MatchString(tarName) {
 			tarToExtract := internal.NewStorageReaderMaker(backup.GetTarPartitionFolder(), tarName)
 			sequentialTarsToExtract = append(sequentialTarsToExtract, tarToExtract)
+			addSize(object.GetSize(), needPgControl)
 			continue
 		}
 
@@ -62,6 +81,13 @@ func (t FilesToExtractProviderImpl) Get(ctx context.Context, backup Backup, file
 
 		tarToExtract := internal.NewStorageReaderMaker(backup.GetTarPartitionFolder(), tarName)
 		concurrentTarsToExtract = append(concurrentTarsToExtract, tarToExtract)
+		addSize(object.GetSize(), true)
 	}
+	// Reverse unpack skips a backup with no useful concurrent archives before
+	// reading its control/label files. Unknown sizes must remain indeterminate.
+	if !knownSize || len(concurrentTarsToExtract) == 0 {
+		total = 0
+	}
+	progress.BeginDownload(ctx, total)
 	return concurrentTarsToExtract, sequentialTarsToExtract, nil
 }
