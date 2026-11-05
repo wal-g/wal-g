@@ -220,3 +220,36 @@ func TestParseBinlogPosFromMariaDBBackupInfo(t *testing.T) {
 	assert.Equal(t, int64(1298), info.BinlogPos.FilePosition)
 	assert.Equal(t, "0-1-6", info.BinlogPos.LastGTID)
 }
+
+func TestBuildPrepareCommand(t *testing.T) {
+	const deltaDir = "/tmp/delta"
+	tests := []struct {
+		name          string
+		serverVersion string
+		incremental   bool
+		isLast        bool
+		want          string
+	}{
+		{"mysql base, not last", "8.0.35-27", false, false, "xtrabackup --prepare --target-dir=/data --apply-log-only"},
+		{"mysql delta, not last", "8.0.35-27", true, false,
+			"xtrabackup --prepare --target-dir=/data --incremental-dir=/tmp/delta --apply-log-only"},
+		{"mysql delta, last", "8.0.35-27", true, true, "xtrabackup --prepare --target-dir=/data --incremental-dir=/tmp/delta"},
+		{"mariadb base, not last", "11.4.10-MariaDB-ubu2404", false, false, "xtrabackup --prepare --target-dir=/data"},
+		{"mariadb delta, not last", "10.6.4-MariaDB-1:10.6.4+maria~focal", true, false,
+			"xtrabackup --prepare --target-dir=/data --incremental-dir=/tmp/delta"},
+		{"mariadb delta, last", "11.4.10-MariaDB-ubu2404", true, true,
+			"xtrabackup --prepare --target-dir=/data --incremental-dir=/tmp/delta"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prepareCmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", "xtrabackup --prepare --target-dir=/data")
+			sentinel := StreamSentinelDto{ServerVersion: tt.serverVersion, IsIncremental: tt.incremental}
+
+			got := buildPrepareCommand(t.Context(), prepareCmd, &sentinel, deltaDir, tt.isLast)
+
+			assert.Equal(t, tt.want, got.Args[len(got.Args)-1])
+			assert.Equal(t, "xtrabackup --prepare --target-dir=/data", prepareCmd.Args[len(prepareCmd.Args)-1])
+		})
+	}
+}
