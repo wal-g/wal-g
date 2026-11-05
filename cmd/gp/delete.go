@@ -10,6 +10,7 @@ import (
 
 var confirmed = false
 var forceDelete = false
+var sentinelOnly = false
 
 var deleteTargetUserData = ""
 
@@ -103,14 +104,20 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 		args = args[1:]
 	}
 
-	delArgs := greenplum.DeleteArgs{Confirmed: confirmed, FindFull: findFullBackup, Force: forceDelete}
-	deleteHandler, err := greenplum.NewDeleteHandler(cmd.Context(), rootFolder, delArgs)
-	tracelog.ErrorLogger.FatalOnError(err)
-
 	targetBackupSelector, err := internal.CreateTargetDeleteBackupSelector(
 		cmd, args, deleteTargetUserData, greenplum.NewGenericMetaFetcher())
 	tracelog.ErrorLogger.FatalOnError(err)
 
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed, FindFull: findFullBackup, Force: forceDelete}
+	if sentinelOnly {
+		deleteHandler, err := greenplum.NewDeleteSentinelOnlyHandler(cmd.Context(), rootFolder, delArgs)
+		tracelog.ErrorLogger.FatalOnError(err)
+		deleteHandler.HandleDeleteTarget(cmd.Context(), targetBackupSelector)
+		return
+	}
+
+	deleteHandler, err := greenplum.NewDeleteHandler(cmd.Context(), rootFolder, delArgs)
+	tracelog.ErrorLogger.FatalOnError(err)
 	deleteHandler.HandleDeleteTarget(cmd.Context(), targetBackupSelector)
 }
 
@@ -131,6 +138,9 @@ func init() {
 
 	deleteTargetCmd.Flags().StringVar(
 		&deleteTargetUserData, internal.DeleteTargetUserDataFlag, "", internal.DeleteTargetUserDataDescription)
+	deleteTargetCmd.Flags().BoolVar(&sentinelOnly, "sentinel-only", false,
+		"Delete only the cluster sentinels of the target backup and its increments without reading "+
+			"the metadata of other backups; run 'delete garbage' afterwards to clean up the rest")
 
 	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteTargetCmd, deleteGarbageCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
