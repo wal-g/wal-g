@@ -181,11 +181,11 @@ committed the data. No mode requires an additional directory scan.
 ### Progress snapshots for automation
 
 Use `--progress-dir=/run/wal-g/progress` with `backup-push` or `backup-fetch` to
-publish a JSON snapshot independently of terminal output. It also works with
-redirected stderr, `TERM=dumb`, or `--progress=false`:
+publish a JSON snapshot independently of terminal output. This does not require
+`--progress` and works with redirected stderr or `TERM=dumb`:
 
 ```bash
-wal-g backup-fetch /var/lib/postgresql/data LATEST --progress=false --progress-dir=/run/wal-g/progress
+wal-g backup-fetch /var/lib/postgresql/data LATEST --progress-dir=/run/wal-g/progress
 wal-g backup-push /var/lib/postgresql/data --progress-dir=/run/wal-g/progress --progress-retention=24h
 ```
 
