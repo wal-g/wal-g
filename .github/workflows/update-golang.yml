@@ -44,18 +44,21 @@ jobs:
         run: |
           current_root=$(go mod edit -json go.mod | python3 -c 'import json,sys; print(json.load(sys.stdin)["Go"])')
           current_exporter=$(go mod edit -json cmd/pg/exporter/go.mod | python3 -c 'import json,sys; print(json.load(sys.stdin)["Go"])')
+          current_mysql_exporter=$(go mod edit -json cmd/mysql/exporter/go.mod | python3 -c 'import json,sys; print(json.load(sys.stdin)["Go"])')
           latest_version='${{ steps.golang.outputs.latest }}'
 
           echo "current_root=$current_root" >> "$GITHUB_OUTPUT"
           echo "current_exporter=$current_exporter" >> "$GITHUB_OUTPUT"
+          echo "current_mysql_exporter=$current_mysql_exporter" >> "$GITHUB_OUTPUT"
 
-          if [ "$current_root" = "$latest_version" ] && [ "$current_exporter" = "$latest_version" ]; then
+          if [ "$current_root" = "$latest_version" ] && [ "$current_exporter" = "$latest_version" ] && [ "$current_mysql_exporter" = "$latest_version" ]; then
             echo "updated=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           go mod edit -go="$latest_version" go.mod
           go mod edit -go="$latest_version" cmd/pg/exporter/go.mod
+          go mod edit -go="$latest_version" cmd/mysql/exporter/go.mod
           echo "updated=true" >> "$GITHUB_OUTPUT"
 
       - name: Create pull request
@@ -67,7 +70,8 @@ jobs:
           commit-message: "chore: update Go to ${{ steps.golang.outputs.latest }}"
           title: "chore: update Go to ${{ steps.golang.outputs.latest }}"
           body: |
-            Updates the Go version in both Go modules.
+            Updates the Go version in all Go modules.
 
             Root module: `${{ steps.update.outputs.current_root }}` -> `${{ steps.golang.outputs.latest }}`
             PostgreSQL exporter module: `${{ steps.update.outputs.current_exporter }}` -> `${{ steps.golang.outputs.latest }}`
+            MySQL exporter module: `${{ steps.update.outputs.current_mysql_exporter }}` -> `${{ steps.golang.outputs.latest }}`

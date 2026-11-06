@@ -441,3 +441,56 @@ Matching is case-sensitive.
 # Run all tests with pitr in their filenames for MySQL 8.4 (the default).
 make MYSQL_TEST_FILTER=pitr mysql_integration_test
 ```
+
+## Monitoring with Prometheus Exporter
+
+WAL-G has a Prometheus exporter for MySQL and MariaDB backup monitoring in `cmd/mysql/exporter`. It runs the `wal-g`
+binary and exposes the backups, binlogs, the data loss window (RPO), the gaps in the binlog coverage and the storage
+health as metrics.
+
+### Installation
+
+```bash
+cd cmd/mysql/exporter
+go build -o walg-mysql-exporter .
+```
+
+### Usage
+
+```bash
+./walg-mysql-exporter \
+  --web.listen-address=:9352 \
+  --walg.path=/usr/local/bin/wal-g \
+  --walg.config-path=/etc/wal-g/config.json
+```
+
+The metric names start with `walg_mysql` by default. Use `--database=mariadb` to get the `walg_mariadb` prefix instead.
+
+### Key Metrics
+
+- `walg_mysql_backup_finish_timestamp` - When backups completed
+- `walg_mysql_backup_duration_seconds` - How long backups took
+- `walg_mysql_backup_compressed_size_bytes` - Backup sizes
+- `walg_mysql_binlog_count` - Number of binlogs in storage
+- `walg_mysql_rpo_seconds` - Seconds since the most recent binlog was archived
+- `walg_mysql_binlog_gap_seconds` - Positive when the binlogs do not reach back to the latest backup
+- `walg_mysql_storage_up` - Storage connectivity status (1=up, 0=down)
+
+### Example Prometheus Queries
+
+**Time since last backup (hours)**:
+```promql
+(time() - max(walg_mysql_backup_finish_timestamp)) / 3600
+```
+
+**Alert if no backup in 25 hours**:
+```promql
+(time() - max(walg_mysql_backup_finish_timestamp)) / 3600 > 25
+```
+
+**Alert if point-in-time recovery has a hole**:
+```promql
+walg_mysql_binlog_gap_seconds > 0
+```
+
+For complete documentation, see [cmd/mysql/exporter/README.md](../cmd/mysql/exporter/README.md)

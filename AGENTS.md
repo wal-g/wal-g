@@ -27,7 +27,7 @@ review aids, not a substitute for reading the code on the branch being changed.
   daemon protocol, command execution and archive-status bookkeeping.
 - `Makefile`, `.github/workflows`, `docker` and `tests_func`: build/test setup.
   Read the current Go version, build tags and experiment settings there; do not
-  copy a toolchain recipe from an old release. `cmd/pg/exporter` has its own module.
+  copy a toolchain recipe from an old release. `cmd/pg/exporter` and `cmd/mysql/exporter` have their own modules.
 
 ## PostgreSQL backup identity and publication
 
