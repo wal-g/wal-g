@@ -36,6 +36,7 @@ func testInterpret(t *testing.T,
 		&bytes.Buffer{},
 		&tar.Header{
 			Name:     name,
+			Linkname: name,
 			Typeflag: typeflag,
 		},
 	)
@@ -172,6 +173,48 @@ func TestInterpretTypeSymlink(t *testing.T) {
 			assert.True(t, dstFileInfo.Mode()&os.ModeSymlink != 0)
 		},
 	)
+}
+
+func TestMultiInterpretTypeSymlink(t *testing.T) {
+	fileName := "test_file"
+	dbDataDirectory := os.TempDir()
+	// Since we pass a noop for delete, we need to remove outside testInterpret
+	defer os.Remove(path.Join(dbDataDirectory, fileName))
+	for i := 1; i < 5; i++ {
+		testInterpret(t,
+			os.TempDir(),
+
+			"test_file",
+			tar.TypeSymlink,
+			// testInterpret runs in a fresh temp dir, so the source must be created on every call
+			createFile,
+			// keep the restored symlink, so the next iteration finds an existing one
+			func(s string) error {
+				return nil
+			},
+			func(_, dstFileInfo os.FileInfo) {
+				// Mode on Windows has i/o vs unix so it must be called within the test
+				assert.True(t, dstFileInfo.Mode()&os.ModeSymlink != 0)
+			},
+		)
+	}
+
+}
+
+func TestInterpretTypeSymlinkUsesLinkname(t *testing.T) {
+	dbDataDirectory := t.TempDir()
+	tarInterpreter := &postgres.FileTarInterpreter{DBDataDirectory: dbDataDirectory}
+
+	err := tarInterpreter.Interpret(&bytes.Buffer{}, &tar.Header{
+		Name:     "postgresql.auto.conf",
+		Linkname: "link_target",
+		Typeflag: tar.TypeSymlink,
+	})
+	assert.NoError(t, err)
+
+	target, err := os.Readlink(filepath.Join(dbDataDirectory, "postgresql.auto.conf"))
+	assert.NoError(t, err)
+	assert.Equal(t, "link_target", target)
 }
 
 func TestPrepareDirsForLocalDirectory(t *testing.T) {
