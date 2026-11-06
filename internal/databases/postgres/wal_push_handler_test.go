@@ -1,7 +1,11 @@
 package postgres_test
 
 import (
+	"encoding/json"
+	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -72,4 +76,49 @@ func TestWalPush_BulkMetadataUploaderWithUploadConcurrency(t *testing.T) {
 	defer testtools.Cleanup(t, dir)
 	_, err := uploader.Folder().ReadObject(t.Context(), testFileName[0:len(testFileName)-1]+".json")
 	assert.NoError(t, err)
+}
+
+// The storage refuses connections: a listed file can only succeed by not needing it.
+func TestWalPushCLISkipList(t *testing.T) {
+	walg := os.Getenv("WALG_TEST_WALG_BIN")
+	if walg == "" {
+		t.Skip("set WALG_TEST_WALG_BIN to run the CLI test")
+	}
+	dir := t.TempDir()
+	listed, unlisted := "000000010000000000000001", "000000010000000000000002"
+	for _, name := range []string{listed, unlisted} {
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("test WAL"), 0600))
+	}
+	listPath := filepath.Join(dir, "skip_list")
+	assert.NoError(t, os.WriteFile(listPath, []byte(listed+"\n"), 0640))
+	config, err := json.Marshal(map[string]string{
+		"AWS_ACCESS_KEY_ID":                    "test",
+		"AWS_ENDPOINT":                         "http://127.0.0.1:9",
+		"AWS_REGION":                           "us-east-1",
+		"AWS_S3_FORCE_PATH_STYLE":              "true",
+		"AWS_SECRET_ACCESS_KEY":                "test",
+		"PGDATA":                               dir,
+		"WALG_FAILOVER_STORAGES_CHECK":         "true",
+		"WALG_FAILOVER_STORAGES_CHECK_TIMEOUT": "2s",
+		"WALG_PG_ARCHIVE_SKIP_LIST":            listPath,
+		"WALG_S3_PREFIX":                       "s3://unreachable/prefix",
+	})
+	assert.NoError(t, err)
+	configPath := filepath.Join(dir, "walg.json")
+	assert.NoError(t, os.WriteFile(configPath, config, 0600))
+	push := func(name string) (string, error) {
+		cmd := exec.CommandContext(t.Context(), walg, "--config", configPath, "wal-push", filepath.Join(dir, name))
+		// Package test initializers export Viper defaults that would override the config.
+		cmd.Env = []string{"HOME=" + dir, "PATH=" + os.Getenv("PATH")}
+		output, err := cmd.CombinedOutput()
+		return string(output), err
+	}
+
+	output, err := push(listed)
+	assert.NoError(t, err, output)
+	assert.Contains(t, output, "skipping archiving of "+listed)
+
+	output, err = push(unlisted)
+	assert.Error(t, err)
+	assert.Contains(t, output, "no alive storages")
 }
