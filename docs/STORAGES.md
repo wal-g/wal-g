@@ -152,6 +152,10 @@ or manual cleanup. S3 Object Lock retention still applies.
 
 Sets batch size for object deletion. By default is set to 1000.
 
+* `S3_CREATE_ONLY`
+
+When `true`, every upload carries `If-None-Match: *` (on `PutObject`, and on `CompleteMultipartUpload` for multipart uploads), so WAL-G never replaces an object. Pair it with a bucket policy that refuses writes without that header, so an archive key can't overwrite backups or WAL. An upload onto an existing key fails with `PreconditionFailed`; with `WALG_PREVENT_WAL_OVERWRITE`, a retried `wal-push` of an identical segment is still accepted. Commands that rewrite an object fail under this setting: `backup-mark`, and a repeated `wal-push` with `WALG_UPLOAD_WAL_METADATA`. Copies and deletions are not covered. Default is `false`.
+
 GCS
 -----------
 To store backups in Google Cloud Storage, WAL-G requires that this variable be set:
