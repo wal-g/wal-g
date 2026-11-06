@@ -12,6 +12,45 @@ Prints listing of the objects in the provided storage folder.
 
 ``wal-g st ls --all-versions`` show all object versions including deleted objects (S3 with versioning enabled). Delete markers are labeled with `DELETE` in the output. This is useful for debugging or inspecting the full version history of objects.
 
+```sh
+wal-g st ls wal_005/ --prefix 0000000800000002
+```
+
+This command lists current objects whose names start with the specified prefix within `wal_005/`.
+S3, GCS and Azure apply the filter directly, with the existing storage configuration and credentials.
+Other storage providers return an error.
+
+The prefix must not be empty. Wildcards are literal characters. WAL-G does not append a slash to the prefix.
+The listing includes matching nested keys. Each name remains relative to the selected folder, with its prefix and compression suffix intact.
+The output includes the stored size and modification time. WAL-G does not download object contents.
+
+WAL-G follows listing pagination before printing that storage's listing. An empty result succeeds and prints the column header.
+Except for the S3 compatibility case below, listing failures return a nonzero exit status. This includes failures on later pages and individual storages with `--target all`.
+Diagnostics go to stderr by default. Validators must check both the exit status and the warnings described below.
+
+Prefix mode uses the same S3 missing-object error handling as plain `st ls` for DigitalOcean Spaces compatibility.
+S3 `NoSuchKey` and `NotFound` responses end the listing successfully.
+A response on the first page produces an empty listing. A response on a later page preserves objects from earlier pages.
+Other listing errors still fail the command.
+
+Do not combine `--prefix` with `--glob`, `--recursive` or `--all-versions`.
+Commands without `--prefix` retain their output and exit-status behaviour. The following warnings also apply without `--prefix`.
+
+Warnings start with `WARNING:`, followed by a timestamp and the message. Validators can match these stable message fragments:
+
+- `S3 listing incomplete after successful pages`: S3 returned `NoSuchKey` or `NotFound` after at least one successful page, including an empty page.
+- `failed to flush storage listing output`: WAL-G could not flush the formatted output to stdout.
+
+These warnings do not change stdout or the exit status. Validators must reject a listing when either warning occurs, even with exit status zero.
+First-page S3 missing-object responses remain quiet. The S3 warning applies to plain, prefix and versioned listings.
+The shared S3 listing code can also emit this warning in other commands, such as `backup-list` and `delete`.
+The flush warning also applies to `st stat`.
+
+Do not use `WALG_LOG_LEVEL=ERROR` when collecting these warnings: it suppresses them.
+Both `NORMAL` (the default) and `DEVEL` retain warnings.
+Use `WALG_LOG_DESTINATION=stderr` to collect warnings on stderr; this is the default destination.
+If stderr also fails, WAL-G cannot reliably deliver the warning. Keep stderr separate from the listing output.
+
 ### ``stat``
 Prints metadata (type, size, last modification time, name) of a single storage object in the same format as ``ls``.
 
