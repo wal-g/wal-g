@@ -34,13 +34,13 @@ Binary name has the following format: `wal-g-DBNAME-OSNAME`, where `DBNAME` stan
 To decompress the binary, use:
 
 ```plaintext
-tar -zxvf wal-g-DBNAME-OSNAME-amd64.tar.gz
+tar -xvf wal-g-DBNAME-OSNAME-amd64.tar.gz
 mv wal-g-DBNAME-OSNAME-amd64 /usr/local/bin/wal-g
 ```
 
 For example, for Postgres and Ubuntu 24.04:
 ```plaintext
-tar -zxvf wal-g-pg-24.04-amd64.tar.gz
+tar -xvf wal-g-pg-24.04-amd64.tar.gz
 mv wal-g-pg-24.04-amd64 /usr/local/bin/wal-g
 ```
 
