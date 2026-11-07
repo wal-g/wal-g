@@ -134,7 +134,19 @@ By default wal-g validates s3 credentials before work. If you want to disable va
 
 * `S3_ENABLE_VERSIONING`
 
-By default, WAL-G checks whether versioning is enabled on the bucket. When the user already knows the bucket’s versioning state, this setting allows them to specify `enabled` or `disabled`, avoiding an unnecessary round trip to the server.
+By default, WAL-G detects whether bucket versioning is enabled. Set `enabled` or
+`disabled` to override detection; this does not change the bucket's S3 configuration.
+
+With versioning enabled, `wal-g delete --confirm ...` permanently removes all
+versions (including noncurrent versions) and delete markers of the objects selected
+for deletion, rather than just adding delete markers. No S3 lifecycle rule is needed
+to clean up those versions. Version-aware deletion is supported since v3.0.7.
+
+Autodetection requires `s3:GetBucketVersioning`; listing and deleting versions require
+`s3:ListBucketVersions` and `s3:DeleteObjectVersion`, in addition to the usual permissions.
+If autodetection is not permitted, set `S3_ENABLE_VERSIONING=enabled` explicitly.
+Setting `disabled` on a versioned bucket leaves noncurrent versions for lifecycle rules
+or manual cleanup. S3 Object Lock retention still applies.
 
 * `S3_DELETE_BATCH_SIZE`
 

@@ -7,6 +7,8 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 )
 
+var recoveryDelete internal.RecoveryOptions
+
 var confirmed = false
 
 // deleteCmd represents the delete command
@@ -41,8 +43,10 @@ var deleteEverythingCmd = &cobra.Command{
 var deleteTargetCmd = &cobra.Command{
 	Use:     internal.DeleteTargetUsageExample, // TODO : improve description
 	Example: internal.DeleteTargetExamples,
-	Args:    internal.DeleteTargetArgsValidator,
-	Run:     runDeleteTarget,
+	Args: func(cmd *cobra.Command, args []string) error {
+		return recoveryDelete.Validate(cmd, args, internal.DeleteTargetArgsValidator)
+	},
+	Run: runDeleteTarget,
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
@@ -56,6 +60,12 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
+	if recoveryDelete.AllowBroken {
+		err := internal.RunRecoveryDeletion(cmd.Context(), recoveryDelete, args, confirmed, mysql.PlanRecoveryDeletion)
+		tracelog.ErrorLogger.FatalOnError(err)
+		return
+	}
+
 	storage, err := internal.ConfigureStorage(cmd.Context())
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -122,6 +132,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 }
 
 func init() {
+	recoveryDelete.AddFlags(deleteTargetCmd)
 	cmd.AddCommand(deleteCmd)
 	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd, deleteTargetCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")

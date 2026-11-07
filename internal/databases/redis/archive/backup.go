@@ -296,7 +296,7 @@ func SentinelWithExistenceCheck(ctx context.Context, folder storage.Folder, back
 		return Backup{}, err
 	}
 
-	return fetchSentinel(ctx, backup, backupName)
+	return fetchSentinel(ctx, backup)
 }
 
 func SentinelWithoutExistenceCheck(ctx context.Context, folder storage.Folder, backupName string) (Backup, error) {
@@ -305,16 +305,25 @@ func SentinelWithoutExistenceCheck(ctx context.Context, folder storage.Folder, b
 		return Backup{}, err
 	}
 
-	return fetchSentinel(ctx, backup, backupName)
+	return fetchSentinel(ctx, backup)
 }
 
-func fetchSentinel(ctx context.Context, backup internal.Backup, backupName string) (Backup, error) {
+func fetchSentinel(ctx context.Context, backup internal.Backup) (Backup, error) {
 	var sentinel Backup
-	if err := backup.FetchSentinel(ctx, &sentinel); err != nil {
+	doc, err := internal.ReadDeletionMetadata(ctx, backup.Folder, backup.Name+utility.SentinelSuffix, &sentinel)
+	if err != nil {
 		return Backup{}, err
 	}
+	if doc.Problem != nil {
+		return Backup{}, doc.Problem
+	}
+	if _, known := doc.Bool("Permanent"); !known {
+		return Backup{}, fmt.Errorf("unknown protection in sentinel for %s", backup.Name)
+	}
 	if sentinel.BackupName == "" {
-		sentinel.BackupName = backupName
+		sentinel.BackupName = backup.Name
+	} else if sentinel.BackupName != backup.Name {
+		return Backup{}, fmt.Errorf("sentinel for %s contains conflicting backup name %s", backup.Name, sentinel.BackupName)
 	}
 	if sentinel.BackupType == "" {
 		sentinel.BackupType = RDBBackupType

@@ -21,6 +21,8 @@ const DeleteGarbageExamples = `  garbage           Deletes outdated WAL archives
 const DeleteGarbageUse = "garbage [ARCHIVES|BACKUPS]"
 const afterFlag = "after"
 
+var recoveryDelete internal.RecoveryOptions
+
 var confirmed = false
 var deleteWithoutBackups = false
 var useSentinelTime = false
@@ -58,8 +60,10 @@ var deleteEverythingCmd = &cobra.Command{
 var deleteTargetCmd = &cobra.Command{
 	Use:     internal.DeleteTargetUsageExample, // TODO : improve description
 	Example: internal.DeleteTargetExamples,
-	Args:    internal.DeleteTargetArgsValidator,
-	Run:     runDeleteTarget,
+	Args: func(cmd *cobra.Command, args []string) error {
+		return recoveryDelete.Validate(cmd, args, internal.DeleteTargetArgsValidator)
+	},
+	Run: runDeleteTarget,
 }
 
 var deleteGarbageCmd = &cobra.Command{
@@ -72,7 +76,8 @@ var deleteGarbageCmd = &cobra.Command{
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	folder := configureFolder(cmd.Context())
 
-	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(cmd.Context(), folder)
+	permanentBackups, permanentWals, err := postgres.GetPermanentBackupsAndWalsChecked(cmd.Context(), folder)
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler, err := postgres.NewDeleteHandler(cmd.Context(), folder, permanentBackups, permanentWals, useSentinelTime)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -83,7 +88,8 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	folder := configureFolder(cmd.Context())
 
-	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(cmd.Context(), folder)
+	permanentBackups, permanentWals, err := postgres.GetPermanentBackupsAndWalsChecked(cmd.Context(), folder)
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler, err := postgres.NewDeleteHandler(cmd.Context(), folder, permanentBackups, permanentWals, useSentinelTime)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -99,7 +105,8 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 func runDeleteEverything(cmd *cobra.Command, args []string) {
 	folder := configureFolder(cmd.Context())
 
-	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(cmd.Context(), folder)
+	permanentBackups, permanentWals, err := postgres.GetPermanentBackupsAndWalsChecked(cmd.Context(), folder)
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler, err := postgres.NewDeleteHandler(cmd.Context(), folder, permanentBackups, permanentWals, useSentinelTime)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -114,9 +121,16 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
+	if recoveryDelete.AllowBroken {
+		err := internal.RunRecoveryDeletion(cmd.Context(), recoveryDelete, args, confirmed, postgres.PlanRecoveryDeletion)
+		tracelog.ErrorLogger.FatalOnError(err)
+		return
+	}
+
 	folder := configureFolder(cmd.Context())
 
-	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(cmd.Context(), folder)
+	permanentBackups, permanentWals, err := postgres.GetPermanentBackupsAndWalsChecked(cmd.Context(), folder)
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	findFullBackup := false
 	modifier := internal.ExtractDeleteTargetModifierFromArgs(args)
@@ -139,7 +153,8 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 func runDeleteGarbage(cmd *cobra.Command, args []string) {
 	folder := configureFolder(cmd.Context())
 
-	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(cmd.Context(), folder)
+	permanentBackups, permanentWals, err := postgres.GetPermanentBackupsAndWalsChecked(cmd.Context(), folder)
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler, err := postgres.NewDeleteHandler(cmd.Context(), folder, permanentBackups, permanentWals, false)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -164,6 +179,7 @@ func DeleteGarbageArgsValidator(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
+	recoveryDelete.AddFlags(deleteTargetCmd)
 	Cmd.AddCommand(deleteCmd)
 
 	deleteTargetCmd.Flags().StringVar(

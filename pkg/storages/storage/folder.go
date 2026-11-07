@@ -105,10 +105,11 @@ func ListFolderRecursivelyWithFilter(
 func prependPaths(objects []Object, folderPrefix string) []Object {
 	relativePathObjects := make([]Object, len(objects))
 	for i, object := range objects {
-		relativePathObjects[i] = NewLocalObject(
+		relativePathObjects[i] = NewLocalObjectWithVersion(
 			path.Join(folderPrefix, object.GetName()),
 			object.GetLastModified(),
 			object.GetSize(),
+			object.GetVersionID(), object.GetAdditionalInfo(),
 		)
 	}
 	return relativePathObjects
@@ -245,6 +246,17 @@ func filterFoldersWithGlobPattern(folders []Folder, pattern string) ([]Folder, e
 // to support showing all versions including deleted objects.
 type AllVersionsFolder interface {
 	SetShowAllVersions(show bool)
+}
+
+type AllVersionsView interface {
+	WithAllVersions() Folder
+}
+
+func WithAllVersions(folder Folder) Folder {
+	if view, ok := folder.(AllVersionsView); ok {
+		return view.WithAllVersions()
+	}
+	return folder
 }
 
 // TODO: unittests

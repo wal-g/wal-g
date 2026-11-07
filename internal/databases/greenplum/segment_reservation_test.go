@@ -34,8 +34,15 @@ func TestSegmentDeletionPreservesReservations(t *testing.T) {
 					marker := path.Join("backup_reservations", utility.BaseBackupPath, name+".json")
 					require.NoError(t, storage.CreateObject(t.Context(), folder, marker, []byte("{}")))
 					if name != abandonedName {
+						start, finish := postgres.LSN(1), postgres.LSN(2)
 						putDTO(t, folder, path.Join(utility.BaseBackupPath, name+utility.SentinelSuffix),
-							postgres.BackupSentinelDto{})
+							postgres.BackupSentinelDto{BackupStartLSN: &start, BackupFinishLSN: &finish})
+						putDTO(t, folder, path.Join(utility.BaseBackupPath, name, "metadata.json"),
+							postgres.ExtendedMetadataDto{StartLsn: start, FinishLsn: finish})
+						for _, manifest := range []string{"ao_files_metadata.json", "pax_files_metadata.json"} {
+							require.NoError(t, folder.PutObject(t.Context(),
+								path.Join(utility.BaseBackupPath, name, manifest), strings.NewReader(`{"Files":{}}`)))
+						}
 					}
 					require.NoError(t, folder.PutObject(t.Context(),
 						path.Join(utility.BaseBackupPath, name, "tar_partitions/part_001.tar.lz4"), strings.NewReader("data")))
@@ -48,7 +55,10 @@ func TestSegmentDeletionPreservesReservations(t *testing.T) {
 			folder := root.GetSubFolder(greenplum.FormatSegmentStoragePrefix(0))
 			target, err := greenplum.NewSegBackup(t.Context(), folder.GetSubFolder(utility.BaseBackupPath), tc.target, "default")
 			require.NoError(t, err)
-			require.NoError(t, handler.Delete(t.Context(), target))
+			plan, err := handler.Prepare(t.Context(), target)
+			require.NoError(t, err)
+			defer plan.Close()
+			require.NoError(t, plan.Execute(t.Context()))
 
 			for _, contentID := range []int{-1, 0, 1} {
 				folder := root.GetSubFolder(greenplum.FormatSegmentStoragePrefix(contentID))

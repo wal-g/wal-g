@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -41,11 +42,22 @@ func purgeJournalInfo(ctx context.Context, backupName string, dryRun bool) {
 	}
 }
 
+type DeletionMetadataLoader interface {
+	BackupMetaForDeletion(context.Context, string) (*models.Backup, error)
+}
+
 // HandleBackupDelete deletes backup.
-func HandleBackupDelete(ctx context.Context, backupName string, downloader archive.Downloader, purger archive.Purger, dryRun bool) error {
-	backup, err := downloader.BackupMeta(ctx, backupName)
+func HandleBackupDelete(ctx context.Context, backupName string, downloader DeletionMetadataLoader,
+	purger archive.Purger, dryRun bool) error {
+	backup, err := downloader.BackupMetaForDeletion(ctx, backupName)
 	if err != nil {
 		return err
+	}
+	if backup.Permanent {
+		return fmt.Errorf("cannot delete permanent backup %s", backup.Name())
+	}
+	if backupName != "LATEST" && backup.Name() != backupName {
+		return fmt.Errorf("conflicting backup name %s in sentinel for %s", backup.Name(), backupName)
 	}
 
 	if dryRun {

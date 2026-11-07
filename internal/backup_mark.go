@@ -50,8 +50,7 @@ func (h *BackupMarkHandler) GetBackupsToMark(ctx context.Context, backupName str
 		return nil, err
 	}
 
-	//raise error when backup already has that type
-	if toPermanent == meta.IsPermanent {
+	if toPermanent == meta.IsPermanent && !meta.NeedsPermanentReconciliation {
 		permanentType := "permanent"
 		if !meta.IsPermanent {
 			permanentType = "impermanent"
@@ -73,7 +72,7 @@ func (h *BackupMarkHandler) getBackupsToMarkPermanent(ctx context.Context, backu
 	}
 
 	// only return backups that we want to update
-	if !meta.IsPermanent {
+	if !meta.IsPermanent || meta.NeedsPermanentReconciliation {
 		backupsToMark = append(backupsToMark, meta.BackupName)
 	}
 
@@ -102,7 +101,10 @@ func (h *BackupMarkHandler) getBackupsToMarkImpermanent(ctx context.Context, bac
 		return nil, err
 	}
 
-	permanentBackups := GetPermanentBackups(ctx, h.baseBackupFolder, h.metaInteractor)
+	permanentBackups, err := GetPermanentBackupsChecked(ctx, h.baseBackupFolder, h.metaInteractor, false)
+	if err != nil {
+		return nil, err
+	}
 	//  del current backup from
 	delete(permanentBackups, backupName)
 
@@ -115,7 +117,7 @@ func (h *BackupMarkHandler) getBackupsToMarkImpermanent(ctx context.Context, bac
 		return nil, newBackupHasPermanentBackupInFutureError(backupName)
 	}
 
-	if !meta.IsPermanent {
+	if !meta.IsPermanent && !meta.NeedsPermanentReconciliation {
 		return []string{}, nil
 	}
 
@@ -196,11 +198,20 @@ func GetPermanentBackupsFromStorage(ctx context.Context, folder storage.Folder, 
 	return getPermanentBackups(ctx, folder, metaFetcher, true)
 }
 
-func getPermanentBackups(ctx context.Context, folder storage.Folder, metaFetcher GenericMetaFetcher, fromStorage bool) map[string]bool {
+func getPermanentBackups(ctx context.Context, folder storage.Folder,
+	metaFetcher GenericMetaFetcher, fromStorage bool) map[string]bool {
+	result, err := GetPermanentBackupsChecked(ctx, folder, metaFetcher, fromStorage)
+	tracelog.ErrorLogger.FatalOnError(err)
+	return result
+}
+
+func GetPermanentBackupsChecked(ctx context.Context, folder storage.Folder,
+	metaFetcher GenericMetaFetcher, fromStorage bool) (map[string]bool, error) {
 	tracelog.InfoLogger.Println("retrieving permanent objects")
 	backupTimes, err := GetBackups(ctx, folder)
-	if err != nil {
-		return map[string]bool{}
+	var empty NoBackupsFoundError
+	if err != nil && !errors.As(err, &empty) {
+		return nil, err
 	}
 	var meta GenericMetadata
 	permanentBackups := map[string]bool{}
@@ -211,12 +222,11 @@ func getPermanentBackups(ctx context.Context, folder storage.Folder, metaFetcher
 			meta, err = metaFetcher.Fetch(ctx, backupTime.BackupName, folder)
 		}
 		if err != nil {
-			FatalOnUnrecoverableMetadataError(backupTime, err)
-			continue
+			return nil, err
 		}
 		if meta.IsPermanent {
 			permanentBackups[backupTime.BackupName] = true
 		}
 	}
-	return permanentBackups
+	return permanentBackups, nil
 }
