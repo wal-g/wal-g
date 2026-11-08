@@ -17,8 +17,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const defaultRawCopyConcurrency = 8
-
 var compressionExtensions = map[string]struct{}{
 	".br":   {},
 	".gz":   {},
@@ -285,6 +283,10 @@ func Execute(ctx context.Context, plan *Plan, options ExecuteOptions) error {
 		return err
 	}
 	options.MaxRetries = &retries
+	concurrency, err := options.copyConcurrency()
+	if err != nil {
+		return err
+	}
 	byOrder, err := groupPendingEntries(ctx, plan, options)
 	if err != nil {
 		return err
@@ -297,7 +299,7 @@ func Execute(ctx context.Context, plan *Plan, options ExecuteOptions) error {
 			size += entry.Size
 		}
 	}
-	tracelog.InfoLogger.Printf("Copying %d objects, %d bytes.", objects, size)
+	tracelog.InfoLogger.Printf("Copying %d objects, %d bytes, up to %d objects at a time.", objects, size, concurrency)
 
 	orders := make([]publicationOrder, 0, len(byOrder))
 	for order := range byOrder {
@@ -320,7 +322,7 @@ func Execute(ctx context.Context, plan *Plan, options ExecuteOptions) error {
 	})
 	for _, order := range orders {
 		group, groupCtx := errgroup.WithContext(ctx)
-		group.SetLimit(defaultRawCopyConcurrency)
+		group.SetLimit(concurrency)
 		for _, entry := range byOrder[order] {
 			if groupCtx.Err() != nil {
 				break

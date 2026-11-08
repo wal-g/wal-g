@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -115,6 +116,34 @@ func TestInitConfigDoesNotValidateDefaults(t *testing.T) {
 	logOutput, err := os.ReadFile(logFile.Name())
 	assert.NoError(t, err)
 	assert.NotContains(t, strings.ToUpper(string(logOutput)), config.FailoverStoragesCheckTimeout+" IS UNKNOWN")
+}
+
+func TestCheckAllowedSettingsAcceptsCopyConcurrency(t *testing.T) {
+	configFile := filepath.Join(t.TempDir(), "config.json")
+	assert.NoError(t, os.WriteFile(configFile, []byte(`{"WALG_COPY_CONCURRENCY": "4", "WALG_NOT_A_SETTING": "1"}`), 0o600))
+
+	logFile, err := os.CreateTemp(t.TempDir(), "warnings-*.log")
+	assert.NoError(t, err)
+	defer func() { _ = logFile.Close() }()
+
+	oldAllowedSettings := config.AllowedSettings
+	t.Cleanup(func() {
+		config.AllowedSettings = oldAllowedSettings
+		tracelog.SetWarningOutput(os.Stderr)
+	})
+	config.AllowedSettings = config.CommonAllowedSettings
+	tracelog.SetWarningOutput(logFile)
+
+	storageConfig := viper.New()
+	config.ReadConfigFromFile(storageConfig, configFile)
+	assert.Equal(t, "4", storageConfig.GetString(config.CopyConcurrency))
+	config.CheckAllowedSettings(storageConfig)
+
+	assert.NoError(t, logFile.Close())
+	logOutput, err := os.ReadFile(logFile.Name())
+	assert.NoError(t, err)
+	assert.Contains(t, string(logOutput), "WALG_NOT_A_SETTING is unknown")
+	assert.NotContains(t, string(logOutput), config.CopyConcurrency+" is unknown")
 }
 
 func resetToDefaults() {

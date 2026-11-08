@@ -33,15 +33,20 @@ func InfosWithOptions(ctx context.Context, chs []InfoProvider, options ExecuteOp
 	if err != nil {
 		return err
 	}
+	concurrency, err := options.copyConcurrency()
+	if err != nil {
+		return err
+	}
 
 	var size int64
 	for _, ch := range chs {
 		size += ch.SrcObj.GetSize()
 	}
-	tracelog.InfoLogger.Printf("Copying %d objects, %d bytes at the source.", len(chs), size)
+	tracelog.InfoLogger.Printf("Copying %d objects, %d bytes at the source, up to %d objects at a time.",
+		len(chs), size, concurrency)
 
 	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(defaultRawCopyConcurrency)
+	group.SetLimit(concurrency)
 	for _, ch := range chs {
 		if groupCtx.Err() != nil {
 			break
