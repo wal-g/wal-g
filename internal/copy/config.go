@@ -12,6 +12,7 @@ import (
 
 type ExecuteOptions struct {
 	MaxRetries             *int
+	Concurrency            int
 	UseServerSideCopy      bool
 	ServerSideCopyFallback bool
 	OverwriteConflicts     bool
@@ -24,27 +25,45 @@ func OptionsFromConfigs(source, destination *viper.Viper) (ExecuteOptions, error
 	if err != nil {
 		return ExecuteOptions{}, err
 	}
+	concurrency, err := configuredCopyConcurrency(source)
+	if err != nil {
+		return ExecuteOptions{}, err
+	}
 	return ExecuteOptions{
 		MaxRetries:             &retries,
+		Concurrency:            concurrency,
 		UseServerSideCopy:      rawCopyConfigEligible(source) && rawCopyConfigEligible(destination),
 		ServerSideCopyFallback: source.GetBool(conf.ServerSideCopyFallback) || destination.GetBool(conf.ServerSideCopyFallback),
 		OverwriteConflicts:     disasterCopyEnabled(source, destination),
 	}, nil
 }
 
+func sourceOrMainSetting(source *viper.Viper, setting string) string {
+	value := conf.CommonDefaultConfigValues[setting]
+	if viper.IsSet(setting) {
+		value = viper.GetString(setting)
+	}
+	if source != nil && source.InConfig(setting) {
+		value = source.GetString(setting)
+	}
+	return strings.TrimSpace(value)
+}
+
 func configuredCopyRetries(source *viper.Viper) (int, error) {
-	value := conf.CommonDefaultConfigValues[conf.DownloadFileRetriesSetting]
-	if viper.IsSet(conf.DownloadFileRetriesSetting) {
-		value = viper.GetString(conf.DownloadFileRetriesSetting)
-	}
-	if source != nil && source.InConfig(conf.DownloadFileRetriesSetting) {
-		value = source.GetString(conf.DownloadFileRetriesSetting)
-	}
-	retries, err := strconv.Atoi(strings.TrimSpace(value))
+	retries, err := strconv.Atoi(sourceOrMainSetting(source, conf.DownloadFileRetriesSetting))
 	if err != nil || retries < 0 {
 		return 0, fmt.Errorf("%s must be a nonnegative integer", conf.DownloadFileRetriesSetting)
 	}
 	return retries, nil
+}
+
+func configuredCopyConcurrency(source *viper.Viper) (int, error) {
+	value := sourceOrMainSetting(source, conf.CopyConcurrency)
+	concurrency, err := strconv.Atoi(value)
+	if err != nil || concurrency < conf.MinAllowedConcurrency {
+		return 0, fmt.Errorf("%s must be a positive integer, got %q", conf.CopyConcurrency, value)
+	}
+	return concurrency, nil
 }
 
 func (o ExecuteOptions) copyRetries() (int, error) {
@@ -55,6 +74,16 @@ func (o ExecuteOptions) copyRetries() (int, error) {
 		return 0, fmt.Errorf("%s must be a nonnegative integer", conf.DownloadFileRetriesSetting)
 	}
 	return *o.MaxRetries, nil
+}
+
+func (o ExecuteOptions) copyConcurrency() (int, error) {
+	if o.Concurrency == 0 {
+		return configuredCopyConcurrency(nil)
+	}
+	if o.Concurrency < conf.MinAllowedConcurrency {
+		return 0, fmt.Errorf("%s must be a positive integer, got %d", conf.CopyConcurrency, o.Concurrency)
+	}
+	return o.Concurrency, nil
 }
 
 func disasterCopyEnabled(source, destination *viper.Viper) bool {

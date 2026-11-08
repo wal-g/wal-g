@@ -95,6 +95,54 @@ func TestCopyRetryConfigPrecedence(t *testing.T) {
 	}
 }
 
+func TestCopyConcurrencyConfigPrecedence(t *testing.T) {
+	for _, tc := range []struct {
+		name, environment, main, source, destination string
+		want                                         int
+		invalid                                      bool
+	}{
+		{name: "default", want: 8},
+		{name: "main", main: "4", want: 4},
+		{name: "environment", environment: "6", want: 6},
+		{name: "source wins", main: "4", source: "2", want: 2},
+		{name: "source wins over environment", environment: "6", source: "2", want: 2},
+		{name: "destination ignored", main: "4", destination: "9", want: 4},
+		{name: "invalid environment", environment: "bad", invalid: true},
+		{name: "zero", source: "0", invalid: true},
+		{name: "negative", source: "-1", invalid: true},
+		{name: "invalid", source: "bad", invalid: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			t.Setenv(conf.CopyConcurrency, tc.environment)
+			viper.AutomaticEnv()
+			if tc.main != "" {
+				viper.Set(conf.CopyConcurrency, tc.main)
+			}
+			source, destination := viper.New(), viper.New()
+			for _, setting := range []struct {
+				config *viper.Viper
+				value  string
+			}{
+				{source, tc.source},
+				{destination, tc.destination},
+			} {
+				if setting.value != "" {
+					require.NoError(t, setting.config.MergeConfigMap(map[string]any{conf.CopyConcurrency: setting.value}))
+				}
+			}
+			options, err := copyutil.OptionsFromConfigs(source, destination)
+			if tc.invalid {
+				require.ErrorContains(t, err, conf.CopyConcurrency)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, options.Concurrency)
+		})
+	}
+}
+
 func TestDisasterCopyConfigEnablement(t *testing.T) {
 	for _, tc := range []struct {
 		name, environment, main, source, destination string
