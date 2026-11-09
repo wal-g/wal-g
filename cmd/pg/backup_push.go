@@ -1,6 +1,9 @@
 package pg
 
 import (
+	"context"
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -43,16 +46,23 @@ var (
 		Short: backupPushShortDescription, // TODO : improve description
 		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			ctx := cmd.Context()
+			if backupPushTimeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, backupPushTimeout)
+				defer cancel()
+			}
+
 			internal.ConfigureLimiters()
 
-			storage, err := internal.ConfigureMultiStorage(cmd.Context(), true)
+			storage, err := internal.ConfigureMultiStorage(ctx, true)
 			tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
 
 			rootFolder := multistorage.SetPolicies(storage.RootFolder(), policies.TakeFirstStorage)
 			if targetStorage == "" {
-				rootFolder, err = multistorage.UseFirstAliveStorage(cmd.Context(), rootFolder)
+				rootFolder, err = multistorage.UseFirstAliveStorage(ctx, rootFolder)
 			} else {
-				rootFolder, err = multistorage.UseSpecificStorage(cmd.Context(), targetStorage, rootFolder)
+				rootFolder, err = multistorage.UseSpecificStorage(ctx, targetStorage, rootFolder)
 			}
 			tracelog.ErrorLogger.FatalOnError(err)
 			tracelog.InfoLogger.Printf("Backup will be pushed to storage: %v", multistorage.UsedStorages(rootFolder)[0])
@@ -110,9 +120,9 @@ var (
 				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
 				userData, withoutFilesMetadata, countJournals, json, pretty)
 
-			backupHandler, err := postgres.NewBackupHandler(cmd.Context(), arguments)
+			backupHandler, err := postgres.NewBackupHandler(ctx, arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
-			backupHandler.HandleBackupPush(cmd.Context())
+			backupHandler.HandleBackupPush(ctx)
 		},
 	}
 	permanent             = false
@@ -127,6 +137,7 @@ var (
 	userDataRaw           = ""
 	withoutFilesMetadata  = false
 	countJournals         = false
+	backupPushTimeout     time.Duration
 )
 
 func chooseTarBallComposer() postgres.TarBallComposerType {
@@ -184,4 +195,6 @@ func init() {
 		false, "Create 'journal_<backup>' objects in storage and maintain the WAL volume required to get from one backup to the next")
 	backupPushCmd.Flags().StringVar(&targetStorage, "target-storage", "",
 		targetStorageDescription)
+	backupPushCmd.Flags().DurationVar(&backupPushTimeout, "timeout", 0,
+		"Overall operation timeout (e.g. 30m, 6h). 0 means no timeout")
 }
