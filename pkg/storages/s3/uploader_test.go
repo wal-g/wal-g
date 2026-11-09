@@ -82,6 +82,79 @@ func TestCreateUploaderAPI_MultipartChecksumCalculation(t *testing.T) {
 	}
 }
 
+// createOnlyClient answers single and multipart uploads, recording each request's If-None-Match by kind,
+// and refuses the object-creating request with 412 when exists is set.
+func createOnlyClient(exists bool, seen map[string][]string) *awss3.Client {
+	return awss3.NewFromConfig(aws.Config{
+		Region:      "us-east-1",
+		Credentials: credentials.NewStaticCredentialsProvider("key", "secret", ""),
+		HTTPClient: smithyhttp.ClientDoFunc(func(req *http.Request) (*http.Response, error) {
+			if req.Body != nil {
+				if _, err := io.Copy(io.Discard, req.Body); err != nil {
+					return nil, err
+				}
+			}
+			header, status, body := http.Header{}, http.StatusOK, ""
+			kind := "put"
+			switch {
+			case req.URL.Query().Has("uploads"):
+				kind, body = "initiate", "<InitiateMultipartUploadResult><UploadId>upload-id</UploadId></InitiateMultipartUploadResult>"
+			case req.URL.Query().Has("partNumber"):
+				kind = "part"
+				header.Set("ETag", "\"part-etag\"")
+			case req.Method == http.MethodPost:
+				kind, body = "complete", "<CompleteMultipartUploadResult><ETag>\"object-etag\"</ETag></CompleteMultipartUploadResult>"
+			case req.Method == http.MethodDelete:
+				kind, status = "abort", http.StatusNoContent
+			}
+			seen[kind] = append(seen[kind], req.Header.Get("If-None-Match"))
+			if exists && (kind == "put" || kind == "complete") {
+				status, body = http.StatusPreconditionFailed, "<Error><Code>PreconditionFailed</Code></Error>"
+			}
+			return &http.Response{StatusCode: status, Header: header,
+				Body: io.NopCloser(strings.NewReader(body)), Request: req}, nil
+		}),
+	}, func(o *awss3.Options) {
+		o.BaseEndpoint = aws.String("https://s3.example.com")
+		o.UsePathStyle = true
+	})
+}
+
+func TestUpload_CreateOnly(t *testing.T) {
+	const partSize = 5 * 1024 * 1024
+	for _, tc := range []struct {
+		name       string
+		size       int
+		createOnly bool
+		want       map[string][]string
+	}{
+		{"single put", 1, true, map[string][]string{"put": {"*"}}},
+		{"multipart", partSize + 1, true, map[string][]string{"initiate": {""}, "part": {"", ""}, "complete": {"*"}}},
+		{"single put, off", 1, false, map[string][]string{"put": {""}}},
+		{"multipart, off", partSize + 1, false, map[string][]string{"initiate": {""}, "part": {"", ""}, "complete": {""}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			seen := map[string][]string{}
+			uploader := NewUploader(CreateUploaderAPI(createOnlyClient(false, seen), partSize, 1), "", "", "", "STANDARD", "", -1)
+			uploader.createOnly = tc.createOnly
+			require.NoError(t, uploader.upload(t.Context(), "bucket", "object", strings.NewReader(strings.Repeat("x", tc.size))))
+			assert.Equal(t, tc.want, seen)
+		})
+	}
+}
+
+func TestUpload_CreateOnlyExisting(t *testing.T) {
+	const partSize = 5 * 1024 * 1024
+	for _, size := range []int{1, partSize + 1} {
+		t.Run(fmt.Sprint(size), func(t *testing.T) {
+			uploader := NewUploader(CreateUploaderAPI(createOnlyClient(true, map[string][]string{}), partSize, 1), "", "", "", "STANDARD", "", -1)
+			uploader.createOnly = true
+			err := uploader.upload(t.Context(), "bucket", "object", strings.NewReader(strings.Repeat("x", size)))
+			assert.ErrorIs(t, err, storage.ErrObjectAlreadyExists)
+		})
+	}
+}
+
 var (
 	dummyStorageClass         = "dummyStorageClass"
 	dummyServerSideEncryption = "dummyServerSideEncryption"

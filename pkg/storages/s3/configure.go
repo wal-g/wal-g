@@ -53,6 +53,7 @@ const (
 	disable100ContinueSetting      = "S3_DISABLE_100_CONTINUE"
 	enableVersioningSetting        = "S3_ENABLE_VERSIONING"
 	deleteBatchSizeSetting         = "S3_DELETE_BATCH_SIZE"
+	createOnlySetting              = "S3_CREATE_ONLY"
 )
 
 var SettingList = []string{
@@ -95,6 +96,7 @@ var SettingList = []string{
 	disable100ContinueSetting,
 	enableVersioningSetting,
 	deleteBatchSizeSetting,
+	createOnlySetting,
 }
 
 const (
@@ -218,6 +220,10 @@ func configureStorage(
 	if err != nil {
 		return nil, err
 	}
+	createOnly, err := setting.BoolOptional(settings, createOnlySetting, false)
+	if err != nil {
+		return nil, err
+	}
 
 	config := &Config{
 		Secrets: &Secrets{
@@ -257,6 +263,7 @@ func configureStorage(
 			ServerSideEncryptionKMSID:    settings[sseKmsIDSetting],
 			RetentionPeriod:              retentionPeriod,
 			RetentionMode:                settings[retentionModeSetting],
+			CreateOnly:                   createOnly,
 		},
 		RangeBatchEnabled:       rangeBatchEnabled,
 		RangeMaxRetries:         rangeMaxRetries,

@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -24,6 +25,9 @@ type UploaderConfig struct {
 	ServerSideEncryptionKMSID    string
 	RetentionPeriod              int
 	RetentionMode                string
+	// CreateOnly sends If-None-Match: * on every upload, so a store that enforces conditional writes never lets
+	// WAL-G replace an object.
+	CreateOnly bool
 }
 
 // UploaderAPI is the narrow caller-defined interface against v2's manager.Uploader.
@@ -49,6 +53,7 @@ func createUploader(s3Client *s3.Client, config *UploaderConfig) (*Uploader, err
 	)
 	uploader.partSize = int64(config.MaxPartSize)
 	uploader.autoPartSize = config.AutoPartSize
+	uploader.createOnly = config.CreateOnly
 	return uploader, nil
 }
 
@@ -56,6 +61,7 @@ type Uploader struct {
 	uploaderAPI          UploaderAPI
 	partSize             int64
 	autoPartSize         bool
+	createOnly           bool
 	serverSideEncryption string
 	SSECustomerKey       string
 	SSEKMSKeyID          string
@@ -87,6 +93,10 @@ func (uploader *Uploader) createUploadInput(bucket, path string, content io.Read
 		Body:         content,
 		StorageClass: types.StorageClass(uploader.StorageClass),
 	}
+	if uploader.createOnly {
+		// The manager copies this onto CompleteMultipartUpload; initiation and parts carry no precondition.
+		uploadInput.IfNoneMatch = aws.String("*")
+	}
 	if uploader.RetentionPeriod != defaultDisabledRetentionPeriod {
 		mytime := time.Now().Add(time.Second * uploader.RetentionPeriod)
 		uploadInput.ObjectLockMode = types.ObjectLockMode(uploader.RetentionMode)
@@ -116,19 +126,28 @@ func (uploader *Uploader) upload(ctx context.Context, bucket, path string, conte
 	input := uploader.createUploadInput(bucket, path, content)
 	if !uploader.autoPartSize {
 		_, err := uploader.uploaderAPI.Upload(ctx, input)
-		return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
+		return uploader.uploadError(err, bucket, path)
 	}
 
 	size, known := uploadSize(content)
 	if !known {
 		_, err := uploader.uploaderAPI.Upload(ctx, input)
-		return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
+		return uploader.uploadError(err, bucket, path)
 	}
 
 	partSize := max((size+int64(manager.MaxUploadParts)-1)/int64(manager.MaxUploadParts), uploader.partSize)
 	_, err := uploader.uploaderAPI.Upload(ctx, input, func(options *manager.Uploader) {
 		options.PartSize = partSize
 	})
+	return uploader.uploadError(err, bucket, path)
+}
+
+// uploadError reports a create-only upload refused because the object exists as storage.ErrObjectAlreadyExists.
+func (uploader *Uploader) uploadError(err error, bucket, path string) error {
+	var apiErr smithy.APIError
+	if uploader.createOnly && errors.As(err, &apiErr) && apiErr.ErrorCode() == "PreconditionFailed" {
+		return fmt.Errorf("upload '%s' to bucket '%s': %w", path, bucket, storage.ErrObjectAlreadyExists)
+	}
 	return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
 }
 
