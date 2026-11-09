@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/progress"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -62,11 +63,18 @@ func NewBackupInStorage(ctx context.Context, baseBackupFolder storage.Folder, na
 	return Backup{Backup: backup}, nil
 }
 
-func (backup *Backup) GetTarNames(ctx context.Context) ([]string, error) {
-	tarPartitionFolder := backup.GetTarPartitionFolder()
-	objects, _, err := tarPartitionFolder.ListFolder(ctx)
+func (backup *Backup) getTarObjects(ctx context.Context) ([]storage.Object, error) {
+	objects, _, err := backup.GetTarPartitionFolder().ListFolder(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to list backup '%s' for deletion", backup.Name)
+		return nil, errors.Wrapf(err, "unable to list backup '%s'", backup.Name)
+	}
+	return objects, nil
+}
+
+func (backup *Backup) GetTarNames(ctx context.Context) ([]string, error) {
+	objects, err := backup.getTarObjects(ctx)
+	if err != nil {
+		return nil, err
 	}
 	result := make([]string, len(objects))
 	for id, object := range objects {
@@ -270,6 +278,7 @@ func (backup *Backup) unwrapOld(
 	dbDataDirectory string, filesToUnwrap map[string]bool, createIncrementalFiles bool,
 	extractProv ExtractProvider,
 ) error {
+	backup.setRestoreProgress(ctx)
 	tarInterpreter, concurrentTarsToExtract, sequentialTarsToExtract, err := extractProv.Get(
 		ctx, *backup, filesToUnwrap, false, dbDataDirectory, createIncrementalFiles)
 	if err != nil {
@@ -297,6 +306,14 @@ func (backup *Backup) unwrapOld(
 
 	tracelog.InfoLogger.Print("\nBackup extraction complete.\n")
 	return nil
+}
+
+func (backup *Backup) setRestoreProgress(ctx context.Context) {
+	backupType := "full"
+	if backup.SentinelDto.IsIncremental() {
+		backupType = "delta"
+	}
+	progress.SetStage(ctx, "restoring "+backupType+" "+backup.Name)
 }
 
 func IsPgControlRequired(backup Backup) bool {
