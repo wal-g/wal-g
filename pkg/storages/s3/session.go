@@ -283,8 +283,8 @@ func detectAWSRegionByBucket(ctx context.Context, awsCfg *aws.Config, bucket, en
 }
 
 // withDynamicEndpoint rewrites the request URL host using a value fetched from
-// EndpointSource on each request. It runs as a Build middleware so the rewrite
-// happens before signing, matching v1's Validate handler timing.
+// EndpointSource on each attempt, after SDK endpoint resolution and before signing.
+// A Build middleware runs too early: ResolveEndpointV2 overwrites its URL changes.
 func withDynamicEndpoint(endpointSource, port, staticEndpoint, scheme, host string, isolateTransport bool) func(*s3.Options) {
 	mw := &dynamicEndpointMiddleware{
 		source:         endpointSource,
@@ -298,7 +298,7 @@ func withDynamicEndpoint(endpointSource, port, staticEndpoint, scheme, host stri
 	}
 	return func(o *s3.Options) {
 		o.APIOptions = append(o.APIOptions, func(s *middleware.Stack) error {
-			return s.Build.Add(mw, middleware.After)
+			return s.Finalize.Insert(mw, "ResolveEndpointV2", middleware.After)
 		})
 	}
 }
@@ -314,12 +314,12 @@ type dynamicEndpointMiddleware struct {
 
 func (*dynamicEndpointMiddleware) ID() string { return "walgDynamicEndpoint" }
 
-func (m *dynamicEndpointMiddleware) HandleBuild(
-	ctx context.Context, in middleware.BuildInput, next middleware.BuildHandler,
-) (middleware.BuildOutput, middleware.Metadata, error) {
+func (m *dynamicEndpointMiddleware) HandleFinalize(
+	ctx context.Context, in middleware.FinalizeInput, next middleware.FinalizeHandler,
+) (middleware.FinalizeOutput, middleware.Metadata, error) {
 	req, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
-		return next.HandleBuild(ctx, in)
+		return next.HandleFinalize(ctx, in)
 	}
 	endpoint := requestEndpointFromSource(ctx, m.source, m.port, m.client)
 	if endpoint != nil {
@@ -330,7 +330,7 @@ func (m *dynamicEndpointMiddleware) HandleBuild(
 	} else {
 		tracelog.DebugLogger.Printf("using S3 endpoint %s", m.staticEndpoint)
 	}
-	return next.HandleBuild(ctx, in)
+	return next.HandleFinalize(ctx, in)
 }
 
 func withAdditionalHeaders(headers map[string]string) func(*s3.Options) {
