@@ -84,9 +84,13 @@ func backupWALRange(sentinel BackupSentinelDto, label []byte) (uint32, WalSegmen
 	if sentinel.BackupStartLSN == nil || sentinel.BackupFinishLSN == nil {
 		return 0, 0, 0, fmt.Errorf("backup metadata has no valid LSN boundaries")
 	}
+	start, finish := *sentinel.BackupStartLSN, *sentinel.BackupFinishLSN
+	if start == 0 || finish <= start {
+		return 0, 0, 0, fmt.Errorf("invalid backup LSN boundaries: start %s must be nonzero and less than finish %s", start, finish)
+	}
 	// The start LSN is inclusive, even at an exact segment boundary. The finish
 	// LSN points just after the last required record.
-	first := NewWalSegmentNo(*sentinel.BackupStartLSN)
-	last := NewWalSegmentNo(*sentinel.BackupFinishLSN - 1)
+	first := NewWalSegmentNo(start)
+	last := NewWalSegmentNo(finish - 1)
 	return timeline, first, last, nil
 }

@@ -132,10 +132,25 @@ func testBackupWALRange(t *testing.T) {
 		{name: "exact segment boundaries", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: finish}, first: 2, last: 3},
 		{name: "inside segments", label: label, dto: BackupSentinelDto{BackupStartLSN: lsn(2*WalSegmentSize + 40), BackupFinishLSN: lsn(3*WalSegmentSize + 40)}, first: 2, last: 3},
 		{name: "single segment", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: lsn(2*WalSegmentSize + 40)}, first: 2, last: 2},
+		{name: "start just before boundary", label: label, dto: BackupSentinelDto{BackupStartLSN: lsn(2*WalSegmentSize - 1), BackupFinishLSN: finish}, first: 1, last: 3},
+		{name: "start just after boundary", label: label, dto: BackupSentinelDto{BackupStartLSN: lsn(2*WalSegmentSize + 1), BackupFinishLSN: finish}, first: 2, last: 3},
+		{name: "finish just before boundary", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: lsn(4*WalSegmentSize - 1)}, first: 2, last: 3},
+		{name: "finish just after boundary", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: lsn(4*WalSegmentSize + 1)}, first: 2, last: 4},
+		{name: "one byte ending at boundary", label: label, dto: BackupSentinelDto{BackupStartLSN: lsn(2*WalSegmentSize - 1), BackupFinishLSN: start}, first: 1, last: 1},
+		{name: "one byte starting at boundary", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: lsn(2*WalSegmentSize + 1)}, first: 2, last: 2},
+		{name: "maximum finish LSN", label: label, dto: BackupSentinelDto{BackupStartLSN: lsn(^uint64(0) - 1), BackupFinishLSN: lsn(^uint64(0))}, first: WalSegmentNo((^uint64(0) - 1) / WalSegmentSize), last: WalSegmentNo((^uint64(0) - 1) / WalSegmentSize)},
 		{name: "delta uses selected backup", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: finish, IncrementFromLSN: lsn(1)}, first: 2, last: 3},
 		{name: "LSNs override filenames", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: finish, StartWalFileName: WalSegmentNo(1).GetFilename(1), EndWalFileName: WalSegmentNo(8).GetFilename(4)}, first: 2, last: 3},
 		{name: "missing start", label: label, dto: BackupSentinelDto{BackupFinishLSN: finish}, wantError: "no valid LSN boundaries"},
 		{name: "missing finish", label: label, dto: BackupSentinelDto{BackupStartLSN: start}, wantError: "no valid LSN boundaries"},
+		{name: "missing both LSNs", label: label, wantError: "no valid LSN boundaries"},
+		{name: "zero start", label: label, dto: BackupSentinelDto{BackupStartLSN: lsn(0), BackupFinishLSN: finish}, wantError: "invalid backup LSN boundaries"},
+		{name: "zero finish", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: lsn(0)}, wantError: "invalid backup LSN boundaries"},
+		{name: "both zero", label: label, dto: BackupSentinelDto{BackupStartLSN: lsn(0), BackupFinishLSN: lsn(0)}, wantError: "invalid backup LSN boundaries"},
+		{name: "equal at boundary", label: label, dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: start}, wantError: "invalid backup LSN boundaries"},
+		{name: "equal inside segment", label: label, dto: BackupSentinelDto{BackupStartLSN: lsn(2*WalSegmentSize + 1), BackupFinishLSN: lsn(2*WalSegmentSize + 1)}, wantError: "invalid backup LSN boundaries"},
+		{name: "reversed across segments", label: label, dto: BackupSentinelDto{BackupStartLSN: finish, BackupFinishLSN: start}, wantError: "invalid backup LSN boundaries"},
+		{name: "reversed within segment", label: label, dto: BackupSentinelDto{BackupStartLSN: lsn(2*WalSegmentSize + 2), BackupFinishLSN: lsn(2*WalSegmentSize + 1)}, wantError: "invalid backup LSN boundaries"},
 		{name: "CRLF label", label: "START WAL LOCATION: 0/1000028 (file " + WalSegmentNo(1).GetFilename(3) + ")\r\n", dto: BackupSentinelDto{BackupStartLSN: start, BackupFinishLSN: finish}, first: 2, last: 3},
 		{name: "empty label", wantError: "no valid START WAL LOCATION"},
 		{name: "malformed filename", label: "START WAL LOCATION: 0/1000028 (file ../../invalid)\n", wantError: "no valid START WAL LOCATION"},
@@ -145,6 +160,9 @@ func testBackupWALRange(t *testing.T) {
 			timeline, first, last, err := backupWALRange(tc.dto, []byte(tc.label))
 			if tc.wantError != "" {
 				require.ErrorContains(t, err, tc.wantError)
+				require.Zero(t, timeline)
+				require.Zero(t, first)
+				require.Zero(t, last)
 				return
 			}
 			require.NoError(t, err)
