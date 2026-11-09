@@ -242,6 +242,14 @@ If a backup is started from a standby server, WAL-G will monitor the timeline of
 
 ``backup-push`` can also be run with the ``--permanent`` flag, which will mark the backup as permanent and prevent it from being removed when running ``delete``.
 
+``backup-push`` has no time limit by default, so it can hang for a long time when the storage stops responding. Pass ``--timeout`` to bound the whole run:
+
+```bash
+wal-g backup-push --timeout 6h $PGDATA
+```
+
+When the timeout expires, in-flight storage operations are cancelled and ``backup-push`` exits with a non-zero code. The partially uploaded backup has no sentinel, so it is not listed by ``backup-list``.
+
 #### Journal size (WAL volume) accounting
 
 Run ``backup-push`` with the ``--count-journals`` flag to maintain a ``journal_<backup>`` object per backup in storage, tracking the volume of WAL accumulated between that backup and the next one. The size is computed from the actual storage object sizes of the archived WAL segments, so it correctly reflects compression, unlike an LSN-difference estimate.
