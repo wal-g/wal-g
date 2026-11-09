@@ -585,7 +585,7 @@ func (bh *BackupHandler) waitForWALArchive(ctx context.Context, rootFolder stora
 	if err != nil {
 		return fmt.Errorf("failed to determine backup timeline: %w", err)
 	}
-	firstSegment := NewWalSegmentNo(bh.CurBackupInfo.startLSN - 1)
+	firstSegment := NewWalSegmentNo(bh.CurBackupInfo.startLSN)
 	lastSegment := NewWalSegmentNo(bh.CurBackupInfo.endLSN - 1)
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
 	compressionExtension := bh.Arguments.Uploader.Compression().FileExtension()

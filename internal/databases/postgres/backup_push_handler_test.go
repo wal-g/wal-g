@@ -95,6 +95,58 @@ func TestHandleJournalInfo(t *testing.T) {
 	})
 }
 
+func TestWaitForWALArchiveLSNBoundaries(t *testing.T) {
+	const timeline = uint32(3)
+	startBoundary := WalSegmentNo(10).firstLsn()
+	endBoundary := WalSegmentNo(12).firstLsn()
+	tests := []struct {
+		name        string
+		start, end  LSN
+		first, last WalSegmentNo
+	}{
+		{"start before boundary", startBoundary - 1, endBoundary + 1, 9, 12},
+		{"start at boundary", startBoundary, endBoundary + 1, 10, 12},
+		{"start after boundary", startBoundary + 1, endBoundary + 1, 10, 12},
+		{"end before boundary", startBoundary, endBoundary - 1, 10, 11},
+		{"end at boundary", startBoundary, endBoundary, 10, 11},
+		{"end after boundary", startBoundary, endBoundary + 1, 10, 12},
+		{"single segment ending at boundary", startBoundary, WalSegmentNo(11).firstLsn(), 10, 10},
+		{"both LSNs within one segment", startBoundary + 1, startBoundary + 2, 10, 10},
+		{"zero start LSN", 0, 1, 0, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			folder := &archiveWaitRecordingFolder{
+				Folder: memory.NewFolder("", memory.NewKVS()),
+				calls:  &[]string{},
+			}
+			handler := &BackupHandler{
+				CurBackupInfo: CurBackupInfo{
+					Name:     "base_" + tt.first.GetFilename(timeline),
+					startLSN: tt.start,
+					endLSN:   tt.end,
+				},
+				Arguments: BackupArguments{
+					Uploader:          internal.NewRegularUploader(lz4.Compressor{}, folder),
+					waitForWALArchive: true,
+				},
+			}
+			var expected []string
+			for segment := tt.first; segment <= tt.last; segment++ {
+				name := segment.GetFilename(timeline) + ".lz4"
+				expected = append(expected, name)
+				require.NoError(t, folder.GetSubFolder(utility.WalPath).PutObject(t.Context(), name, strings.NewReader("WAL")))
+			}
+			// Cancel up front so an unexpected lookup fails without waiting for a poll.
+			// The memory folder still permits the expected objects to be inspected.
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+			require.NoError(t, handler.waitForWALArchive(ctx, folder))
+			require.Equal(t, expected, *folder.calls)
+		})
+	}
+}
+
 func TestWaitForWALArchive(t *testing.T) {
 	const timeline = uint32(3)
 	firstSegment := WalSegmentNo(10)
