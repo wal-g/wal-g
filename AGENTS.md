@@ -101,6 +101,17 @@ Removing a sentinel also does not protect a restore that has already read it.
 
 ## WAL pipelines
 
+- `backup-fetch --fetch-wal` takes the timeline from the restored `backup_label`
+  and computes its WAL range from the sentinel's inclusive start LSN and exclusive
+  finish LSN. At an exact start boundary, use the segment starting there, even if
+  the name or `StartWalFileName` refers to the preceding segment. Both LSNs are
+  required; delta ancestors do not extend the range. WAL reads are delegated to
+  `HandleWALFetch` with `NopPrefetcher` and a reader rooted above `wal_005`; see
+  `backup_fetch_wal.go` and its regression tests. The current handler writes
+  directly to the destination and may leave output on failure. Size validation
+  and safe publication remain deferred handler fixes; backup-fetch tests check
+  error propagation rather than promising those guarantees.
+
 - Keep one `pgproto3.Backend` per `wal-send` connection, including startup and
   COPY: it can buffer the next query while reading CopyDone. Hand reading back
   to the command loop only after the COPY reader exits, and serialize each
@@ -152,6 +163,13 @@ Removing a sentinel also does not protect a restore that has already read it.
 
 ## Validation and handoff
 
+- `pg_ctl -w start` can return when hot standby accepts connections, before
+  promotion finishes. Tests expecting a writable restored cluster must wait for
+  `pg_is_in_recovery()` to become false; see `backup_fetch_wal_test.sh`.
+- Register new S3 integration-test buckets in `docker-compose.yml` under the
+  `s3` service's `S3_BUCKET`. Its healthcheck (`docker/s3/check-ready.sh`) verifies
+  only registered buckets; a healthy service can still return `NoSuchBucket`
+  for a bucket referenced only in a test config.
 - Start with a failing reproducer; run focused tests, affected package suites and
   race tests for concurrency changes. Use the current Makefile/CI recipes for
   native dependencies and integration tests. Include Greenplum where shared

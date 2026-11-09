@@ -158,6 +158,23 @@ WAL-G can fetch the backup that has the specific UserData (stored in backup meta
 wal-g backup-fetch /path --target-user-data "{ \"x\": [3], \"y\": 4 }"
 ```
 
+To download the WAL needed to make the selected backup consistent during `backup-fetch`, add `--fetch-wal`:
+
+```bash
+wal-g backup-fetch /path LATEST --fetch-wal
+```
+
+WAL-G downloads the required segments into the restored cluster's `pg_wal` directory
+(`pg_xlog` before PostgreSQL 10), along with its timeline history when applicable.
+This works with both unpack modes and incremental backups; only WAL for the selected
+backup's recovery interval is fetched. Missing or corrupt required WAL makes the command fail.
+For clusters with a nondefault WAL segment size, set `WALG_PG_WAL_SIZE` to the cluster's
+segment size in MiB, as for `wal-fetch`.
+
+PostgreSQL still replays these files when it starts. This flag does not fetch WAL beyond
+the backup's end for point-in-time recovery or configure PostgreSQL recovery settings;
+keep `restore_command` configured if recovery needs additional archived WAL.
+
 #### Reverse delta unpack
 
 Beta feature: WAL-G can unpack delta backups in reverse order to improve fetch efficiency.
