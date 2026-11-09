@@ -2,7 +2,9 @@ package postgres
 
 import (
 	"archive/tar"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -76,6 +78,39 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Rea
 	return utility.WriteLocalFile(fileReader, fileInfo, file, fsync)
 }
 
+// handleSymlink will follow all required logic to properly handle symlinks.
+// Logic depends on which unwrap implementation is used, whether the file was already extracted before
+// and other file stat information on the target file
+func handleSymlink(linkTarget string, targetPath string) error {
+	// In some edge cases symlinks end up in the delta backups multiple times.
+	// os.Symlink cannot replace symlinks that already exist, and we want the latest symlink in our final restore.
+	// Therefore, we check symlinks in the tar file to see if they already exist and already are symlinks in the
+	// restore in which case we replace it (remove before creation).
+	if fi, err := os.Lstat(targetPath); os.IsNotExist(err) {
+		tracelog.DebugLogger.Printf("Interpret: %s does not yet exist", targetPath)
+	} else if err != nil {
+		return fmt.Errorf("Interpret: failed to stat %s: %w", targetPath, err)
+	} else if fi.Mode()&fs.ModeSymlink != 0 {
+		if useNewUnwrapImplementation {
+			tracelog.DebugLogger.Printf("Interpret: symlink %s already exists from a newer backup, keeping it", targetPath)
+			return nil
+		} else if err = os.Remove(targetPath); err == nil {
+			// target exists and is symlink and using old unwrap implementation. Replace (remove before create)
+			tracelog.DebugLogger.Printf("Interpret: symlink %s already existed. Removed so we can replace.", targetPath)
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("Interpret: symlink %s already exists, and could not be removed: %w", targetPath, err)
+		}
+	} else {
+		// if it exists and is no symlink we could remove data
+		// this probably is coming from an earlier tar from this restore, but let's not take any chances
+		return fmt.Errorf("Interpret: %s exists and is no symlink", targetPath)
+	}
+	if err := os.Symlink(linkTarget, targetPath); err != nil {
+		return errors.Wrapf(err, "Interpret: failed to create symlink %s", targetPath)
+	}
+	return nil
+}
+
 // Interpret extracts a tar file to disk and creates needed directories.
 // Returns the first error encountered. Calls fsync after each file
 // is written successfully.
@@ -104,8 +139,8 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 			return errors.Wrapf(err, "Interpret: failed to create hardlink %s", targetPath)
 		}
 	case tar.TypeSymlink:
-		if err := os.Symlink(fileInfo.Name, targetPath); err != nil {
-			return errors.Wrapf(err, "Interpret: failed to create symlink %s", targetPath)
+		if err := handleSymlink(fileInfo.Linkname, targetPath); err != nil {
+			return err
 		}
 	}
 	return nil

@@ -7,6 +7,9 @@ set -e -x
 prepare_config "/tmp/configs/several_delta_backups_test_config.json"
 
 initdb ${PGDATA}
+# Sometimes, files are actually symlinks, and to check that wal-g can operate on that we also add one symlinked file.
+# Below is what Stolon does to disable `ALTER SYSTEM` options and is required to support stolon/wal-g configurations.
+ln -sf /dev/null "${PGDATA}/postgresql.auto.conf"
 
 echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
 echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p && mkdir -p /tmp/deltas/$(basename %p)'" >> ${PGDATA}/postgresql.conf
@@ -38,6 +41,12 @@ sleep 1
 /tmp/scripts/drop_pg.sh
 
 wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST
+
+# The symlink must be restored with its original target, not as a symlink to itself.
+if [ "$(readlink "${PGDATA}/postgresql.auto.conf")" != "/dev/null" ]; then
+  echo "postgresql.auto.conf was restored as symlink to '$(readlink "${PGDATA}/postgresql.auto.conf")' instead of '/dev/null'"
+  exit 1
+fi
 
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" | write_recovery_settings
 
