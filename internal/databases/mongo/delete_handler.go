@@ -67,9 +67,11 @@ func HandlePurge(ctx context.Context, downloader archive.Downloader, purger arch
 		return err
 	}
 
-	_, _, err = HandleBackupsPurge(ctx, backupTimes, downloader, purger, opts)
-	if err != nil {
-		return err
+	if opts.retainCount != nil || opts.retainAfter != nil {
+		_, _, err = HandleBackupsPurge(ctx, backupTimes, downloader, purger, opts)
+		if err != nil {
+			return err
+		}
 	}
 
 	if opts.purgeOplog {

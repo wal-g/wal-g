@@ -79,6 +79,10 @@ Removing a sentinel also does not protect a restore that has already read it.
   client. Check `pkg/storages/s3/session.go` and its tests.
 - Recursive filesystem listings can contain leading slashes. Normalize paths
   before applying protected-prefix filters, and test both forms through wrappers.
+- MongoDB and Redis purge without a retention policy must not load completed
+  backup sentinels: garbage prefixes are determined from the listing alone.
+  Retention policies still require metadata. See
+  `TestPurgeGarbageWithUnreadableSentinel` in both databases' `delete_handler_test.go`.
 
 ## Avoid listings in hot paths
 
