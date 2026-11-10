@@ -238,7 +238,7 @@ func TestDaemonArchiverTimeoutAndRecovery(t *testing.T) {
 func TestDaemonArchiverGapRefill(t *testing.T) {
 	archiveTestConfig(t)
 	files := archiveTestFiles(t, 7)
-	// Force the sorted-list fallback, with more work than background slots.
+	// Force the directory-list fallback, with more work than background slots.
 	require.NoError(t, os.Remove(filepath.Join(filepath.Dir(files[1]), archiveStatusDir, filepath.Base(files[1])+readySuffix)))
 	manager := asm.NewFakeASM()
 	a := newDaemonArchiver(t.Context(), 2, 5, time.Minute, manager,
@@ -264,6 +264,7 @@ func TestDaemonArchiverCandidateRolloverAndCache(t *testing.T) {
 	// READY_RENAME removes .ready, but ASM still provides the lookahead bridge.
 	require.NoError(t, manager.MarkWalUploaded(next))
 	require.NoError(t, os.Remove(filepath.Join(dir, archiveStatusDir, filepath.Base(next)+readySuffix)))
+	scan.cursor = anchor // Rediscover the bridge using the persistent success marker.
 	require.Equal(t, []string{next}, a.candidates(anchor, &scan))
 	require.True(t, scan.lastFullScan.IsZero())
 }

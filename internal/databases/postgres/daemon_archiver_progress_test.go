@@ -130,6 +130,53 @@ func TestDaemonArchiveScanBoundsAndClosesListing(t *testing.T) {
 	require.Equal(t, other, scan.cursor)
 }
 
+func TestDaemonArchiveScanKeepsSequentialPriorityDuringListing(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 8)
+	a := &daemonArchiver{window: 2, manager: asm.NewFakeASM()}
+	var scan daemonArchiveScan
+	scan.follow(files[0])
+	// Give reconciliation a far-ahead entry first, independently of the host
+	// filesystem's directory order. The real archive_status also has near WALs.
+	listingDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(listingDir, filepath.Base(files[7])+readySuffix), nil, 0600))
+	var err error
+	scan.listing, err = os.Open(listingDir)
+	require.NoError(t, err)
+	defer scan.closeListing()
+
+	require.Equal(t, files[1:3], a.candidates(files[0], &scan),
+		"reconciliation must not replace contiguous discovery with directory order")
+	require.Equal(t, files[2], scan.cursor, "far-ahead listed entries must not move the sequential cursor")
+}
+
+func TestDaemonArchiverRetriesBeforePendingNewWAL(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 5)
+	started := make(chan string, 2)
+	a := newDaemonArchiver(t.Context(), 2, 0, time.Minute, asm.NewFakeASM(), archiveTestFactory(
+		func(ctx context.Context, file ioextensions.NamedReader) error {
+			started <- file.Name()
+			<-ctx.Done()
+			return ctx.Err()
+		}))
+	defer a.Close()
+	// A known failure's backoff has expired while newer candidates remain.
+	a.mu.Lock()
+	a.retryAfter[files[1]] = time.Now().Add(-time.Second)
+	a.retryAfter[files[2]] = time.Now().Add(-time.Second)
+	a.mu.Unlock()
+	scan := daemonArchiveScan{dir: filepath.Dir(files[0]), cursor: files[3], pending: []string{files[4]}}
+	a.refill(files[0], &scan)
+	select {
+	case filename := <-started:
+		require.Equal(t, files[1], filename, "old retries must precede new pending WALs")
+	case <-time.After(3 * time.Second):
+		t.Fatal("no WAL upload started")
+	}
+	require.Equal(t, []string{files[4]}, scan.pending, "busy workers must retain newer candidates")
+}
+
 func TestDaemonArchiverNewReadyWithoutClientRequest(t *testing.T) {
 	archiveTestConfig(t)
 	files := archiveTestFiles(t, 4)
@@ -146,13 +193,14 @@ func TestDaemonArchiverNewReadyWithoutClientRequest(t *testing.T) {
 		"contiguous arrivals must not wait for a new client request or five-second reconciliation")
 }
 
-func TestDaemonArchiverExpiresRetryStateWithoutClientProgress(t *testing.T) {
+func TestDaemonArchiverRetainsDueRetryWithoutClientProgress(t *testing.T) {
 	files := archiveTestFiles(t, 3)
 	a := &daemonArchiver{anchor: files[0], retryAfter: map[string]time.Time{
 		files[1]: time.Now().Add(-time.Second),
 		files[2]: time.Now().Add(time.Minute),
 	}}
 	require.Equal(t, files[0], a.scanAnchor())
-	require.NotContains(t, a.retryAfter, files[1])
+	require.Contains(t, a.retryAfter, files[1], "expiry must make a retry eligible without losing it")
 	require.Contains(t, a.retryAfter, files[2])
+	require.Equal(t, files[1], a.retryCandidate(files[0]))
 }

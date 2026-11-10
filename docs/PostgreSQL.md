@@ -738,7 +738,10 @@ retry a failed foreground request immediately.
 
 Next WAL names are predicted arithmetically and checked for `.ready` status. A bounded,
 streaming directory scan handles gaps and periodically revisits failures and late ready
-files. Directory passes are separated by at least five seconds. Storage selection is repeated for each new upload
+files. Sequential discovery continues during directory passes, and known failed uploads
+are retried before newer WALs once their retry delay expires. Other workers can continue
+past an upload that is still running or waiting for retry; completion order is not guaranteed.
+Directory passes are separated by at least five seconds. Storage selection is repeated for each new upload
 using the existing multi-storage health cache; in-flight uploads are not moved between
 storages. Standalone `wal-push` and WAL delta mode retain their batch lifecycle.
 

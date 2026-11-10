@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -219,6 +220,8 @@ func (a *daemonArchiver) startJob(ctx context.Context, filename string, backgrou
 		a.mu.Lock()
 		if background && (job.err != nil || job.markFailed) {
 			a.retryAfter[filename] = time.Now().Add(time.Second)
+		} else if job.err == nil && !job.markFailed {
+			delete(a.retryAfter, filename)
 		}
 		delete(a.jobs, filename)
 		close(job.done)
@@ -284,6 +287,9 @@ func (a *daemonArchiver) scan() {
 
 func (a *daemonArchiver) refill(anchor string, scan *daemonArchiveScan) {
 	scan.follow(anchor)
+	if !a.retryFailed(anchor) {
+		return
+	}
 	if len(scan.pending) == 0 {
 		scan.pending = a.candidates(anchor, scan)
 	}
@@ -300,25 +306,59 @@ func (a *daemonArchiver) refill(anchor string, scan *daemonArchiveScan) {
 			}
 		}
 		scan.pending = scan.pending[1:]
-		if filename > scan.cursor {
-			scan.cursor = filename
-		}
 	}
 	if len(scan.pending) == 0 && (hadCandidates || scan.listing != nil) {
 		a.notify() // A batch is a memory bound, not an archival progress limit.
 	}
 }
 
-// Expire retry delays even when PostgreSQL is stuck on the same WAL.
+// Keep due retries until they can run, even when PostgreSQL is stuck on one WAL.
 func (a *daemonArchiver) scanAnchor() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	for filename, retryAt := range a.retryAfter {
-		if !time.Now().Before(retryAt) || filename <= a.anchor || filepath.Dir(filename) != filepath.Dir(a.anchor) {
+	for filename := range a.retryAfter {
+		if filename <= a.anchor || filepath.Dir(filename) != filepath.Dir(a.anchor) {
 			delete(a.retryAfter, filename)
 		}
 	}
 	return a.anchor
+}
+
+func (a *daemonArchiver) retryCandidate(anchor string) string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	var oldest string
+	now := time.Now()
+	for filename, retryAt := range a.retryAfter {
+		if filename <= anchor || filepath.Dir(filename) != filepath.Dir(anchor) ||
+			now.Before(retryAt) || a.jobs[filename] != nil {
+			continue
+		}
+		if oldest == "" || filename < oldest {
+			oldest = filename
+		}
+	}
+	return oldest
+}
+
+// Retry known failures before consuming newer candidates. Busy uploads and
+// retry delays do not hold up the other workers.
+func (a *daemonArchiver) retryFailed(anchor string) bool {
+	for filename := a.retryCandidate(anchor); filename != ""; filename = a.retryCandidate(anchor) {
+		if !a.needsUpload(filename) {
+			a.mu.Lock()
+			if a.jobs[filename] == nil && !time.Now().Before(a.retryAfter[filename]) {
+				delete(a.retryAfter, filename)
+			}
+			a.mu.Unlock()
+			continue
+		}
+		job, err := a.startJob(a.ctx, filename, true)
+		if err != nil || job == nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (a *daemonArchiver) needsUpload(filename string) bool {
@@ -370,26 +410,38 @@ func (scan *daemonArchiveScan) follow(anchor string) {
 
 func (a *daemonArchiver) candidates(anchor string, scan *daemonArchiveScan) []string {
 	scan.follow(anchor)
+	files := a.predictCandidates(scan.cursor)
+	var listed []string
 	if scan.listing != nil {
-		return a.listCandidates(anchor, scan)
-	}
-	if time.Now().Before(scan.nextRescan) {
-		if files := a.predictCandidates(scan.cursor); len(files) > 0 {
-			return files
+		listed = a.listCandidates(anchor, scan)
+	} else if !time.Now().Before(scan.nextRescan) || (len(files) == 0 && scan.lastFullScan.IsZero()) {
+		scan.lastFullScan = time.Now()
+		scan.nextRescan = scan.lastFullScan.Add(daemonArchiveRescanInterval)
+		var err error
+		scan.listing, err = os.Open(filepath.Join(scan.dir, archiveStatusDir))
+		if err != nil {
+			tracelog.ErrorLogger.Print(fmt.Errorf("scan archive_status: %w", err))
+		} else {
+			listed = a.listCandidates(anchor, scan)
 		}
-		if !scan.lastFullScan.IsZero() {
-			return nil
+	}
+	// Reconciliation can recover old holes, but arbitrary far-ahead directory
+	// entries must not replace sequential discovery or advance its cursor.
+	var older []string
+	for _, filename := range listed {
+		if filename <= scan.cursor {
+			older = append(older, filename)
 		}
 	}
-	scan.lastFullScan = time.Now()
-	scan.nextRescan = scan.lastFullScan.Add(daemonArchiveRescanInterval)
-	var err error
-	scan.listing, err = os.Open(filepath.Join(scan.dir, archiveStatusDir))
-	if err != nil {
-		tracelog.ErrorLogger.Print(fmt.Errorf("scan archive_status: %w", err))
-		return nil
+	if len(older) > 0 {
+		slices.Sort(older)
+		return older
 	}
-	return a.listCandidates(anchor, scan)
+	if len(files) > 0 {
+		scan.cursor = files[len(files)-1]
+		return files
+	}
+	return listed
 }
 
 func (a *daemonArchiver) predictCandidates(cursor string) []string {
