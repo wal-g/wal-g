@@ -114,7 +114,6 @@ type greenplumCopyState struct {
 	segmentBackups map[string]postgres.Backup
 
 	walFolders    map[string]walFolderIndex
-	filesMetadata map[string]struct{}
 	restorePoints map[string]RestorePointMetadata
 }
 
@@ -136,21 +135,20 @@ func newGreenplumCopyState(ctx context.Context, plan *copy.Plan, withHistory boo
 		segmentDepths:  make(map[string]int),
 		segmentBackups: make(map[string]postgres.Backup),
 		walFolders:     make(map[string]walFolderIndex),
-		filesMetadata:  make(map[string]struct{}),
 	}
-	walDir := strings.TrimSuffix(utility.WalPath, "/")
+	if withHistory {
+		// Only direct restore-point metadata, not backup payloads or segments.
+		if err := plan.InventoryFolder(ctx, utility.BaseBackupPath); err != nil {
+			return nil, err
+		}
+	}
 	restorePointPaths := make([]string, 0)
 	for _, object := range plan.SourceObjects() {
 		name := object.GetName()
-		switch {
-		case withHistory && strings.HasPrefix(name, utility.BaseBackupPath) &&
+		if withHistory && strings.HasPrefix(name, utility.BaseBackupPath) &&
 			!strings.Contains(strings.TrimPrefix(name, utility.BaseBackupPath), "/") &&
-			strings.HasSuffix(name, RestorePointSuffix):
+			strings.HasSuffix(name, RestorePointSuffix) {
 			restorePointPaths = append(restorePointPaths, name)
-		case path.Base(name) == ao.FilesMetadataName || path.Base(name) == pax.FilesMetadataName:
-			state.filesMetadata[name] = struct{}{}
-		case path.Base(path.Dir(name)) == walDir:
-			state.indexWAL(name)
 		}
 	}
 	points, err := fetchRestorePoints(ctx, plan.From, restorePointPaths)
@@ -223,10 +221,7 @@ func BuildCopyPlan(
 	backupName string,
 	withHistory bool,
 ) (*copy.Plan, error) {
-	plan, err := copy.NewPlan(ctx, from, to)
-	if err != nil {
-		return nil, err
-	}
+	plan := copy.NewScopedPlan(from, to)
 	names, err := plan.ResolveBackupNames(ctx, backupName)
 	if err != nil {
 		return nil, err
@@ -287,10 +282,10 @@ func addGreenplumBackupToPlan(
 		return err
 	}
 	if withHistory {
-		err = addGreenplumRestorePointMetadata(plan, state, &sentinel, selected, endpoint, lastWAL)
+		err = addGreenplumRestorePointMetadata(ctx, plan, state, &sentinel, selected, endpoint, lastWAL)
 	} else {
 		metadataPath := path.Join(utility.BaseBackupPath, RestorePointMetadataFileName(selected.Name))
-		err = plan.AddObject(metadataPath, metadataPath, copy.RecoveryMetadataPhase, false)
+		err = plan.AddSourceObject(ctx, metadataPath, metadataPath, copy.RecoveryMetadataPhase, false)
 	}
 	if err != nil {
 		return err
@@ -335,7 +330,7 @@ func addGreenplumBackupChain(
 		}
 	}
 	topSentinel := path.Join(strings.TrimSuffix(utility.BaseBackupPath, "/"), internal.SentinelNameFromBackup(name))
-	if err := plan.AddObject(topSentinel, topSentinel, copy.AggregateCommitPhase, false); err != nil {
+	if err := plan.AddSourceObject(ctx, topSentinel, topSentinel, copy.AggregateCommitPhase, false); err != nil {
 		return internal.Backup{}, BackupSentinelDto{}, 0, err
 	}
 	if err := plan.SetOrder(topSentinel, copy.AggregateCommitPhase, depth); err != nil {
@@ -379,10 +374,13 @@ func addGreenplumSegmentChain(
 		}
 		depth = parentDepth + 1
 	}
+	if err := plan.InventoryBackup(ctx, basePath, name); err != nil {
+		return 0, err
+	}
 	if err := plan.AddBackupAt(basePath, name, name); err != nil {
 		return 0, err
 	}
-	if err := addGreenplumSegmentSharedFiles(ctx, plan, state, basePath, backup); err != nil {
+	if err := addGreenplumSegmentSharedFiles(ctx, plan, basePath, backup); err != nil {
 		return 0, fmt.Errorf("plan shared files for Greenplum segment %d backup %q: %w", contentID, name, err)
 	}
 	targetSentinel := path.Join(basePath, internal.SentinelNameFromBackup(name))
@@ -398,7 +396,6 @@ func addGreenplumSegmentChain(
 func addGreenplumSegmentSharedFiles(
 	ctx context.Context,
 	plan *copy.Plan,
-	state *greenplumCopyState,
 	basePath string,
 	backup internal.Backup,
 ) error {
@@ -413,8 +410,12 @@ func addGreenplumSegmentSharedFiles(
 		{storagePath: pax.StoragePath, metadataPath: pax.GetFilesMetadataPath, fetch: pax.FetchReferencedFiles},
 	}
 	for _, shared := range sharedStorages {
-		if _, ok := state.filesMetadata[path.Join(basePath, shared.metadataPath(backup.Name))]; !ok {
-			continue
+		if _, err := plan.FindObject(ctx, path.Join(basePath, shared.metadataPath(backup.Name))); err != nil {
+			var missing storage.ObjectNotFoundError
+			if errors.As(err, &missing) {
+				continue
+			}
+			return err
 		}
 		files, err := shared.fetch(ctx, baseBackupsFolder, backupTime)
 		if err != nil {
@@ -422,7 +423,7 @@ func addGreenplumSegmentSharedFiles(
 		}
 		for storagePath := range files {
 			name := path.Join(basePath, shared.storagePath, storagePath)
-			if err := plan.AddObject(name, name, copy.PayloadPhase, false); err != nil {
+			if err := plan.AddSourceObject(ctx, name, name, copy.PayloadPhase, false); err != nil {
 				return err
 			}
 		}
@@ -505,6 +506,15 @@ func addGreenplumSegmentHistory(
 		pgBackup, ok := state.segmentBackups[segmentBackupKey(segment.ContentID, segment.BackupName)]
 		if !ok {
 			return nil, fmt.Errorf("greenplum segment %d backup %q is not planned", segment.ContentID, segment.BackupName)
+		}
+		walPath := FormatSegmentWalPath(segment.ContentID)
+		if err := plan.InventoryPrefix(ctx, walPath); err != nil {
+			return nil, err
+		}
+		if _, indexed := state.walFolders[strings.TrimSuffix(walPath, "/")]; !indexed {
+			for _, object := range plan.SourceObjectsAt(walPath) {
+				state.indexWAL(object.GetName())
+			}
 		}
 		wal := state.walFolder(segment.ContentID)
 		last, err := greenplumStopWAL(ctx, pgBackup)
@@ -622,6 +632,7 @@ func resolveGreenplumTimeline(
 }
 
 func addGreenplumRestorePointMetadata(
+	ctx context.Context,
 	plan *copy.Plan,
 	state *greenplumCopyState,
 	backup *BackupSentinelDto,
@@ -641,7 +652,7 @@ func addGreenplumRestorePointMetadata(
 			}
 		}
 		metadataPath := path.Join(utility.BaseBackupPath, RestorePointMetadataFileName(name))
-		if err := plan.AddObject(metadataPath, metadataPath, copy.RecoveryMetadataPhase, false); err != nil {
+		if err := plan.AddSourceObject(ctx, metadataPath, metadataPath, copy.RecoveryMetadataPhase, false); err != nil {
 			return err
 		}
 	}

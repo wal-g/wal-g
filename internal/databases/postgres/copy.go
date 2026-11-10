@@ -38,10 +38,7 @@ func BuildCopyPlan(
 	backupName string,
 	withAllHistory bool,
 ) (*copy.Plan, error) {
-	plan, err := copy.NewPlan(ctx, from, to)
-	if err != nil {
-		return nil, err
-	}
+	plan := copy.NewScopedPlan(from, to)
 	names, err := plan.ResolveBackupNames(ctx, backupName)
 	if err != nil {
 		return nil, err
@@ -96,6 +93,9 @@ func addPostgresBackupChain(
 		}
 		depth = parentDepth + 1
 	}
+	if err := plan.InventoryBackup(ctx, utility.BaseBackupPath, name); err != nil {
+		return Backup{}, 0, err
+	}
 	if err := plan.AddBackup(name, name); err != nil {
 		return Backup{}, 0, err
 	}
@@ -142,6 +142,9 @@ func AddHistoryToPlan(
 	}
 
 	walPrefix := strings.TrimSuffix(path.Join(prefix, utility.WalPath), "/") + "/"
+	if err := plan.InventoryPrefix(ctx, walPrefix); err != nil {
+		return err
+	}
 	history, err := addPostgresHistoryObjects(plan, walPrefix, first, last, withAllHistory)
 	if err != nil {
 		return err
@@ -161,7 +164,7 @@ func addPostgresHistoryObjects(
 		return postgresHistoryScan{}, err
 	}
 	history := postgresHistoryScan{segments: make(map[uint32]map[uint64]bool)}
-	for _, object := range plan.SourceObjects() {
+	for _, object := range plan.SourceObjectsAt(walPrefix) {
 		name := object.GetName()
 		if !strings.HasPrefix(name, walPrefix) {
 			continue

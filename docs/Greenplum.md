@@ -136,6 +136,13 @@ Copies a cluster backup, every coordinator/segment backup chain, and the WAL req
 wal-g copy --from=config_from.yaml --to=config_to.yaml --backup-name=LATEST
 ```
 
+Planning lists only the selected backup payload prefixes and their segment WAL
+directories, not the entire storage. Shared AO/PAX objects are looked up by keys
+from the selected manifests. Destination checks use bounded concurrent HEAD/stat
+requests for planned objects, without listing the destination.
+WAL directories can still be large: this does not yet remove WAL/history
+enumeration or bound the in-memory plan independently of the selected data.
+
 `--with-history` extends every coordinator/segment WAL stream through the LSN recorded by the newest cluster-wide restore point. WAL-G publishes restore-point metadata only after all referenced streams are present. Repeating the command later adds newly archived WAL and restore points while skipping immutable objects already present at the destination with the same path and size.
 
 In both modes, history files with IDs below each coordinator/segment stream's first required WAL timeline are omitted. That timeline's history contains its ancestry; its history and all later history files are retained for `recovery_target_timeline=latest` discovery. The lower bound is independent for each stream. Unrecognized history filenames are retained conservatively, and selection does not open or decrypt the files.
