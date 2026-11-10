@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,20 +12,32 @@ import (
 )
 
 func TestCreateTarFileInfoHeaderStoresSymlinkTarget(t *testing.T) {
-	dir := t.TempDir()
-	link := filepath.Join(dir, "link")
-	// A relative target without separators, so the test behaves the same on Windows,
-	// where absolute targets come back from os.Readlink with backslashes.
-	require.NoError(t, os.Symlink("target-file", link))
-	info, err := os.Lstat(link)
-	require.NoError(t, err)
+	for _, tc := range []struct {
+		name   string
+		target string
+	}{
+		{name: "relative", target: "target-file"},
+		// An absolute target, like Stolon's postgresql.auto.conf -> /dev/null.
+		{name: "absolute", target: "/dev/null"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if filepath.IsAbs(tc.target) && runtime.GOOS == "windows" {
+				t.Skip("os.Readlink returns absolute targets with backslashes on Windows")
+			}
+			dir := t.TempDir()
+			link := filepath.Join(dir, "link")
+			require.NoError(t, os.Symlink(tc.target, link))
+			info, err := os.Lstat(link)
+			require.NoError(t, err)
 
-	bundle := &Bundle{Directory: dir}
-	header, err := bundle.createTarFileInfoHeader(link, info)
-	require.NoError(t, err)
+			bundle := &Bundle{Directory: dir}
+			header, err := bundle.createTarFileInfoHeader(link, info)
+			require.NoError(t, err)
 
-	assert.Equal(t, byte(tar.TypeSymlink), header.Typeflag)
-	assert.Equal(t, "target-file", header.Linkname)
+			assert.Equal(t, byte(tar.TypeSymlink), header.Typeflag)
+			assert.Equal(t, tc.target, header.Linkname)
+		})
+	}
 }
 
 func TestCreateTarFileInfoHeaderRegularFileHasNoLinkname(t *testing.T) {
