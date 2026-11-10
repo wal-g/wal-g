@@ -121,6 +121,14 @@ Removing a sentinel also does not protect a restore that has already read it.
   this slower than individual WAL polls. See `wal_send_regression_test.go`
   (`TestWalSendLiveTimelineSwitchWithoutPartial`,
   `TestWalSendIdleTimelineDiscoverySharesRefresh`).
+- `PrepareMultiStorageWalUploader` fails when no storage is alive, so anything
+  that has to work without storage must precede it on every path: standalone,
+  daemon pipeline and WAL delta. See `SkipListedWAL` and its callers.
+- Acknowledging a WAL hands the file back to PostgreSQL, which may recycle its
+  inode: no upload of it may still run, and a hung one pins disk until it times
+  out. See `daemonArchiver.forget` and `TestDaemonArchiverSkipListStopsRunningUpload`.
+- `statistics.PushMetrics` runs repeatedly in the daemon, and statsd adds up
+  whatever counter value it gets: send deltas. See `metrics_test.go`.
 - A WAL-sized decoded payload can still end with a checksum/read error. Drain
   the decoder to EOF before releasing the final streaming chunk. Serialize late
   prefetch publication with foreground cleanup so consumed files cannot reappear;

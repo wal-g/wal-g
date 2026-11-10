@@ -425,6 +425,18 @@ wal-g wal-push /path/to/archive
 
 This command is intended to be executed from the Postgres [archive_command](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-COMMAND) parameter.
 
+Configuration, also honored by the [daemon](#daemon):
+
+* `WALG_PG_ARCHIVE_SKIP_LIST`
+
+Path to a file naming WAL files to acknowledge to PostgreSQL without archiving, for an external process that sheds WAL when no storage accepts it and the disk is running out. Empty by default, which disables the feature. Assume that a skipped file never reaches the archive: this leaves a gap in the WAL history, and accounting for it (a new full backup, for example) is up to the operator. Each skip is logged as a warning and counted by the `walg_wal_push_skipped_total` metric.
+
+The file is text with one name per line, exactly as PostgreSQL passes `%f`, and nothing else. WAL-G only reads it, so replace it atomically. A missing, unreadable or expired file skips nothing, and WAL is archived as usual.
+
+* `WALG_PG_ARCHIVE_SKIP_LIST_TTL`
+
+How long the list stays valid after its modification time. Default `60s`. The writer has to keep rewriting the file for as long as the list is current.
+
 ### ``wal-show``
 
 Show information about the WAL storage folder. `wal-show` shows all WAL segment timelines available in storage, displays the available backups for them, and checks them for missing segments.
@@ -741,6 +753,9 @@ streaming directory scan handles gaps and periodically revisits failures and lat
 files. Directory passes are separated by at least five seconds. Storage selection is repeated for each new upload
 using the existing multi-storage health cache; in-flight uploads are not moved between
 storages. Standalone `wal-push` and WAL delta mode retain their batch lifecycle.
+
+With `WALG_STATSD_ADDRESS` set, metrics are published after archive requests. The
+`walg_s3_bytes_*` and `walg_s3_response_` gauges then hold totals since the daemon started.
 
 ##### ``walg-daemon-client``
 

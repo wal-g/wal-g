@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -30,6 +31,50 @@ func newCantOverwriteWalFileError(walFilePath string) CantOverwriteWalFileError 
 
 func (err CantOverwriteWalFileError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+// SkipListedWAL reports whether a valid WALG_PG_ARCHIVE_SKIP_LIST names walFilePath, which must
+// then be acknowledged without archiving. Call it before preparing an uploader: preparation
+// fails when no storage is alive, and that is when such a list exists.
+func SkipListedWAL(walFilePath string) bool {
+	listPath := viper.GetString(conf.PgArchiveSkipList)
+	if listPath == "" {
+		return false
+	}
+	names, err := readWALSkipList(listPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			tracelog.WarningLogger.Printf("ignoring WAL skip list %s: %v", listPath, err)
+		}
+		return false
+	}
+	name := filepath.Base(walFilePath)
+	if !slices.Contains(names, name) {
+		return false
+	}
+	tracelog.WarningLogger.Printf("skipping archiving of %s: listed in %s", name, listPath)
+	statistics.WalgMetrics.WalPushSkippedTotal.Inc()
+	return true
+}
+
+// readWALSkipList returns no names once the list has outlived its TTL.
+func readWALSkipList(listPath string) ([]string, error) {
+	ttl, err := conf.GetDurationSetting(conf.PgArchiveSkipListTTL)
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Stat(listPath)
+	if err != nil {
+		return nil, err
+	}
+	if !time.Now().Before(info.ModTime().Add(ttl)) {
+		return nil, nil
+	}
+	list, err := os.ReadFile(listPath)
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(string(list), "\n"), nil
 }
 
 // TODO : unit tests
