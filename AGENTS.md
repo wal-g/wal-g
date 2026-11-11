@@ -95,10 +95,11 @@ Removing a sentinel also does not protect a restore that has already read it.
 - Listings can still be appropriate, for example to verify that deletion left
   no unexpected objects. Keep such checks scoped to the affected backup prefix,
   outside the steady-state hot path where possible, and account for their cost.
-- The PostgreSQL no-list prototype requires a complete tar inventory, including
-  separately uploaded `pg_control`. Preserve permanent WAL intervals and whole
-  bulk-record ranges when deriving keys; see `delete_no_list_test.go` and the
-  experimental deletion section in `docs/PostgreSQL.md`.
+- The PostgreSQL no-list prototype derives WAL ranges from existing backup metadata;
+  keep sentinels compact. Walk only selected backup subtrees to include unrecorded
+  tar parts and backups without file metadata. Preserve permanent WAL intervals and
+  whole bulk-record ranges; see `delete_no_list_test.go` and the experimental deletion
+  section in `docs/PostgreSQL.md`.
 
 ## WAL pipelines
 

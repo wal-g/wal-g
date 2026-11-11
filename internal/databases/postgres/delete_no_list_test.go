@@ -20,7 +20,9 @@ import (
 
 type noListTrace struct {
 	root, catalog string
-	lists         int
+	lists         map[string]int
+	allowed       []string
+	failList      string
 	deleted       []string
 	largestBatch  int
 	failKey       string
@@ -38,9 +40,17 @@ func (f noListTestFolder) GetSubFolder(name string) storage.Folder {
 }
 
 func (f noListTestFolder) ListFolder(ctx context.Context) ([]storage.Object, []storage.Folder, error) {
-	f.trace.lists++
-	if f.GetPath() != f.trace.catalog || f.trace.lists > 1 {
+	prefix := f.GetPath()
+	f.trace.lists[prefix]++
+	allowed := prefix == f.trace.catalog
+	for _, selected := range f.trace.allowed {
+		allowed = allowed || strings.HasPrefix(prefix, selected)
+	}
+	if !allowed || f.trace.lists[prefix] > 1 {
 		return nil, nil, fmt.Errorf("unexpected LIST %s", f.GetPath())
+	}
+	if prefix == f.trace.failList {
+		return nil, nil, fmt.Errorf("injected listing error: %s", prefix)
 	}
 	objects, folders, err := f.Folder.ListFolder(ctx)
 	for i := range folders {
@@ -66,22 +76,34 @@ func (f noListTestFolder) DeleteObjects(ctx context.Context, objects []storage.O
 
 func (f noListTestFolder) GetVersioningEnabled(context.Context) bool { return f.trace.versioned }
 
-func traceNoListFolder(root storage.Folder) noListTestFolder {
-	return noListTestFolder{root, &noListTrace{
+func traceNoListFolder(root storage.Folder, selected ...string) noListTestFolder {
+	trace := &noListTrace{
 		root: root.GetPath(), catalog: root.GetSubFolder(utility.BaseBackupPath).GetPath(),
-	}}
+		lists: map[string]int{},
+	}
+	for _, name := range selected {
+		trace.allowed = append(trace.allowed, root.GetSubFolder(utility.BaseBackupPath+name).GetPath())
+	}
+	return noListTestFolder{root, trace}
 }
 
 func putNoListBackup(t *testing.T, root storage.Folder, segment uint64, parent string, permanent bool) string {
 	t.Helper()
-	name := "base_" + WalSegmentNo(segment).GetFilename(1)
+	return putNoListTimelineBackup(t, root, 1, segment, parent, permanent)
+}
+
+func putNoListTimelineBackup(t *testing.T, root storage.Folder, timeline uint32,
+	segment uint64, parent string, permanent bool) string {
+	t.Helper()
+	name := "base_" + WalSegmentNo(segment).GetFilename(timeline)
 	if parent != "" {
 		name += "_D_" + strings.TrimPrefix(parent, "base_")
 	}
 	start, finish := LSN(segment*WalSegmentSize+1), LSN((segment+1)*WalSegmentSize+42)
 	systemID := uint64(42)
 	sentinel := BackupSentinelDto{BackupStartLSN: &start, BackupFinishLSN: &finish, SystemIdentifier: &systemID,
-		StartWalFileName: WalSegmentNo(segment).GetFilename(1), EndWalFileName: WalSegmentNo(segment + 1).GetFilename(1)}
+		StartWalFileName: WalSegmentNo(segment).GetFilename(timeline),
+		EndWalFileName:   WalSegmentNo(segment + 1).GetFilename(timeline)}
 	if parent != "" {
 		_, parentSegment, err := ParseWALFilename(strings.TrimPrefix(parent, "base_"))
 		require.NoError(t, err)
@@ -137,16 +159,21 @@ func TestDeleteWithoutListing(t *testing.T) {
 					WalSegmentNo(16).GetFilename(1) + "_delta.lz4", WalSegmentNo(64).GetFilename(1) + "_delta.lz4"} {
 					require.NoError(t, wal.PutObject(t.Context(), key, strings.NewReader("wal")))
 				}
-				folder := traceNoListFolder(root)
+				// Neither numbered tar gaps nor unknown nested sidecars should survive.
+				require.NoError(t, root.PutObject(t.Context(), utility.BaseBackupPath+old+"/extra/nested/object",
+					strings.NewReader("sidecar")))
+				folder := traceNoListFolder(root, old, delta)
 				plan, err := PlanDeleteWithoutListing(t.Context(), folder, NoListDeleteOptions{
-					Retain: 1, Modifier: internal.FullDeleteModifier, WalFrom: []string{WalSegmentNo(1).GetFilename(1)},
+					Retain: 1, Modifier: internal.FullDeleteModifier,
 				})
 				require.NoError(t, err)
-				require.Equal(t, 1, folder.trace.lists)
+				t.Cleanup(plan.Close)
+				require.Equal(t, 1, folder.trace.lists[folder.trace.catalog])
+				listingCount := len(folder.trace.lists)
 				require.NoError(t, plan.Execute(t.Context(), false))
 				require.Empty(t, folder.trace.deleted)
 				require.NoError(t, plan.Execute(t.Context(), true))
-				require.Equal(t, 1, folder.trace.lists)
+				require.Len(t, folder.trace.lists, listingCount)
 				require.Equal(t, 500, folder.trace.largestBatch)
 				for _, name := range []string{old, delta} {
 					objects, err := storage.ListFolderRecursively(t.Context(), root.GetSubFolder(utility.BaseBackupPath+name))
@@ -186,23 +213,120 @@ func assertNoListExists(t *testing.T, root storage.Folder, key string, want bool
 	require.Equal(t, want, exists, key)
 }
 
+func TestDeleteWithoutListingUsesExistingMetadata(t *testing.T) {
+	for _, format := range []string{"legacy_sentinel", "files_metadata_disabled"} {
+		t.Run(format, func(t *testing.T) {
+			root := memory.NewFolder("tenant/", memory.NewKVS())
+			old := putNoListBackup(t, root, 1, "", false)
+			keep := putNoListBackup(t, root, 10, "", false)
+			base := root.GetSubFolder(utility.BaseBackupPath)
+			var sentinel map[string]json.RawMessage
+			require.NoError(t, internal.FetchDto(t.Context(), base, &sentinel, old+utility.SentinelSuffix))
+			require.NotContains(t, sentinel, "TarFiles")
+			if format == "legacy_sentinel" {
+				delete(sentinel, "Version")
+				delete(sentinel, "IsPermanent")
+			} else {
+				sentinel["FilesMetadataDisabled"] = json.RawMessage(`true`)
+				require.NoError(t, base.DeleteObjects(t.Context(), []storage.Object{
+					storage.NewLocalObject(getFilesMetadataPath(old), time.Time{}, 0),
+				}))
+			}
+			require.NoError(t, internal.UploadDto(t.Context(), base, sentinel, old+utility.SentinelSuffix))
+			wal := root.GetSubFolder(utility.WalPath)
+			key := WalSegmentNo(1).GetFilename(1) + ".lz4"
+			require.NoError(t, wal.PutObject(t.Context(), key, strings.NewReader("wal")))
+			folder := traceNoListFolder(root, old)
+			plan, err := PlanDeleteWithoutListing(t.Context(), folder, NoListDeleteOptions{Before: keep})
+			require.NoError(t, err)
+			t.Cleanup(plan.Close)
+			require.NoError(t, plan.Execute(t.Context(), true))
+			assertNoListExists(t, wal, key, false)
+			assertNoListExists(t, base, old+utility.SentinelSuffix, false)
+			assertNoListExists(t, base, old+"/tar_partitions/pg_control.tar.lz4", false)
+			assertNoListExists(t, base, keep+utility.SentinelSuffix, true)
+		})
+	}
+}
+
+func TestDeleteWithoutListingTimelineRanges(t *testing.T) {
+	root := memory.NewFolder("tenant/", memory.NewKVS())
+	old := putNoListTimelineBackup(t, root, 1, 1, "", false)
+	newer := putNoListTimelineBackup(t, root, 2, 4, "", false)
+	keep := putNoListTimelineBackup(t, root, 3, 10, "", false)
+	wal := root.GetSubFolder(utility.WalPath)
+	for timeline := uint32(1); timeline <= 4; timeline++ {
+		for n := uint64(0); n <= 10; n++ {
+			require.NoError(t, wal.PutObject(t.Context(), WalSegmentNo(n).GetFilename(timeline)+".lz4", strings.NewReader("wal")))
+		}
+	}
+	plan, err := PlanDeleteWithoutListing(t.Context(), traceNoListFolder(root, old, newer), NoListDeleteOptions{Before: keep})
+	require.NoError(t, err)
+	t.Cleanup(plan.Close)
+	require.NoError(t, plan.Execute(t.Context(), true))
+	for timeline := uint32(1); timeline <= 4; timeline++ {
+		for n := uint64(0); n <= 10; n++ {
+			deleted := n < 10 && ((timeline == 1 && n >= 1) || (timeline == 2 && n >= 4))
+			assertNoListExists(t, wal, WalSegmentNo(n).GetFilename(timeline)+".lz4", !deleted)
+		}
+	}
+}
+
+func TestDeleteWithoutListingBoundsFollowSelectedMetadata(t *testing.T) {
+	root := memory.NewFolder("tenant/", memory.NewKVS())
+	putNoListBackup(t, root, 1, "", true)
+	old := putNoListBackup(t, root, 5, "", false)
+	keep := putNoListBackup(t, root, 10, "", false)
+	base := root.GetSubFolder(utility.BaseBackupPath)
+	// Exact LSN boundaries belong to the preceding WAL segment. The permanent
+	// backup must not make each deletion enumerate the entire archive history.
+	for name, first := range map[string]uint64{old: 5, keep: 10} {
+		start := LSN((first + 1) * WalSegmentSize)
+		var sentinel map[string]json.RawMessage
+		require.NoError(t, internal.FetchDto(t.Context(), base, &sentinel, name+utility.SentinelSuffix))
+		sentinel["LSN"], _ = json.Marshal(start)
+		require.NoError(t, internal.UploadDto(t.Context(), base, sentinel, name+utility.SentinelSuffix))
+		var meta ExtendedMetadataDto
+		require.NoError(t, internal.FetchDto(t.Context(), base, &meta, name+"/metadata.json"))
+		meta.StartLsn = start
+		require.NoError(t, internal.UploadDto(t.Context(), base, meta, name+"/metadata.json"))
+	}
+	wal := root.GetSubFolder(utility.WalPath)
+	for n := uint64(0); n <= 10; n++ {
+		require.NoError(t, wal.PutObject(t.Context(), WalSegmentNo(n).GetFilename(1)+".lz4", strings.NewReader("wal")))
+	}
+	plan, err := PlanDeleteWithoutListing(t.Context(), traceNoListFolder(root, old), NoListDeleteOptions{Before: keep})
+	require.NoError(t, err)
+	t.Cleanup(plan.Close)
+	require.NoError(t, plan.Execute(t.Context(), true))
+	for n := uint64(0); n <= 10; n++ {
+		assertNoListExists(t, wal, WalSegmentNo(n).GetFilename(1)+".lz4", n < 5 || n >= 10)
+	}
+	// With no selected backups, a fresh run has no WAL interval to enumerate.
+	folder := traceNoListFolder(root)
+	again, err := PlanDeleteWithoutListing(t.Context(), folder, NoListDeleteOptions{Before: keep})
+	require.NoError(t, err)
+	t.Cleanup(again.Close)
+	require.NoError(t, again.Execute(t.Context(), true))
+	require.Empty(t, folder.trace.deleted)
+}
+
 func TestDeleteWithoutListingRejectsUnknownMetadata(t *testing.T) {
-	for _, failure := range []string{"missing_inventory", "unsafe_key", "unknown_protection", "incremental_boundary",
-		"retained_dependency", "segment_size", "system_id", "unknown_timeline", "missing_from", "versioned"} {
+	for _, failure := range []string{"missing_wal_boundaries", "unknown_protection", "incremental_boundary",
+		"retained_dependency", "segment_size", "system_id", "selected_system_id", "versioned", "listing"} {
 		t.Run(failure, func(t *testing.T) {
 			root := memory.NewFolder("tenant/", memory.NewKVS())
 			old := putNoListBackup(t, root, 1, "", false)
 			keep := putNoListBackup(t, root, 10, "", false)
 			base := root.GetSubFolder(utility.BaseBackupPath)
-			folder := traceNoListFolder(root)
-			options := NoListDeleteOptions{Before: keep, WalFrom: []string{WalSegmentNo(1).GetFilename(1)}}
+			folder := traceNoListFolder(root, old)
+			options := NoListDeleteOptions{Before: keep}
 			var sentinel map[string]json.RawMessage
 			require.NoError(t, internal.FetchDto(t.Context(), base, &sentinel, old+utility.SentinelSuffix))
 			switch failure {
-			case "missing_inventory":
-				delete(sentinel, "TarFiles")
-			case "unsafe_key":
-				sentinel["TarFiles"] = json.RawMessage(`["../../retained.tar.lz4"]`)
+			case "missing_wal_boundaries":
+				delete(sentinel, "StartWalFileName")
+				delete(sentinel, "EndWalFileName")
 			case "unknown_protection":
 				sentinel["Version"] = json.RawMessage(`1`)
 				require.NoError(t, base.PutObject(t.Context(), old+"/metadata.json", strings.NewReader("{}")))
@@ -214,33 +338,37 @@ func TestDeleteWithoutListingRejectsUnknownMetadata(t *testing.T) {
 				oldSize := WalSegmentSize
 				SetWalSize(64)
 				t.Cleanup(func() { SetWalSize(oldSize >> 20) })
-			case "system_id":
-				// Two retained backups must not describe different clusters.
-				name := putNoListBackup(t, root, 12, "", false)
+			case "system_id", "selected_system_id":
+				// Both retained and selected backups must belong to the same cluster.
+				name := old
+				if failure == "system_id" {
+					name = putNoListBackup(t, root, 12, "", false)
+				}
 				var s map[string]json.RawMessage
 				require.NoError(t, internal.FetchDto(t.Context(), base, &s, name+utility.SentinelSuffix))
 				s["SystemIdentifier"] = json.RawMessage(`99`)
 				require.NoError(t, internal.UploadDto(t.Context(), base, s, name+utility.SentinelSuffix))
+				if name == old {
+					sentinel = s
+				}
 				var meta ExtendedMetadataDto
 				require.NoError(t, internal.FetchDto(t.Context(), base, &meta, name+"/metadata.json"))
 				sid := uint64(99)
 				meta.SystemIdentifier = &sid
 				require.NoError(t, internal.UploadDto(t.Context(), base, meta, name+"/metadata.json"))
-			case "unknown_timeline":
-				options.WalFrom = []string{WalSegmentNo(1).GetFilename(2)}
-			case "missing_from":
-				options.WalFrom = nil
 			case "versioned":
 				folder.trace.versioned = true
+			case "listing":
+				folder.trace.failList = base.GetSubFolder(old + "/tar_partitions").GetPath()
 			}
 			require.NoError(t, internal.UploadDto(t.Context(), base, sentinel, old+utility.SentinelSuffix))
 			_, err := PlanDeleteWithoutListing(t.Context(), folder, options)
 			messages := map[string]string{
-				"missing_inventory": "no TarFiles inventory", "unsafe_key": "invalid TarFiles entry",
-				"unknown_protection": "cannot establish retention", "incremental_boundary": "is incremental",
+				"missing_wal_boundaries": "recorded WAL boundaries",
+				"unknown_protection":     "cannot establish retention", "incremental_boundary": "is incremental",
 				"retained_dependency": "depends on deletion target", "segment_size": "segment size",
-				"system_id": "conflicting system identifiers", "unknown_timeline": "has no retained backup",
-				"missing_from": "requires --wal-from", "versioned": "versioned storage",
+				"system_id": "conflicting system identifiers", "selected_system_id": "conflicting system identifiers",
+				"versioned": "versioned storage", "listing": "injected listing error",
 			}
 			require.ErrorContains(t, err, messages[failure])
 			require.Empty(t, folder.trace.deleted)
@@ -283,11 +411,12 @@ func TestDeleteWithoutListingStopsOnDeleteFailure(t *testing.T) {
 			keep := putNoListBackup(t, root, 10, "", false)
 			walKey := utility.WalPath + WalSegmentNo(1).GetFilename(1) + ".lz4"
 			require.NoError(t, root.PutObject(t.Context(), walKey, strings.NewReader("wal")))
-			folder := traceNoListFolder(root)
+			folder := traceNoListFolder(root, old)
 			plan, err := PlanDeleteWithoutListing(t.Context(), folder, NoListDeleteOptions{
-				Before: keep, WalFrom: []string{WalSegmentNo(1).GetFilename(1)},
+				Before: keep,
 			})
 			require.NoError(t, err)
+			t.Cleanup(plan.Close)
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			switch failure {

@@ -30,7 +30,6 @@ var deleteWithoutBackups = false
 var useSentinelTime = false
 var deleteTargetUserData = ""
 var noListDelete bool
-var noListWalFrom []string
 var noListTargetStorage string
 
 // deleteCmd represents the delete command
@@ -200,9 +199,6 @@ func DeleteGarbageArgsValidator(cmd *cobra.Command, args []string) error {
 
 func validateNoListDeleteArgs(normal cobra.PositionalArgs) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
-		if noListDelete != (len(noListWalFrom) > 0) {
-			return fmt.Errorf("--no-list and --wal-from must be used together")
-		}
 		if !noListDelete && noListTargetStorage != "" {
 			return fmt.Errorf("--target-storage on this command requires --no-list")
 		}
@@ -215,18 +211,18 @@ func runDeleteWithoutListing(ctx context.Context, options postgres.NoListDeleteO
 	if err != nil {
 		return err
 	}
-	options.WalFrom, options.UseSentinelTime = noListWalFrom, useSentinelTime
+	options.UseSentinelTime = useSentinelTime
 	plan, err := postgres.PlanDeleteWithoutListing(ctx, folder, options)
 	if err != nil {
 		return err
 	}
+	defer plan.Close()
 	return plan.Execute(ctx, confirmed)
 }
 
 func init() {
 	for _, cmd := range []*cobra.Command{deleteBeforeCmd, deleteRetainCmd} {
-		cmd.Flags().BoolVar(&noListDelete, "no-list", false, "Experimental: delete using tar inventories and computed WAL names")
-		cmd.Flags().StringArrayVar(&noListWalFrom, "wal-from", nil, "First WAL to enumerate (inclusive); repeat for each timeline")
+		cmd.Flags().BoolVar(&noListDelete, "no-list", false, "Experimental: derive WAL deletion ranges from backup metadata")
 		cmd.Flags().StringVar(&noListTargetStorage, "target-storage", "", "Destination for --no-list; required with multiple storages")
 	}
 	recoveryDelete.AddFlags(deleteTargetCmd)

@@ -194,8 +194,6 @@ type BackupSentinelDtoV2 struct {
 	Hostname       string    `json:"Hostname"`
 	DataDir        string    `json:"DataDir"`
 	IsPermanent    bool      `json:"IsPermanent"`
-	// TarFiles is an optional compact inventory for deletion without listing payloads.
-	TarFiles []string `json:"TarFiles,omitempty"`
 }
 
 func NewBackupSentinelDtoV2(sentinel BackupSentinelDto, meta ExtendedMetadataDto) BackupSentinelDtoV2 {

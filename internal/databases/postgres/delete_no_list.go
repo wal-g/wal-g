@@ -1,8 +1,8 @@
 package postgres
 
 import (
+	"cmp"
 	"context"
-	"encoding/json"
 	"fmt"
 	"path"
 	"slices"
@@ -16,30 +16,12 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-// backupDeletionTarFiles covers local composers, including copied/rated parts.
-// pg_control is uploaded separately from the composer. Streaming backups and
-// backups without file metadata currently have no inventory and remain on the
-// ordinary deletion path.
-func backupDeletionTarFiles(meta FilesMetadataDto, extension string) []string {
-	if len(meta.TarFileSets) == 0 {
-		return nil
-	}
-	names := make([]string, 0, len(meta.TarFileSets)+1)
-	for name := range meta.TarFileSets {
-		names = append(names, name)
-	}
-	names = append(names, utility.AddFileExtension("pg_control.tar", extension))
-	slices.Sort(names)
-	return slices.Compact(names)
-}
-
 type NoListDeleteOptions struct {
 	Before          string
 	Retain          int
 	Modifier        int
 	After           string
 	UseSentinelTime bool
-	WalFrom         []string
 }
 
 func (o NoListDeleteOptions) target(h *internal.DeleteHandler) (internal.BackupObject, error) {
@@ -55,21 +37,17 @@ func (o NoListDeleteOptions) target(h *internal.DeleteHandler) (internal.BackupO
 	return h.FindTargetRetain(o.Retain, o.Modifier)
 }
 
-type noListBackup struct {
-	name string
-	tars []string
-}
-
 type noListWALRange struct {
 	timeline uint32
 	first    uint64
 }
 
-// NoListDeletePlan keeps backup inventories and WAL ranges, not all WAL keys.
-// The only listing is the shallow backup catalog used to establish retention.
+// NoListDeletePlan derives WAL keys from existing backup metadata. Listings are
+// limited to the shallow backup catalog and the selected backup subtrees;
+// payload keys are spooled to disk and WAL keys are generated during execution.
 type NoListDeletePlan struct {
 	root      storage.Folder
-	backups   []noListBackup
+	payload   *internal.DeletionPlan
 	ranges    []noListWALRange
 	retention deletionWALRetention
 }
@@ -81,9 +59,6 @@ func PlanDeleteWithoutListing(ctx context.Context, root storage.Folder, options 
 	if root.GetVersioningEnabled(ctx) {
 		return nil, fmt.Errorf("--no-list does not support versioned storage")
 	}
-	if len(options.WalFrom) == 0 {
-		return nil, fmt.Errorf("--no-list requires --wal-from to bound WAL enumeration")
-	}
 	catalog, objects, err := noListBackupCatalog(ctx, root)
 	if err != nil {
 		return nil, err
@@ -91,7 +66,7 @@ func PlanDeleteWithoutListing(ctx context.Context, root storage.Folder, options 
 	if err := selectNoListBackups(catalog, objects, options); err != nil {
 		return nil, err
 	}
-	p := &NoListDeletePlan{root: root, retention: deletionWALRetention{
+	p := &NoListDeletePlan{root: root, payload: catalog, retention: deletionWALRetention{
 		knownTimelines: map[uint32]bool{}, segmentSize: WalSegmentSize,
 	}}
 	for _, backup := range catalog.Retained() {
@@ -102,26 +77,25 @@ func PlanDeleteWithoutListing(ctx context.Context, root storage.Folder, options 
 	if !p.retention.hasCutoff {
 		return nil, fmt.Errorf("--no-list requires an ordinary retained backup as the WAL boundary")
 	}
-	for _, name := range catalog.TargetNames() {
-		data := catalog.Backups[name].Metadata.(DeletionBackupMetadata)
-		tars, err := deletionTarFiles(name, &data)
-		if err != nil {
-			return nil, err
-		}
-		p.backups = append(p.backups, noListBackup{name, tars})
-	}
-	if err := p.setWALRanges(options.WalFrom); err != nil {
+	if err := p.setWALRanges(catalog); err != nil {
 		return nil, err
 	}
+	if err := p.planBackupPayload(ctx); err != nil {
+		p.Close()
+		return nil, err
+	}
+	p.payload.Before = append(p.payload.Before, p.deleteSentinels)
 	return p, nil
 }
+
+func (p *NoListDeletePlan) Close() { p.payload.Close() }
 
 func noListBackupCatalog(ctx context.Context, root storage.Folder) (*internal.DeletionPlan, []internal.BackupObject, error) {
 	sentinels, err := internal.GetBackupSentinelObjects(ctx, root)
 	if err != nil {
 		return nil, nil, err
 	}
-	catalog := &internal.DeletionPlan{Backups: map[string]internal.DeletionBackup{}, Selected: map[string]bool{}}
+	catalog := &internal.DeletionPlan{Root: root, Backups: map[string]internal.DeletionBackup{}, Selected: map[string]bool{}}
 	objects := make([]internal.BackupObject, 0, len(sentinels))
 	for _, object := range sentinels {
 		name := strings.TrimSuffix(strings.TrimLeft(object.GetName(), "/"), utility.SentinelSuffix)
@@ -190,58 +164,71 @@ func selectNoListBackups(catalog *internal.DeletionPlan, objects []internal.Back
 	return nil
 }
 
-func deletionTarFiles(name string, data *DeletionBackupMetadata) ([]string, error) {
-	var tars []string
-	if data.Sentinel.FilesMetadataDisabled || len(data.TarFiles) == 0 {
-		return nil, fmt.Errorf("backup %s has no TarFiles inventory; use ordinary deletion", name)
-	}
-	if err := json.Unmarshal(data.TarFiles, &tars); err != nil || len(tars) == 0 {
-		return nil, fmt.Errorf("backup %s has an invalid TarFiles inventory", name)
-	}
-	for _, tar := range tars {
-		if tar == "" || tar == "." || tar == ".." || path.Base(tar) != tar || strings.ContainsAny(tar, "\\\x00") ||
-			!strings.Contains(tar, ".tar") {
-			return nil, fmt.Errorf("invalid TarFiles entry %q in %s", tar, name)
+func (p *NoListDeletePlan) setWALRanges(catalog *internal.DeletionPlan) error {
+	// Validate selected backups with the same identity/segment-size checks as
+	// retained backups, without changing the actual retention boundary.
+	validation := deletionWALRetention{knownTimelines: map[uint32]bool{},
+		segmentSize: p.retention.segmentSize, systemID: p.retention.systemID}
+	starts := map[uint32]uint64{}
+	for _, name := range catalog.TargetNames() {
+		backup := catalog.Backups[name]
+		if err := validation.retainBackup(catalog, backup); err != nil {
+			return err
+		}
+		data := backup.Metadata.(DeletionBackupMetadata)
+		timeline, _ := ParseTimelineFromBackupName(name) // Validated above.
+		first := uint64(data.Meta.StartLsn-1) / p.retention.segmentSize
+		if previous, ok := starts[timeline]; !ok || first < previous {
+			starts[timeline] = first
 		}
 	}
-	return tars, nil
+	for timeline, first := range starts {
+		if first < p.retention.cutoff {
+			p.retention.knownTimelines[timeline] = true
+			p.ranges = append(p.ranges, noListWALRange{timeline, first})
+		}
+	}
+	slices.SortFunc(p.ranges, func(a, b noListWALRange) int { return cmp.Compare(a.timeline, b.timeline) })
+	return nil
 }
 
-func (p *NoListDeletePlan) setWALRanges(from []string) error {
-	seen := map[uint32]bool{}
-	for _, name := range from {
-		timeline, first, err := parseDeletionWALFilename(name, p.retention.segmentSize)
-		if err != nil || name != strings.ToUpper(name) {
-			return fmt.Errorf("invalid --wal-from %q", name)
+func (p *NoListDeletePlan) planBackupPayload(ctx context.Context) error {
+	base := p.root.GetSubFolder(utility.BaseBackupPath)
+	payload, err := p.payload.NewStage("selected backup payload", base)
+	if err != nil {
+		return err
+	}
+	metadata, err := p.payload.NewStage("backup metadata and journals", base)
+	if err != nil {
+		return err
+	}
+	for _, name := range p.payload.TargetNames() {
+		// A single walk per selected backup also covers old/streaming backups,
+		// disabled file metadata, non-contiguous tar parts and unknown sidecars.
+		err := storage.WalkObjects(ctx, base.GetSubFolder(name), func(object storage.Object) error {
+			key := name + "/" + strings.TrimLeft(object.GetName(), "/")
+			stage := payload
+			if key == getFilesMetadataPath(name) || key == path.Join(name, utility.MetadataFileName) {
+				stage = metadata
+			}
+			return stage.Add(storage.NewLocalObjectWithVersion(key, object.GetLastModified(), object.GetSize(),
+				object.GetVersionID(), object.GetAdditionalInfo()))
+		})
+		if err != nil {
+			return fmt.Errorf("list selected backup %s: %w", name, err)
 		}
-		if !p.retention.knownTimelines[timeline] {
-			return fmt.Errorf("--wal-from timeline %08X has no retained backup", timeline)
+		if err := metadata.Add(storage.NewLocalObject(internal.JournalPrefix+name, time.Time{}, 0)); err != nil {
+			return err
 		}
-		if seen[timeline] || first >= p.retention.cutoff {
-			return fmt.Errorf("duplicate timeline or empty WAL range in --wal-from %s", name)
-		}
-		seen[timeline] = true
-		p.ranges = append(p.ranges, noListWALRange{timeline, first})
 	}
 	return nil
 }
 
-func (p *NoListDeletePlan) Execute(ctx context.Context, confirmed bool) error {
-	for _, backup := range p.backups {
-		tracelog.InfoLogger.Printf("No-list deletion: backup=%s tar_keys=%d", backup.name, len(backup.tars))
-	}
-	for _, r := range p.ranges {
-		tracelog.InfoLogger.Printf("No-list WAL range: timeline=%08X segments=[%d,%d), permanent intervals excluded",
-			r.timeline, r.first, p.retention.cutoff)
-	}
-	if !confirmed {
-		tracelog.InfoLogger.Println("Dry run; pass --confirm to delete the planned keys")
-		return nil
-	}
+func (p *NoListDeletePlan) deleteSentinels(ctx context.Context) error {
 	base := p.root.GetSubFolder(utility.BaseBackupPath)
 	batch := noListDeleteBatch{folder: base}
-	for _, backup := range p.backups {
-		if err := batch.add(ctx, backup.name+utility.SentinelSuffix); err != nil {
+	for _, name := range p.payload.TargetNames() {
+		if err := batch.add(ctx, name+utility.SentinelSuffix); err != nil {
 			return err
 		}
 	}
@@ -249,47 +236,34 @@ func (p *NoListDeletePlan) Execute(ctx context.Context, confirmed bool) error {
 		return err
 	}
 	// Confirm unpublication before removing any payload or WAL.
-	for _, backup := range p.backups {
-		exists, err := base.Exists(ctx, backup.name+utility.SentinelSuffix)
+	for _, name := range p.payload.TargetNames() {
+		exists, err := base.Exists(ctx, name+utility.SentinelSuffix)
 		if err != nil {
 			return err
 		}
 		if exists {
-			return fmt.Errorf("sentinel deletion unconfirmed: %s", backup.name)
+			return fmt.Errorf("sentinel deletion unconfirmed: %s", name)
 		}
 	}
-	if err := p.deleteBackupPayload(ctx, &batch); err != nil {
+	return nil
+}
+
+func (p *NoListDeletePlan) Execute(ctx context.Context, confirmed bool) error {
+	for _, r := range p.ranges {
+		tracelog.InfoLogger.Printf("No-list WAL range: timeline=%08X segments=[%d,%d), permanent intervals excluded",
+			r.timeline, r.first, p.retention.cutoff)
+	}
+	if err := p.payload.Execute(ctx, confirmed); err != nil {
 		return err
 	}
-	batch.folder = p.root.GetSubFolder(utility.WalPath)
+	if !confirmed {
+		return nil
+	}
+	batch := noListDeleteBatch{folder: p.root.GetSubFolder(utility.WalPath)}
 	if err := p.walkWALKeys(ctx, func(key string) error { return batch.add(ctx, key) }); err != nil {
 		return err
 	}
 	return batch.flush(ctx)
-}
-
-func (p *NoListDeletePlan) deleteBackupPayload(ctx context.Context, batch *noListDeleteBatch) error {
-	for _, backup := range p.backups {
-		for _, tar := range backup.tars {
-			if err := batch.add(ctx, internal.GetBackupTarPath(backup.name, tar)); err != nil {
-				return err
-			}
-		}
-		// Keep metadata available for recovery until this backup's tar deletions succeed.
-		if err := batch.flush(ctx); err != nil {
-			return err
-		}
-		for _, key := range []string{getFilesMetadataPath(backup.name), backup.name + "/" + utility.MetadataFileName,
-			internal.JournalPrefix + backup.name} {
-			if err := batch.add(ctx, key); err != nil {
-				return err
-			}
-		}
-		if err := batch.flush(ctx); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // Include historical codecs even when their decoders are excluded by build tags.

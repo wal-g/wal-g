@@ -20,7 +20,6 @@ type DeletionBackupMetadata struct {
 	Meta      ExtendedMetadataDto
 	LogsKnown bool
 	Identity  interface{}
-	TarFiles  json.RawMessage
 }
 
 func LoadDeletionBackup(ctx context.Context, root storage.Folder, name string) (internal.DeletionBackup, error) {
@@ -31,8 +30,6 @@ func LoadDeletionBackup(ctx context.Context, root storage.Folder, name string) (
 		return internal.DeletionBackup{}, err
 	}
 	normalizeLegacyDeletionLSN(name, &s, &data.Sentinel)
-	// Optional inventory is interpreted only by the no-list prototype.
-	data.TarFiles = s.Fields["TarFiles"]
 	m, err := internal.ReadDeletionMetadata(ctx, base, name+"/metadata.json", &data.Meta)
 	if err != nil {
 		return internal.DeletionBackup{}, err
