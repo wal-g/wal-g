@@ -204,3 +204,129 @@ func TestDaemonArchiverRetainsDueRetryWithoutClientProgress(t *testing.T) {
 	require.Contains(t, a.retryAfter, files[2])
 	require.Equal(t, files[1], a.retryCandidate(files[0]))
 }
+
+// Model successful completion without worker timing. Refill still consumes the
+// real pending batch, including whatever cursor maintenance this version owns.
+func archiveTestConsumeBatch(t *testing.T, a *daemonArchiver, anchor string,
+	scan *daemonArchiveScan, batch []string) {
+	t.Helper()
+	if len(batch) == 0 {
+		return
+	}
+	for _, filename := range batch {
+		require.NoError(t, a.manager.MarkWalUploaded(filename))
+	}
+	scan.pending = batch
+	a.refill(anchor, scan)
+	require.Empty(t, scan.pending)
+}
+
+func TestDaemonArchiveScanContiguousArrivalBeyondGap(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 5)
+	status := filepath.Join(filepath.Dir(files[0]), archiveStatusDir)
+	require.NoError(t, os.Remove(filepath.Join(status, filepath.Base(files[1])+readySuffix)))
+	newReady := filepath.Join(status, filepath.Base(files[4])+readySuffix)
+	require.NoError(t, os.Remove(newReady))
+	a := &daemonArchiver{ctx: t.Context(), window: 2, manager: asm.NewFakeASM()}
+	var scan daemonArchiveScan
+	defer scan.closeListing()
+	for range 12 {
+		batch := a.candidates(files[0], &scan)
+		archiveTestConsumeBatch(t, a, files[0], &scan, batch)
+		if scan.listing == nil && len(batch) == 0 {
+			break
+		}
+	}
+	require.True(t, a.manager.IsWalAlreadyUploaded(files[2]))
+	require.True(t, a.manager.IsWalAlreadyUploaded(files[3]))
+	require.Nil(t, scan.listing, "the first pass must have reached EOF")
+	require.True(t, time.Now().Before(scan.nextRescan))
+	require.NoError(t, os.WriteFile(newReady, nil, 0600))
+	batch := a.candidates(files[0], &scan)
+	t.Logf("after discovering the run beyond the gap: cursor=%s; new candidates=%v",
+		filepath.Base(scan.cursor), batch)
+	require.Contains(t, batch, files[4],
+		"a contiguous arrival after an already discovered run must not need another directory pass")
+}
+
+func TestDaemonArchiveScanRetainsMixedBatch(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 8)
+	status := filepath.Join(filepath.Dir(files[0]), archiveStatusDir)
+	require.NoError(t, os.Remove(filepath.Join(status, filepath.Base(files[4])+readySuffix)))
+	a := &daemonArchiver{ctx: t.Context(), window: 2, manager: asm.NewFakeASM()}
+	var scan daemonArchiveScan
+	scan.follow(files[0])
+	scan.cursor = files[3]
+	scan.lastFullScan = time.Now()
+	// Supply an exact bounded reconciliation chunk, independent of filesystem
+	// ordering. Both names still have real .ready files in archive_status.
+	listingDir := t.TempDir()
+	for _, filename := range []string{files[1], files[7]} {
+		require.NoError(t, os.WriteFile(filepath.Join(listingDir, filepath.Base(filename)+readySuffix), nil, 0600))
+	}
+	var err error
+	scan.listing, err = os.Open(listingDir)
+	require.NoError(t, err)
+	defer scan.closeListing()
+	var seen []string
+	for range 8 {
+		batch := a.candidates(files[0], &scan)
+		seen = append(seen, batch...)
+		archiveTestConsumeBatch(t, a, files[0], &scan, batch)
+		if scan.listing == nil && len(batch) == 0 {
+			break
+		}
+	}
+	require.Nil(t, scan.listing)
+	require.True(t, time.Now().Before(scan.nextRescan))
+	t.Logf("candidates retained from the complete reconciliation chunk: %v", seen)
+	require.Contains(t, seen, files[1])
+	require.Contains(t, seen, files[7],
+		"prioritizing the old hole must retain the known newer WAL for available workers")
+}
+
+// A retained far-ahead entry must not displace the next prediction batch.
+// Drive refill manually so each completion gives exactly one worker slot.
+func TestDaemonArchiverRefillsBeforeFarListedWAL(t *testing.T) {
+	archiveTestConfig(t)
+	files := archiveTestFiles(t, 8)
+	started, release := make(chan string, 1), make(chan struct{})
+	a := newDaemonArchiver(t.Context(), 2, 2, time.Minute, asm.NewFakeASM(), archiveTestFactory(
+		func(ctx context.Context, file ioextensions.NamedReader) error {
+			started <- file.Name()
+			select {
+			case <-release:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}))
+	defer a.Close()
+	// No Push establishes an anchor, so the scanner cannot add any jobs.
+	var scan daemonArchiveScan
+	scan.follow(files[0])
+	listingDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(listingDir, filepath.Base(files[7])+readySuffix), nil, 0600))
+	var err error
+	scan.listing, err = os.Open(listingDir)
+	require.NoError(t, err)
+	defer scan.closeListing()
+	a.refill(files[0], &scan)
+	require.Contains(t, scan.pending, files[7], "retain the listed WAL while closer work runs")
+	for i := 1; i < len(files); i++ {
+		if i > 1 {
+			a.refill(files[0], &scan)
+		}
+		select {
+		case filename := <-started:
+			require.Equal(t, files[i], filename, "prefer the smallest ready WAL across prediction batches")
+		case <-time.After(3 * time.Second):
+			t.Fatal("no WAL upload started")
+		}
+		require.LessOrEqual(t, len(scan.pending), 2*a.window)
+		release <- struct{}{}
+		a.wg.Wait() // The manual scheduler is the only producer of jobs.
+	}
+}
