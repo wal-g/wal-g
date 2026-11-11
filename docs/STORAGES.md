@@ -115,6 +115,8 @@ Sets the maximum request retry delay in milliseconds. Default is 300000ms. The m
 
 Comma-separated list of S3 error codes to retry in addition to the default ones, for example `InvalidRequest`. A response is retried if its error code is in the list, for any HTTP status. Codes are case-sensitive. The number of attempts is limited by `WALG_S3_MAX_RETRIES`. Empty by default.
 
+A `MalformedXML` response to `CompleteMultipartUpload` is retried without any configuration, using the same upload ID and part ETags and the same attempt limit. If retries are exhausted, the upload is aborted as before.
+
 Copy operations also use `WALG_DOWNLOAD_FILE_RETRIES` for whole-object retries (default 15 additional attempts; zero disables them). Database `copy`/`backup-copy` and `st copy` reopen the source and restart the destination upload after a transient source or destination failure, including a truncated source stream (`unexpected EOF`). The explicit source config value takes precedence over the main config or environment; destination config does not set this budget. Invalid or negative budgets are rejected.
 
 These retry layers have separate budgets: SDK retries replay individual requests, optional range recovery resumes a download, and copy retries restart the entire object. Whole-object retries use exponential backoff starting at one second, with jitter and a 30-second cap. Cancellation interrupts backoff. Permanent errors stop immediately. Database copy publishes backup completion metadata only after payload transfers succeed, except for explicitly configured disaster-copy skips, which apply after retries are exhausted.
