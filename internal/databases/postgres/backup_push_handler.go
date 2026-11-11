@@ -657,7 +657,9 @@ func (bh *BackupHandler) uploadMetadata(ctx context.Context, sentinelDto BackupS
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload files metadata for backup %s: %v", curBackupName, err)
 	}
-	err = internal.UploadSentinel(ctx, bh.Arguments.Uploader, NewBackupSentinelDtoV2(sentinelDto, meta), bh.CurBackupInfo.Name)
+	sentinel := NewBackupSentinelDtoV2(sentinelDto, meta)
+	sentinel.TarFiles = backupDeletionTarFiles(filesMetaDto, bh.Arguments.Uploader.Compression().FileExtension())
+	err = internal.UploadSentinel(ctx, bh.Arguments.Uploader, sentinel, bh.CurBackupInfo.Name)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload sentinel file for backup %s: %v", curBackupName, err)
 	}
