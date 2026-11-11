@@ -31,6 +31,8 @@ WAL-G redis extension currently supports these commands:
 
 ### ``copy``
 
+Use `--output rclone --output-file files.txt` to save the copy plan as an rclone raw file list without copying. `--to` is optional in this mode. See [exporting copy file lists](COPY.md) for details.
+
 Copies one backup or all backups between storage configurations without transforming payload objects:
 
 ```bash
