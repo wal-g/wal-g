@@ -68,6 +68,9 @@ type PgQueryRunner struct {
 	SystemIdentifier  *uint64
 	stopBackupTimeout time.Duration
 	Mu                sync.Mutex
+
+	// Skip PostgreSQL's archive wait only when the backup handler checks WAL in storage itself.
+	skipWaitForArchive bool
 }
 
 // BuildGetVersion formats a query to retrieve PostgreSQL numeric version
@@ -123,7 +126,12 @@ func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 	switch {
 	case queryRunner.Version >= 150000:
+		if queryRunner.skipWaitForArchive {
+			return "SELECT labelfile, spcmapfile, lsn FROM pg_catalog.pg_backup_stop(false)", nil
+		}
 		return "SELECT labelfile, spcmapfile, lsn FROM pg_catalog.pg_backup_stop()", nil
+	case queryRunner.Version >= 100000 && queryRunner.skipWaitForArchive:
+		return "SELECT labelfile, spcmapfile, lsn FROM pg_catalog.pg_stop_backup(false, false)", nil
 	case queryRunner.Version >= 90600:
 		return "SELECT labelfile, spcmapfile, lsn FROM pg_catalog.pg_stop_backup(false)", nil
 	case queryRunner.Version >= 90000:
