@@ -145,9 +145,10 @@ Removing a sentinel also does not protect a restore that has already read it.
 - For idle-backlog bugs, test a blocked foreground upload, a blocked background
   upload, more ready WALs than the discovery window, and no further client calls.
   CPU waves alone do not identify a scheduler bug or a storage bottleneck.
-- Daemon reconciliation reads directory order, not WAL order; listed entries
-  must not move the sequential discovery cursor. Prioritize due retries before
-  newer candidates without blocking other workers on an earlier upload. See
+- Daemon reconciliation reads directory order, not WAL order. Retain and merge
+  both bounded candidate batches. Before a far-ahead listed WAL, refill nearer
+  sequential candidates; follow the listed run only after prediction is exhausted.
+  Prioritize due retries without blocking other workers on an earlier upload. See
   `daemon_archiver_progress_test.go` and its sequential-priority, retry-priority
   and blocked-upload regression tests.
 - Publish prefetched files only after successful download/decompression and

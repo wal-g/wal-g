@@ -298,6 +298,15 @@ func (a *daemonArchiver) refill(anchor string, scan *daemonArchiveScan) {
 		if a.ctx.Err() != nil {
 			return
 		}
+		// Extend the nearer run before dispatching a far-ahead listed WAL.
+		if scan.pending[0] > scan.cursor {
+			if files := a.predictCandidates(scan.cursor); len(files) > 0 {
+				scan.cursor = files[len(files)-1]
+				scan.pending = append(scan.pending, files...)
+				slices.Sort(scan.pending)
+				scan.pending = slices.Compact(scan.pending)
+			}
+		}
 		filename := scan.pending[0]
 		if filename > anchor && a.needsUpload(filename) {
 			job, err := a.startJob(a.ctx, filename, true)
@@ -306,6 +315,7 @@ func (a *daemonArchiver) refill(anchor string, scan *daemonArchiveScan) {
 			}
 		}
 		scan.pending = scan.pending[1:]
+		scan.cursor = max(scan.cursor, filename) // Follow the listed run after prediction ends.
 	}
 	if len(scan.pending) == 0 && (hadCandidates || scan.listing != nil) {
 		a.notify() // A batch is a memory bound, not an archival progress limit.
@@ -425,23 +435,13 @@ func (a *daemonArchiver) candidates(anchor string, scan *daemonArchiveScan) []st
 			listed = a.listCandidates(anchor, scan)
 		}
 	}
-	// Reconciliation can recover old holes, but arbitrary far-ahead directory
-	// entries must not replace sequential discovery or advance its cursor.
-	var older []string
-	for _, filename := range listed {
-		if filename <= scan.cursor {
-			older = append(older, filename)
-		}
-	}
-	if len(older) > 0 {
-		slices.Sort(older)
-		return older
-	}
 	if len(files) > 0 {
 		scan.cursor = files[len(files)-1]
-		return files
 	}
-	return listed
+	// Retain both bounded batches, preferring the lowest filenames.
+	files = append(files, listed...)
+	slices.Sort(files)
+	return slices.Compact(files)
 }
 
 func (a *daemonArchiver) predictCandidates(cursor string) []string {

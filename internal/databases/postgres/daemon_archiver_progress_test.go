@@ -115,7 +115,7 @@ func TestDaemonArchiveScanBoundsAndClosesListing(t *testing.T) {
 	scan.follow(files[0])
 	scan.nextRescan = time.Time{} // Force reconciliation, rather than prediction.
 	batch := a.candidates(files[0], &scan)
-	require.LessOrEqual(t, len(batch), a.window)
+	require.LessOrEqual(t, len(batch), 2*a.window)
 	listing := scan.listing
 	require.NotNil(t, listing)
 	scan.pending = batch
@@ -145,8 +145,9 @@ func TestDaemonArchiveScanKeepsSequentialPriorityDuringListing(t *testing.T) {
 	require.NoError(t, err)
 	defer scan.closeListing()
 
-	require.Equal(t, files[1:3], a.candidates(files[0], &scan),
-		"reconciliation must not replace contiguous discovery with directory order")
+	batch := a.candidates(files[0], &scan)
+	require.Equal(t, []string{files[1], files[2], files[7]}, batch,
+		"retain listed WALs after the nearer sequential candidates")
 	require.Equal(t, files[2], scan.cursor, "far-ahead listed entries must not move the sequential cursor")
 }
 
