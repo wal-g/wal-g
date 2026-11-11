@@ -316,6 +316,9 @@ func TestDaemonArchiverRefillsBeforeFarListedWAL(t *testing.T) {
 	defer scan.closeListing()
 	a.refill(files[0], &scan)
 	require.Contains(t, scan.pending, files[7], "retain the listed WAL while closer work runs")
+	// A long pass can outlive its opening deadline. The recently read chunk
+	// still permits near-first extension until directory progress is due again.
+	scan.nextRescan = time.Time{}
 	for i := 1; i < len(files); i++ {
 		if i > 1 {
 			a.refill(files[0], &scan)
@@ -329,5 +332,70 @@ func TestDaemonArchiverRefillsBeforeFarListedWAL(t *testing.T) {
 		require.LessOrEqual(t, len(scan.pending), 2*a.window)
 		release <- struct{}{}
 		a.wg.Wait() // The manual scheduler is the only producer of jobs.
+	}
+}
+
+func TestDaemonArchiverReconcilesRetainedBatch(t *testing.T) {
+	for _, activeListing := range []bool{false, true} {
+		t.Run(fmt.Sprintf("active_listing=%v", activeListing), func(t *testing.T) {
+			archiveTestConfig(t)
+			files := archiveTestFiles(t, 24)
+			lateReady := filepath.Join(filepath.Dir(files[0]), archiveStatusDir, filepath.Base(files[1])+readySuffix)
+			require.NoError(t, os.Remove(lateReady))
+			started, release := make(chan string, 1), make(chan struct{})
+			a := newDaemonArchiver(t.Context(), 2, 2, time.Minute, asm.NewFakeASM(), archiveTestFactory(
+				func(ctx context.Context, file ioextensions.NamedReader) error {
+					started <- file.Name()
+					select {
+					case <-release:
+						return nil
+					case <-ctx.Done():
+						return ctx.Err()
+					}
+				}))
+			defer a.Close()
+			// No client anchor: only this test drives scheduling. Start with
+			// a full merged batch, retaining two far-ahead directory entries.
+			var scan daemonArchiveScan
+			scan.follow(files[0])
+			defer scan.closeListing()
+			scan.cursor = files[4]
+			scan.pending = []string{files[3], files[4], files[22], files[23]}
+			lastScan := time.Now().Add(-time.Minute)
+			scan.lastFullScan = lastScan
+			scan.lastListingRead = lastScan
+			scan.nextRescan = time.Time{}
+			if activeListing {
+				// The next chunk contains the late old WAL, independently of
+				// the host filesystem's directory order.
+				listingDir := t.TempDir()
+				require.NoError(t, os.WriteFile(filepath.Join(listingDir, filepath.Base(files[1])+readySuffix), nil, 0600))
+				var err error
+				scan.listing, err = os.Open(listingDir)
+				require.NoError(t, err)
+			}
+			require.NoError(t, os.WriteFile(lateReady, nil, 0600))
+			var seen []string
+			for range 2*a.window + 1 {
+				a.refill(files[0], &scan)
+				require.LessOrEqual(t, len(scan.pending), 2*a.window)
+				if !activeListing && scan.lastFullScan.After(lastScan) {
+					return // The overdue pass started despite retained work.
+				}
+				select {
+				case filename := <-started:
+					seen = append(seen, filepath.Base(filename))
+					if activeListing && filename == files[1] {
+						return
+					}
+				case <-time.After(3 * time.Second):
+					t.Fatal("no WAL upload started")
+				}
+				require.Equal(t, files[4], scan.cursor, "draining must preserve the nearer sequential cursor")
+				release <- struct{}{}
+				a.wg.Wait()
+			}
+			require.Fail(t, "retained WALs postponed reconciliation beyond a bounded batch", "uploaded=%v", seen)
+		})
 	}
 }

@@ -298,14 +298,11 @@ func (a *daemonArchiver) refill(anchor string, scan *daemonArchiveScan) {
 		if a.ctx.Err() != nil {
 			return
 		}
-		// Extend the nearer run before dispatching a far-ahead listed WAL.
-		if scan.pending[0] > scan.cursor {
-			if files := a.predictCandidates(scan.cursor); len(files) > 0 {
-				scan.cursor = files[len(files)-1]
-				scan.pending = append(scan.pending, files...)
-				slices.Sort(scan.pending)
-				scan.pending = slices.Compact(scan.pending)
-			}
+		// Drain this bounded batch when directory progress is due. Preserve
+		// the sequential cursor instead of skipping the unpredicted nearer run.
+		canExtend := scan.canExtendPrediction(time.Now())
+		if canExtend {
+			a.extendPending(scan)
 		}
 		filename := scan.pending[0]
 		if filename > anchor && a.needsUpload(filename) {
@@ -315,11 +312,28 @@ func (a *daemonArchiver) refill(anchor string, scan *daemonArchiveScan) {
 			}
 		}
 		scan.pending = scan.pending[1:]
-		scan.cursor = max(scan.cursor, filename) // Follow the listed run after prediction ends.
+		if canExtend {
+			scan.cursor = max(scan.cursor, filename) // Follow the listed run after prediction ends.
+		}
 	}
 	if len(scan.pending) == 0 && (hadCandidates || scan.listing != nil) {
 		a.notify() // A batch is a memory bound, not an archival progress limit.
 	}
+}
+
+// Extend the nearer run before dispatching a far-ahead listed WAL.
+func (a *daemonArchiver) extendPending(scan *daemonArchiveScan) {
+	if scan.pending[0] <= scan.cursor {
+		return
+	}
+	files := a.predictCandidates(scan.cursor)
+	if len(files) == 0 {
+		return
+	}
+	scan.cursor = files[len(files)-1]
+	scan.pending = append(scan.pending, files...)
+	slices.Sort(scan.pending)
+	scan.pending = slices.Compact(scan.pending)
 }
 
 // Keep due retries until they can run, even when PostgreSQL is stuck on one WAL.
@@ -392,12 +406,21 @@ const daemonArchiveRescanInterval = 5 * time.Second
 // Both predicted and listed candidates are retained in bounded batches while
 // workers are busy; a large or sparse backlog does not need to fit in memory.
 type daemonArchiveScan struct {
-	dir          string
-	cursor       string
-	lastFullScan time.Time
-	nextRescan   time.Time
-	pending      []string
-	listing      *os.File
+	dir             string
+	cursor          string
+	lastFullScan    time.Time
+	lastListingRead time.Time
+	nextRescan      time.Time
+	pending         []string
+	listing         *os.File
+}
+
+func (scan *daemonArchiveScan) canExtendPrediction(now time.Time) bool {
+	deadline := scan.nextRescan
+	if scan.listing != nil {
+		deadline = scan.lastListingRead.Add(daemonArchiveRescanInterval)
+	}
+	return now.Before(deadline)
 }
 
 func (scan *daemonArchiveScan) closeListing() {
@@ -464,6 +487,7 @@ func (a *daemonArchiver) predictCandidates(cursor string) []string {
 
 func (a *daemonArchiver) listCandidates(anchor string, scan *daemonArchiveScan) []string {
 	names, err := scan.listing.Readdirnames(a.window)
+	scan.lastListingRead = time.Now()
 	if err != nil {
 		scan.closeListing()
 		if err != io.EOF {
