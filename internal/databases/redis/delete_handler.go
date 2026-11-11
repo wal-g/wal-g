@@ -60,9 +60,11 @@ func HandlePurge(ctx context.Context, backupFolder storage.Folder, setters ...Pu
 		return err
 	}
 
-	_, _, err = HandleBackupsDelete(ctx, backupTimes, backupFolder, opts)
-	if err != nil {
-		return err
+	if opts.retainCount != nil || opts.retainAfter != nil {
+		_, _, err = HandleBackupsDelete(ctx, backupTimes, backupFolder, opts)
+		if err != nil {
+			return err
+		}
 	}
 
 	if opts.purgeGarbage {
