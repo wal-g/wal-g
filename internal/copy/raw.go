@@ -94,6 +94,8 @@ type Plan struct {
 	From storage.Folder
 	To   storage.Folder
 
+	scoped  bool
+	listed  map[string]bool
 	source  map[string]storage.Object
 	entries map[string]Entry
 }
@@ -101,23 +103,128 @@ type Plan struct {
 // NewPlan inventories the source once so planners can validate the full
 // manifest before any destination object is written.
 func NewPlan(ctx context.Context, from, to storage.Folder) (*Plan, error) {
+	p := NewScopedPlan(from, to)
 	objects, err := storage.ListFolderRecursively(ctx, from)
 	if err != nil {
 		return nil, fmt.Errorf("list source storage: %w", err)
 	}
-
-	source := make(map[string]storage.Object, len(objects))
 	for _, object := range objects {
-		source[path.Clean(object.GetName())] = object
+		p.source[path.Clean(object.GetName())] = object
 	}
+	p.scoped = false
+	return p, nil
+}
 
-	return &Plan{From: from, To: to, source: source, entries: make(map[string]Entry)}, nil
+// NewScopedPlan inventories only explicitly requested backup dependencies.
+func NewScopedPlan(from, to storage.Folder) *Plan {
+	return &Plan{From: from, To: to, scoped: true,
+		listed: make(map[string]bool), source: make(map[string]storage.Object), entries: make(map[string]Entry)}
+}
+
+// InventoryPrefix is for payloads whose complete key set is not recorded in
+// metadata. Never pass a storage root when planning one selected backup.
+func (p *Plan) InventoryPrefix(ctx context.Context, prefix string) error {
+	if !p.scoped {
+		return nil
+	}
+	prefix = path.Clean(strings.TrimSuffix(prefix, "/"))
+	if err := validateSourcePath(prefix); err != nil {
+		return err
+	}
+	if p.listed[prefix] {
+		return nil
+	}
+	tracelog.InfoLogger.Printf("Listing selected copy source prefix %q", prefix)
+	folder := p.From.GetSubFolder(prefix)
+	if err := storage.WalkObjects(ctx, folder, func(object storage.Object) error {
+		name := path.Join(prefix, object.GetName())
+		p.source[name] = storage.NewLocalObjectWithVersion(name, object.GetLastModified(), object.GetSize(),
+			object.GetVersionID(), object.GetAdditionalInfo())
+		return nil
+	}); err != nil {
+		return fmt.Errorf("list source prefix %q: %w", prefix, err)
+	}
+	p.listed[prefix] = true
+	return nil
+}
+
+// InventoryFolder reads only direct children, for backup/restore-point names.
+func (p *Plan) InventoryFolder(ctx context.Context, prefix string) error {
+	if err := validateSourcePath(path.Clean(prefix)); err != nil {
+		return err
+	}
+	objects, _, err := p.From.GetSubFolder(prefix).ListFolder(ctx)
+	if err != nil {
+		return err
+	}
+	for _, object := range objects {
+		name := path.Join(prefix, object.GetName())
+		p.source[name] = storage.NewLocalObjectWithVersion(name, object.GetLastModified(), object.GetSize(),
+			object.GetVersionID(), object.GetAdditionalInfo())
+	}
+	return nil
+}
+
+// FindObject looks up a known source key without listing its parent.
+func (p *Plan) FindObject(ctx context.Context, name string) (storage.Object, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	name = path.Clean(name)
+	if err := validateSourcePath(name); err != nil {
+		return nil, err
+	}
+	if object, ok := p.source[name]; ok {
+		return object, nil
+	}
+	object, err := p.From.StatObject(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	p.source[name] = object
+	return object, nil
+}
+
+// InventoryBackup discovers only one backup payload and its completion marker.
+func (p *Plan) InventoryBackup(ctx context.Context, basePath, name string) error {
+	if err := p.InventoryPrefix(ctx, path.Join(basePath, name)); err != nil {
+		return err
+	}
+	_, err := p.FindObject(ctx, path.Join(basePath, internal.SentinelNameFromBackup(name)))
+	return err
+}
+
+// AddSourceObject validates a known source key before adding it to a scoped plan.
+func (p *Plan) AddSourceObject(ctx context.Context, sourcePath, targetPath string, phase Phase, mutable bool) error {
+	if _, err := p.FindObject(ctx, sourcePath); err != nil {
+		return fmt.Errorf("required source object %q: %w", sourcePath, err)
+	}
+	return p.AddObject(sourcePath, targetPath, phase, mutable)
+}
+
+func validateSourcePath(name string) error {
+	if name == "." || name == ".." || strings.HasPrefix(name, "../") || path.IsAbs(name) {
+		return fmt.Errorf("invalid copy source path %q", name)
+	}
+	return nil
 }
 
 // SourceObjects returns the immutable source inventory used by this plan.
 func (p *Plan) SourceObjects() []storage.Object {
-	objects := make([]storage.Object, 0, len(p.source))
-	for _, object := range p.source {
+	return p.SourceObjectsAt("")
+}
+
+// SourceObjectsAt avoids sorting unrelated payload/shared-file keys for each
+// segment's WAL validation. This only reads the already inventoried objects.
+func (p *Plan) SourceObjectsAt(prefix string) []storage.Object {
+	if prefix != "" {
+		prefix = strings.TrimSuffix(prefix, "/") + "/"
+	}
+	var objects []storage.Object
+	for name, object := range p.source {
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
 		objects = append(objects, object)
 	}
 	slices.SortFunc(objects, func(a, b storage.Object) int { return strings.Compare(a.GetName(), b.GetName()) })
@@ -145,6 +252,11 @@ func (p *Plan) BackupNames() []string {
 // ResolveBackupNames applies the shared empty/all and LATEST semantics.
 func (p *Plan) ResolveBackupNames(ctx context.Context, requested string) ([]string, error) {
 	if requested == "" {
+		if p.scoped {
+			if err := p.InventoryFolder(ctx, utility.BaseBackupPath); err != nil {
+				return nil, err
+			}
+		}
 		names := p.BackupNames()
 		if len(names) == 0 {
 			return nil, internal.NewNoBackupsFoundError()
@@ -337,28 +449,53 @@ func Execute(ctx context.Context, plan *Plan, options ExecuteOptions) error {
 }
 
 func groupPendingEntries(ctx context.Context, plan *Plan, options ExecuteOptions) (map[publicationOrder][]Entry, error) {
-	targetObjects, err := storage.ListFolderRecursively(ctx, plan.To)
+	entries := plan.Entries()
+	concurrency, err := options.copyConcurrency()
 	if err != nil {
-		return nil, fmt.Errorf("list destination storage: %w", err)
+		return nil, err
 	}
-	target := make(map[string]storage.Object, len(targetObjects))
-	for _, object := range targetObjects {
-		target[path.Clean(object.GetName())] = object
+	existing := make([]storage.Object, len(entries))
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(concurrency)
+	for i, entry := range entries {
+		if entry.Mutable {
+			continue
+		}
+		if groupCtx.Err() != nil {
+			break
+		}
+		group.Go(func() error {
+			object, err := plan.To.StatObject(groupCtx, entry.TargetPath)
+			var missing storage.ObjectNotFoundError
+			if errors.As(err, &missing) {
+				return nil
+			}
+			if err != nil {
+				return fmt.Errorf("stat destination object %q: %w", entry.TargetPath, err)
+			}
+			existing[i] = object
+			return nil
+		})
 	}
-
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	byOrder := map[publicationOrder][]Entry{}
-	for _, entry := range plan.Entries() {
-		if existing, ok := target[entry.TargetPath]; ok && !entry.Mutable {
-			if existing.GetSize() == entry.Size {
+	for i, entry := range entries {
+		if object := existing[i]; object != nil {
+			if object.GetSize() == entry.Size {
 				tracelog.DebugLogger.Printf("Skipping existing object %q", entry.TargetPath)
 				continue
 			}
 			if !options.OverwriteConflicts {
 				return nil, fmt.Errorf("destination object %q conflicts with source: source size %d, destination size %d",
-					entry.TargetPath, entry.Size, existing.GetSize())
+					entry.TargetPath, entry.Size, object.GetSize())
 			}
 			tracelog.WarningLogger.Printf("Will overwrite conflicting destination object %q: source size %d, destination size %d",
-				entry.TargetPath, entry.Size, existing.GetSize())
+				entry.TargetPath, entry.Size, object.GetSize())
 		}
 		order := publicationOrder{phase: entry.Phase, sequence: entry.Sequence}
 		byOrder[order] = append(byOrder[order], entry)
