@@ -2,6 +2,8 @@ package pg
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -27,6 +29,8 @@ var confirmed = false
 var deleteWithoutBackups = false
 var useSentinelTime = false
 var deleteTargetUserData = ""
+var noListDelete bool
+var noListTargetStorage string
 
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
@@ -37,7 +41,7 @@ var deleteCmd = &cobra.Command{
 var deleteBeforeCmd = &cobra.Command{
 	Use:     internal.DeleteBeforeUsageExample, // TODO : improve description
 	Example: internal.DeleteBeforeExamples,
-	Args:    internal.DeleteBeforeArgsValidator,
+	Args:    validateNoListDeleteArgs(internal.DeleteBeforeArgsValidator),
 	Run:     runDeleteBefore,
 }
 
@@ -45,7 +49,7 @@ var deleteRetainCmd = &cobra.Command{
 	Use:       internal.DeleteRetainUsageExample, // TODO : improve description
 	Example:   internal.DeleteRetainExamples,
 	ValidArgs: internal.StringModifiers,
-	Args:      internal.DeleteRetainArgsValidator,
+	Args:      validateNoListDeleteArgs(internal.DeleteRetainArgsValidator),
 	Run:       runDeleteRetain,
 }
 
@@ -74,6 +78,12 @@ var deleteGarbageCmd = &cobra.Command{
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
+	if noListDelete {
+		modifier, before := internal.ExtractDeleteModifierFromArgs(args)
+		err := runDeleteWithoutListing(cmd.Context(), postgres.NoListDeleteOptions{Before: before, Modifier: modifier})
+		tracelog.ErrorLogger.FatalOnError(err)
+		return
+	}
 	folder := configureFolder(cmd.Context())
 
 	permanentBackups, permanentWals, err := postgres.GetPermanentBackupsAndWalsChecked(cmd.Context(), folder)
@@ -86,6 +96,15 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
+	if noListDelete {
+		modifier, count := internal.ExtractDeleteModifierFromArgs(args)
+		retain, err := strconv.Atoi(count)
+		tracelog.ErrorLogger.FatalOnError(err)
+		after, _ := cmd.Flags().GetString(afterFlag)
+		err = runDeleteWithoutListing(cmd.Context(), postgres.NoListDeleteOptions{Retain: retain, Modifier: modifier, After: after})
+		tracelog.ErrorLogger.FatalOnError(err)
+		return
+	}
 	folder := configureFolder(cmd.Context())
 
 	permanentBackups, permanentWals, err := postgres.GetPermanentBackupsAndWalsChecked(cmd.Context(), folder)
@@ -178,7 +197,34 @@ func DeleteGarbageArgsValidator(cmd *cobra.Command, args []string) error {
 	return internal.DeleteArgsValidator(args, modifiers, 0, 1)
 }
 
+func validateNoListDeleteArgs(normal cobra.PositionalArgs) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if !noListDelete && noListTargetStorage != "" {
+			return fmt.Errorf("--target-storage on this command requires --no-list")
+		}
+		return normal(cmd, args)
+	}
+}
+
+func runDeleteWithoutListing(ctx context.Context, options postgres.NoListDeleteOptions) error {
+	folder, _, err := internal.ConfigureRecoveryFolder(ctx, internal.RecoveryOptions{TargetStorage: noListTargetStorage})
+	if err != nil {
+		return err
+	}
+	options.UseSentinelTime = useSentinelTime
+	plan, err := postgres.PlanDeleteWithoutListing(ctx, folder, options)
+	if err != nil {
+		return err
+	}
+	defer plan.Close()
+	return plan.Execute(ctx, confirmed)
+}
+
 func init() {
+	for _, cmd := range []*cobra.Command{deleteBeforeCmd, deleteRetainCmd} {
+		cmd.Flags().BoolVar(&noListDelete, "no-list", false, "Experimental: derive WAL deletion ranges from backup metadata")
+		cmd.Flags().StringVar(&noListTargetStorage, "target-storage", "", "Destination for --no-list; required with multiple storages")
+	}
 	recoveryDelete.AddFlags(deleteTargetCmd)
 	Cmd.AddCommand(deleteCmd)
 
