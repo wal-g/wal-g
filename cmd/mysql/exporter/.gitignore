@@ -1,0 +1,11 @@
+# Built binaries ('go build' without -o writes ./exporter)
+exporter
+walg-mysql-exporter
+walg-mysql-exporter-linux
+
+# Test binary
+*.test
+
+# Local environment and config files that may hold secrets
+.env
+config.json

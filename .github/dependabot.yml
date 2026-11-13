@@ -29,3 +29,7 @@ updates:
     directory: "/cmd/pg/exporter"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "gomod"
+    directory: "/cmd/mysql/exporter"
+    schedule:
+      interval: "weekly"
