@@ -87,6 +87,10 @@ To configure AWS KMS key for client-side encryption and decryption. By default, 
 
 To configure AWS KMS key for client-side encryption and decryption. By default, no encryption is used. (AWS_REGION or WALG_CSE_KMS_REGION required to be set when using AWS KMS key client-side encryption)
 
+* `WALG_S3_LOG_LEVEL`
+
+Controls AWS SDK logging. Set to `RETRIES` to log request retries, or `DEVEL` to log HTTP requests, HTTP responses and retries. Unset by default; other values leave SDK debug logging disabled. Values are case-sensitive.
+
 * `WALG_S3_RANGE_BATCH_ENABLED`
 
 Set to TRUE to resume interrupted S3 downloads from the last byte read using HTTP Range requests. Disabled by default. Resumed requests retain SSE-C headers and the original object version or ETag when supplied by S3; inconsistent ranges or changed objects fail the read.
