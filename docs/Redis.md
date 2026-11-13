@@ -24,6 +24,14 @@ Username for 'redis-cli' command. Required for interacting with server if you ha
 
 Password for 'redis-cli' command. Required for backup archiving procedure if you have password.
 
+* `WALG_BACKUP_FILE_PART_SIZE`
+
+Maximum uncompressed part size in bytes for AOF and standalone or attached
+tiered-storage (TS) files. Default: `0` (disabled). Does not affect RDB streams.
+For example, `WALG_BACKUP_FILE_PART_SIZE=67108864` splits files larger than 64 MiB
+into separate archives. Restore detects file parts automatically; the setting is
+only needed when creating a backup. Shared with MongoDB binary backups.
+
 Usage
 -----
 

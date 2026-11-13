@@ -2,6 +2,7 @@ package binary
 
 import (
 	"context"
+	"path"
 	"strings"
 
 	"github.com/wal-g/wal-g/internal"
@@ -39,4 +40,10 @@ func (maker *DirDatabaseTarBallComposerMaker) Make(ctx context.Context, bundle *
 
 func mongoPathFilter(path string) bool {
 	return strings.Contains(path, CollectionPrefix) || strings.Contains(path, IndexPrefix)
+}
+
+func shouldSplitWiredTigerFile(info *internal.ComposeFileInfo) bool {
+	name := path.Base(strings.ReplaceAll(info.Header.Name, `\`, "/"))
+	return strings.HasSuffix(name, ".wt") &&
+		(strings.HasPrefix(name, "collection-") || strings.HasPrefix(name, "index-"))
 }

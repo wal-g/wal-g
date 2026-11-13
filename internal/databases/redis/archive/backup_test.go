@@ -5,8 +5,27 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/wal-g/wal-g/internal/fileparts"
 	"github.com/wal-g/wal-g/internal/printlist"
 )
+
+func TestRedisMetaConstructorPreservesFinalizedSentinel(t *testing.T) {
+	constructor := &RedisMetaConstructor{}
+	backup := constructor.MetaInfo().(*Backup)
+	backup.BackupName = "aof_20261109T000000Z"
+	backup.DataSize = 8192
+	backup.BackupSize = 4096
+	backup.FileParts = &fileparts.Info{PartSize: 1024, Files: map[string]int64{"/appendonly.aof.1.base.rdb": 8192}}
+
+	require.NoError(t, constructor.Finalize(t.Context(), backup.BackupName))
+	finalized := constructor.MetaInfo().(*Backup)
+	require.Same(t, backup, finalized)
+	require.False(t, finalized.FinishLocalTime.IsZero())
+	require.Equal(t, int64(8192), finalized.DataSize)
+	require.Equal(t, int64(4096), finalized.BackupSize)
+	require.Equal(t, backup.FileParts, finalized.FileParts)
+}
 
 func TestBackup_PrintableFields(t *testing.T) {
 	b := Backup{

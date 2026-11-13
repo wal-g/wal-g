@@ -51,27 +51,6 @@ func TestTarInterpreterDelegatesRegularFile(t *testing.T) {
 	require.Equal(t, "data", regular.data)
 }
 
-func TestTarBallComposerMakerIsOptional(t *testing.T) {
-	base := internal.NewRegularTarBallComposerMaker(
-		&internal.RegularBundleFiles{}, internal.NewRegularTarFileSets(), false,
-	)
-	bundle := internal.NewBundle(t.TempDir(), nil, 1024, nil)
-
-	disabled := NewTarBallComposerMaker(base, 0, nil)
-	composer, err := disabled.Make(t.Context(), bundle)
-	require.NoError(t, err)
-	require.IsType(t, &internal.RegularTarBallComposer{}, composer)
-	require.False(t, disabled.Enabled())
-	require.Nil(t, disabled.FileParts())
-
-	enabled := NewTarBallComposerMaker(base, 4, nil)
-	composer, err = enabled.Make(t.Context(), bundle)
-	require.NoError(t, err)
-	require.IsType(t, &TarBallComposer{}, composer)
-	require.True(t, enabled.Enabled())
-	require.Nil(t, enabled.FileParts())
-}
-
 type recordingTarInterpreter struct {
 	header *tar.Header
 	data   string

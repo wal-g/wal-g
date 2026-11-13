@@ -8,6 +8,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
 	"github.com/wal-g/wal-g/internal/databases/redis/pin"
+	"github.com/wal-g/wal-g/internal/fileparts"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -25,6 +26,12 @@ type PushArgs struct {
 
 // Push uploads a recursively pinned tiered-storage tree and writes its sentinel.
 func Push(ctx context.Context, args PushArgs) (*archive.Backup, error) {
+	composerMaker, err := fileparts.NewTarBallComposerMaker(
+		internal.NewRegularTarBallComposerMaker(&internal.RegularBundleFiles{}, internal.NewRegularTarFileSets(), false), nil,
+	)
+	if err != nil {
+		return nil, err
+	}
 	sourceInfo, err := os.Stat(args.SourceDir)
 	if err != nil {
 		return nil, fmt.Errorf("stat ts source directory %s: %w", args.SourceDir, err)
@@ -51,9 +58,10 @@ func Push(ctx context.Context, args PushArgs) (*archive.Backup, error) {
 	defer pinner.Unpin()
 
 	concurrentUploader, err := internal.CreateConcurrentUploader(ctx, internal.CreateConcurrentUploaderArgs{
-		Uploader:   args.Uploader,
-		BackupName: args.DataPrefix,
-		Directory:  pinRoot,
+		Uploader:             args.Uploader,
+		BackupName:           args.DataPrefix,
+		Directory:            pinRoot,
+		TarBallComposerMaker: composerMaker,
 	})
 	if err != nil {
 		return nil, err
@@ -78,6 +86,7 @@ func Push(ctx context.Context, args PushArgs) (*archive.Backup, error) {
 		DataSize:        concurrentUploader.UncompressedSize,
 		BackupSize:      concurrentUploader.CompressedSize,
 		BackupType:      archive.TSBackupType,
+		FileParts:       composerMaker.FileParts(),
 		TSBackupID:      args.BackupID,
 		TSBackupPath:    args.BackupPath,
 		TSDataSize:      concurrentUploader.UncompressedSize,
@@ -102,6 +111,10 @@ type FetchArgs struct {
 
 // Fetch restores a tiered-storage tree from the data prefix into TargetDir.
 func Fetch(ctx context.Context, args FetchArgs) error {
+	var sentinel archive.Backup
+	if err := internal.FetchDto(ctx, args.Folder, &sentinel, args.DataPrefix+utility.SentinelSuffix); err != nil {
+		return fmt.Errorf("fetch ts sentinel %s: %w", args.DataPrefix, err)
+	}
 	if !args.SkipClean {
 		if err := os.RemoveAll(args.TargetDir); err != nil {
 			return fmt.Errorf("clean ts restore directory %s: %w", args.TargetDir, err)
@@ -111,8 +124,9 @@ func Fetch(ctx context.Context, args FetchArgs) error {
 		}
 	}
 
-	downloader := internal.NewCommonDirectoryDownloader(args.Folder, args.DataPrefix)
-	if err := downloader.DownloadDirectory(ctx, args.TargetDir, args.SkipClean); err != nil {
+	interpreter := fileparts.NewTarInterpreter(args.TargetDir, internal.NewFileTarInterpreter(args.TargetDir), sentinel.FileParts)
+	downloader := &internal.CommonDirectoryDownloader{Folder: args.Folder, BackupName: args.DataPrefix}
+	if err := downloader.DownloadDirectoryWithTarInterpreter(ctx, args.TargetDir, args.SkipClean, interpreter); err != nil {
 		return fmt.Errorf("download ts backup %s: %w", args.DataPrefix, err)
 	}
 	return nil

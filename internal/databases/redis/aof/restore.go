@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
+	"github.com/wal-g/wal-g/internal/fileparts"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -65,7 +66,7 @@ func (r *RestoreService) DoRestore(ctx context.Context, args RestoreArgs) error 
 		}
 
 		tracelog.InfoLogger.Printf("Download backup files to %s\n", r.TargetDiskFolder.Path)
-		err = r.downloadFromTarArchives(ctx, sentinel.Name())
+		err = r.downloadFromTarArchives(ctx, sentinel.Name(), sentinel.FileParts)
 		if err != nil {
 			return err
 		}
@@ -76,7 +77,9 @@ func (r *RestoreService) DoRestore(ctx context.Context, args RestoreArgs) error 
 	return nil
 }
 
-func (r *RestoreService) downloadFromTarArchives(ctx context.Context, backupName string) error {
+func (r *RestoreService) downloadFromTarArchives(ctx context.Context, backupName string, expectedParts *fileparts.Info) error {
+	directory := r.TargetDiskFolder.Path
+	interpreter := fileparts.NewTarInterpreter(directory, internal.NewFileTarInterpreter(directory), expectedParts)
 	downloader := internal.CreateConcurrentDownloader(r.Uploader, nil)
-	return downloader.Download(ctx, backupName, r.TargetDiskFolder.Path, nil)
+	return downloader.DownloadWithTarInterpreter(ctx, backupName, directory, nil, interpreter)
 }

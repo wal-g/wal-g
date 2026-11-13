@@ -10,7 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/redis/archive"
 	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func init() {
@@ -22,6 +24,8 @@ func init() {
 func TestFetchHonorsSkipClean(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	dataPrefix := "ts_20260721T120000Z"
+	require.NoError(t, internal.UploadDto(t.Context(), folder, &archive.Backup{BackupType: archive.TSBackupType},
+		dataPrefix+utility.SentinelSuffix))
 	tarData := makeTar(t, "restored.data", []byte("restored"))
 	require.NoError(t, folder.PutObject(
 		t.Context(), dataPrefix+internal.TarPartitionFolderName+"part.tar", bytes.NewReader(tarData),

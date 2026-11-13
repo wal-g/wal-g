@@ -157,6 +157,17 @@ Removing a sentinel also does not protect a restore that has already read it.
 
 ## Validation and handoff
 
+- MongoDB binary and Redis AOF/TS backups share `WALG_BACKUP_FILE_PART_SIZE` and
+  `internal/fileparts`.
+  A regular composer can leave partially filled tarballs queued; close them before
+  placing a file part in its own archive. Restore lists each payload's
+  `tar_partitions` once (regular
+  archives plus roughly `sum(ceil(file_size / part_size))` split archives) and
+  validates completeness against its own sentinel, including attached TS data.
+  Keep Redis metadata mutable through deferred publication: `aof_ts` retrieves
+  the main sentinel again after upload. See Redis `file_parts_test.go` and
+  `archive/backup_test.go:TestRedisMetaConstructorPreservesFinalizedSentinel`.
+
 - Start with a failing reproducer; run focused tests, affected package suites and
   race tests for concurrency changes. Use the current Makefile/CI recipes for
   native dependencies and integration tests. Include Greenplum where shared

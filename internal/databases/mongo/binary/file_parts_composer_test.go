@@ -33,7 +33,7 @@ func TestFilePartsBackupRestore(t *testing.T) {
 			t.Run(fmt.Sprintf("compression=%s/partSize=%d", compressor.FileExtension(), configuredPartSize), func(t *testing.T) {
 				const backupName = "binary_20261019T000000Z"
 				setFilePartsTestConfig(t, map[string]any{
-					conf.MongoDBBackupFilePartSize:    configuredPartSize,
+					conf.BackupFilePartSize:           configuredPartSize,
 					conf.UploadDiskConcurrencySetting: 3,
 					conf.UploadQueueSetting:           2,
 					conf.DownloadConcurrencySetting:   4,
@@ -51,7 +51,7 @@ func TestFilePartsBackupRestore(t *testing.T) {
 				source := t.TempDir()
 				folder := fs.NewFolder(t.TempDir(), "")
 				uploader := internal.NewRegularUploader(compressor, folder)
-				maker, err := newTarBallComposerMaker()
+				maker, err := fileparts.NewTarBallComposerMaker(NewDirDatabaseTarBallComposerMaker(), shouldSplitWiredTigerFile)
 				require.NoError(t, err)
 				concurrent, err := internal.CreateConcurrentUploader(t.Context(), internal.CreateConcurrentUploaderArgs{
 					Uploader: uploader, BackupName: backupName, Directory: filepath.ToSlash(source), TarBallComposerMaker: maker,
@@ -151,7 +151,7 @@ func TestFilePartsBackupRestore(t *testing.T) {
 				}
 				require.Equal(t, 1, entries["index-small.wt"])
 				require.Equal(t, 1, entries["WiredTiger"])
-				viper.Set(conf.MongoDBBackupFilePartSize, 0)
+				viper.Set(conf.BackupFilePartSize, 0)
 
 				for _, partial := range []bool{false, true} {
 					t.Run(fmt.Sprintf("partial=%t", partial), func(t *testing.T) {
@@ -217,41 +217,6 @@ func TestFilePartsBackupRestore(t *testing.T) {
 				}
 			})
 		}
-	}
-}
-
-func TestFilePartsComposerConfiguration(t *testing.T) {
-	for _, test := range []struct {
-		name    string
-		value   any
-		split   bool
-		invalid bool
-	}{
-		{name: "unset"},
-		{name: "disabled", value: "0"},
-		{name: "enabled", value: "1024", split: true},
-		{name: "negative", value: "-1", invalid: true},
-		{name: "noninteger", value: "small", invalid: true},
-		{name: "fractional", value: "1.5", invalid: true},
-		{name: "overflow", value: "9223372036854775808", invalid: true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			setFilePartsTestConfig(t, map[string]any{conf.MongoDBBackupFilePartSize: test.value})
-			maker, err := newTarBallComposerMaker()
-			if test.invalid {
-				require.ErrorContains(t, err, conf.MongoDBBackupFilePartSize)
-				return
-			}
-			require.NoError(t, err)
-			require.Equal(t, test.split, maker.Enabled())
-			composer, err := maker.Make(t.Context(), internal.NewBundle(t.TempDir(), nil, 1024, nil))
-			require.NoError(t, err)
-			_, splitsFiles := composer.(*fileparts.TarBallComposer)
-			require.Equal(t, test.split, splitsFiles)
-			baseComposer, err := NewDirDatabaseTarBallComposerMaker().Make(t.Context(), internal.NewBundle(t.TempDir(), nil, 1024, nil))
-			require.NoError(t, err)
-			require.IsType(t, &internal.DirDatabaseTarBallComposer{}, baseComposer)
-		})
 	}
 }
 

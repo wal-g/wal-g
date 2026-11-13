@@ -31,6 +31,12 @@ func NewDirectoryIsNotEmptyError(path string) DirectoryIsNotEmptyError {
 }
 
 func (downloader *CommonDirectoryDownloader) DownloadDirectory(ctx context.Context, pathToRestore string, skipClean bool) error {
+	return downloader.DownloadDirectoryWithTarInterpreter(ctx, pathToRestore, skipClean, NewFileTarInterpreter(pathToRestore))
+}
+
+func (downloader *CommonDirectoryDownloader) DownloadDirectoryWithTarInterpreter(ctx context.Context,
+	pathToRestore string, skipClean bool, tarInterpreter TarInterpreter,
+) error {
 	tarsToExtract, err := downloader.getTarsToExtract(ctx)
 	if err != nil {
 		return err
@@ -47,7 +53,13 @@ func (downloader *CommonDirectoryDownloader) DownloadDirectory(ctx context.Conte
 		}
 	}
 
-	return ExtractAll(ctx, NewFileTarInterpreter(pathToRestore), tarsToExtract)
+	if err := ExtractAll(ctx, tarInterpreter, tarsToExtract); err != nil {
+		return err
+	}
+	if finalizer, ok := tarInterpreter.(finalizingTarInterpreter); ok {
+		return finalizer.Finalize()
+	}
+	return nil
 }
 
 func (downloader *CommonDirectoryDownloader) getTarPartitionFolder() storage.Folder {

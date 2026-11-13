@@ -61,6 +61,7 @@ const (
 	LogLevelSetting               = "WALG_LOG_LEVEL"
 	LogDestinationSetting         = "WALG_LOG_DESTINATION"
 	TarSizeThresholdSetting       = "WALG_TAR_SIZE_THRESHOLD"
+	BackupFilePartSize            = "WALG_BACKUP_FILE_PART_SIZE"
 	TarDisableFsyncSetting        = "WALG_TAR_DISABLE_FSYNC"
 	CseKmsIDSetting               = "WALG_CSE_KMS_ID"
 	CseKmsRegionSetting           = "WALG_CSE_KMS_REGION"
@@ -136,7 +137,6 @@ const (
 	MongoDBLastWriteUpdateInterval      = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
 	MongoDBExtendBackupCursor           = "MONGODB_EXTEND_BACKUP_CURSOR"
 	MongoDBBackupCursorFastRetry        = "MONGODB_BACKUP_CURSOR_FAST_RETRY"
-	MongoDBBackupFilePartSize           = "WALG_MONGO_BACKUP_FILE_PART_SIZE"
 	MongoDBDeletionProtectionWhitelist  = "MONGODB_DELETION_PROTECTION_WHITELIST"
 	MongoDBExtraInternalDatabases       = "MONGODB_EXTRA_INTERNAL_DATABASES"
 	OplogArchiveAfterSize               = "OPLOG_ARCHIVE_AFTER_SIZE"
@@ -397,6 +397,7 @@ var (
 		LogLevelSetting:               true,
 		LogDestinationSetting:         true,
 		TarSizeThresholdSetting:       true,
+		BackupFilePartSize:            true,
 		TarDisableFsyncSetting:        true,
 		"WALG_" + GpgKeyIDSetting:     true,
 		"WALE_" + GpgKeyIDSetting:     true,
@@ -579,7 +580,6 @@ var (
 		MongoDBLastWriteUpdateInterval:     true,
 		MongoDBExtendBackupCursor:          true,
 		MongoDBBackupCursorFastRetry:       true,
-		MongoDBBackupFilePartSize:          true,
 		MongoDBDeletionProtectionWhitelist: true,
 		MongoDBExtraInternalDatabases:      true,
 		OplogArchiveTimeoutInterval:        true,
