@@ -12,6 +12,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/fileparts"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -196,7 +197,7 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 	backupCursor.StartKeepAlive()
 
 	mongodDBPath := backupCursor.BackupCursorMeta.DBPath
-	composerMaker, err := newTarBallComposerMaker()
+	composerMaker, err := fileparts.NewTarBallComposerMaker(NewDirDatabaseTarBallComposerMaker(), shouldSplitWiredTigerFile)
 	if err != nil {
 		return err
 	}

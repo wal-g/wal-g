@@ -9,6 +9,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
 	"github.com/wal-g/wal-g/internal/databases/redis/pin"
 	"github.com/wal-g/wal-g/internal/diskwatcher"
+	"github.com/wal-g/wal-g/internal/fileparts"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -18,6 +19,7 @@ type BackupService struct {
 	metaConstructor         internal.MetaConstructor
 	backupFilesListProvider *BackupFilesListProvider
 	filesPinner             *FilesPinner
+	composerMaker           *fileparts.TarBallComposerMaker
 }
 
 func GenerateNewBackupName() string {
@@ -32,6 +34,7 @@ func NewFilesPinner(path string) *FilesPinner {
 
 func CreateBackupService(diskWatcher *diskwatcher.DiskWatcher, uploader *internal.ConcurrentUploader,
 	metaConstructor internal.MetaConstructor, backupFilesListProvider *BackupFilesListProvider, filesPinner *FilesPinner,
+	composerMaker *fileparts.TarBallComposerMaker,
 ) (*BackupService, error) {
 	return &BackupService{
 		DiskWatcher:             diskWatcher,
@@ -39,6 +42,7 @@ func CreateBackupService(diskWatcher *diskwatcher.DiskWatcher, uploader *interna
 		backupFilesListProvider: backupFilesListProvider,
 		filesPinner:             filesPinner,
 		metaConstructor:         metaConstructor,
+		composerMaker:           composerMaker,
 	}, nil
 }
 
@@ -118,6 +122,7 @@ func (bs *BackupService) Finalize(ctx context.Context, backupName string, deferS
 	backup.BackupName = backupName
 	backup.BackupSize = bs.concurrentUploader.CompressedSize
 	backup.DataSize = bs.concurrentUploader.UncompressedSize
+	backup.FileParts = bs.composerMaker.FileParts()
 	if !deferSentinel {
 		if err := bs.concurrentUploader.UploadSentinel(ctx, backupSentinelInfo, backupName); err != nil {
 			return fmt.Errorf("can not upload sentinel: %+v", err)

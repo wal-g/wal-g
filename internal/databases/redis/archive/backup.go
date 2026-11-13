@@ -9,6 +9,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	client "github.com/wal-g/wal-g/internal/databases/redis/client"
+	"github.com/wal-g/wal-g/internal/fileparts"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -36,25 +37,26 @@ func GenerateNewTSBackupName() string {
 
 // Backup represents backup sentinel data
 type Backup struct {
-	BackupName      string      `json:"BackupName,omitempty"`
-	StartLocalTime  time.Time   `json:"StartLocalTime,omitempty"`
-	FinishLocalTime time.Time   `json:"FinishLocalTime,omitempty"`
-	UserData        interface{} `json:"UserData,omitempty"`
-	Permanent       bool        `json:"Permanent"`
-	DataSize        int64       `json:"DataSize,omitempty"`
-	BackupSize      int64       `json:"BackupSize,omitempty"`
-	BackupType      string      `json:"BackupType,omitempty"`
-	Version         string      `json:"Version,omitempty"`
-	UsedMemory      int64       `json:"UsedMemory,omitempty"`
-	UsedMemoryRss   int64       `json:"UsedMemoryRss,omitempty"`
-	MaxDBNumber     int64       `json:"MaxDBNumber"`
-	HasTS           bool        `json:"HasTS,omitempty"`
-	TSBackupID      string      `json:"TSBackupID,omitempty"`
-	TSBackupPath    string      `json:"TSBackupPath,omitempty"`
-	TSDataSize      int64       `json:"TSDataSize,omitempty"`
-	TSFileCount     int64       `json:"TSFileCount,omitempty"`
-	TSStartTime     time.Time   `json:"TSStartTime,omitempty"`
-	TSFinishTime    time.Time   `json:"TSFinishTime,omitempty"`
+	BackupName      string          `json:"BackupName,omitempty"`
+	StartLocalTime  time.Time       `json:"StartLocalTime,omitempty"`
+	FinishLocalTime time.Time       `json:"FinishLocalTime,omitempty"`
+	UserData        interface{}     `json:"UserData,omitempty"`
+	Permanent       bool            `json:"Permanent"`
+	DataSize        int64           `json:"DataSize,omitempty"`
+	BackupSize      int64           `json:"BackupSize,omitempty"`
+	BackupType      string          `json:"BackupType,omitempty"`
+	Version         string          `json:"Version,omitempty"`
+	UsedMemory      int64           `json:"UsedMemory,omitempty"`
+	UsedMemoryRss   int64           `json:"UsedMemoryRss,omitempty"`
+	MaxDBNumber     int64           `json:"MaxDBNumber"`
+	FileParts       *fileparts.Info `json:"FileParts,omitempty"`
+	HasTS           bool            `json:"HasTS,omitempty"`
+	TSBackupID      string          `json:"TSBackupID,omitempty"`
+	TSBackupPath    string          `json:"TSBackupPath,omitempty"`
+	TSDataSize      int64           `json:"TSDataSize,omitempty"`
+	TSFileCount     int64           `json:"TSFileCount,omitempty"`
+	TSStartTime     time.Time       `json:"TSStartTime,omitempty"`
+	TSFinishTime    time.Time       `json:"TSFinishTime,omitempty"`
 }
 
 func (b *Backup) Name() string {
@@ -210,24 +212,9 @@ func RedisModelToTimedBackup(backups []Backup) []internal.TimedBackup {
 	return result
 }
 
-// BackupMeta stores the data needed to create a Backup json object
-type BackupMeta struct {
-	DataSize       int64
-	CompressedSize int64
-	Permanent      bool
-	User           interface{}
-	StartTime      time.Time
-	FinishTime     time.Time
-	BackupType     string
-	Version        string
-	UsedMemory     int64
-	UsedMemoryRss  int64
-	MaxDBNumber    int64
-}
-
 type RedisMetaConstructor struct {
 	folder           storage.Folder
-	meta             BackupMeta
+	meta             Backup
 	permanent        bool
 	backupType       string
 	versionParser    *VersionParser
@@ -241,14 +228,14 @@ func (m *RedisMetaConstructor) Init(ctx context.Context) error {
 		return err
 	}
 	serverData := m.serverDataGetter.Get(ctx)
-	m.meta = BackupMeta{
-		Permanent:     m.permanent,
-		User:          userData,
-		StartTime:     utility.TimeNowCrossPlatformLocal(),
-		BackupType:    m.backupType,
-		UsedMemory:    serverData.UsedMemory,
-		UsedMemoryRss: serverData.UsedMemoryRss,
-		MaxDBNumber:   serverData.MaxDBNumber,
+	m.meta = Backup{
+		Permanent:      m.permanent,
+		UserData:       userData,
+		StartLocalTime: utility.TimeNowCrossPlatformLocal(),
+		BackupType:     m.backupType,
+		UsedMemory:     serverData.UsedMemory,
+		UsedMemoryRss:  serverData.UsedMemoryRss,
+		MaxDBNumber:    serverData.MaxDBNumber,
 	}
 	if m.versionParser != nil {
 		m.meta.Version, err = m.versionParser.Get()
@@ -260,22 +247,11 @@ func (m *RedisMetaConstructor) Init(ctx context.Context) error {
 }
 
 func (m *RedisMetaConstructor) MetaInfo() interface{} {
-	meta := m.meta
-	return &Backup{
-		Permanent:       meta.Permanent,
-		UserData:        meta.User,
-		StartLocalTime:  meta.StartTime,
-		FinishLocalTime: meta.FinishTime,
-		BackupType:      meta.BackupType,
-		Version:         meta.Version,
-		UsedMemory:      meta.UsedMemory,
-		UsedMemoryRss:   meta.UsedMemoryRss,
-		MaxDBNumber:     meta.MaxDBNumber,
-	}
+	return &m.meta
 }
 
 func (m *RedisMetaConstructor) Finalize(_ context.Context, _ string) error {
-	m.meta.FinishTime = utility.TimeNowCrossPlatformLocal()
+	m.meta.FinishLocalTime = utility.TimeNowCrossPlatformLocal()
 	return nil
 }
 

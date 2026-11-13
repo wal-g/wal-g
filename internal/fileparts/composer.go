@@ -22,10 +22,12 @@ type TarBallComposerMaker struct {
 	fileParts   *Info
 }
 
-func NewTarBallComposerMaker(base internal.TarBallComposerMaker, partSize int64,
-	shouldSplit ShouldSplitFunc,
-) *TarBallComposerMaker {
-	return &TarBallComposerMaker{base: base, partSize: partSize, shouldSplit: shouldSplit}
+func NewTarBallComposerMaker(base internal.TarBallComposerMaker, shouldSplit ShouldSplitFunc) (*TarBallComposerMaker, error) {
+	partSize, err := conf.GetBackupFilePartSize()
+	if err != nil {
+		return nil, err
+	}
+	return &TarBallComposerMaker{base: base, partSize: partSize, shouldSplit: shouldSplit}, nil
 }
 
 func (maker *TarBallComposerMaker) Enabled() bool {
@@ -131,6 +133,15 @@ func (composer *TarBallComposer) packFilePart(ctx context.Context, sets internal
 	ball, err := composer.bundle.TarBallQueue.Deque(ctx)
 	if err != nil {
 		return err
+	}
+	for ball.TarWriter() != nil {
+		if err := composer.bundle.TarBallQueue.FinishTarBall(ball); err != nil {
+			return err
+		}
+		ball, err = composer.bundle.TarBallQueue.Deque(ctx)
+		if err != nil {
+			return err
+		}
 	}
 	ball.SetUp(composer.ctx, composer.bundle.Crypter)
 	header := *original

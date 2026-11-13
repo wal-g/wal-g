@@ -9,6 +9,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis/aof"
 	"github.com/wal-g/wal-g/internal/diskwatcher"
+	"github.com/wal-g/wal-g/internal/fileparts"
 )
 
 type AOFBackupPushArgs struct {
@@ -25,6 +26,12 @@ func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
 	if backupName == "" {
 		backupName = aof.GenerateNewBackupName()
 	}
+	composerMaker, err := fileparts.NewTarBallComposerMaker(
+		internal.NewRegularTarBallComposerMaker(&internal.RegularBundleFiles{}, internal.NewRegularTarFileSets(), false), nil,
+	)
+	if err != nil {
+		return err
+	}
 
 	dataFolder, _ := conf.GetSetting(conf.RedisDataPath)
 	aofFolder, _ := conf.GetSetting(conf.RedisAppendonlyFolder)
@@ -33,9 +40,10 @@ func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
 	concurrentUploader, err := internal.CreateConcurrentUploader(
 		ctx,
 		internal.CreateConcurrentUploaderArgs{
-			Uploader:   args.Uploader,
-			BackupName: backupName,
-			Directory:  tmpPath,
+			Uploader:             args.Uploader,
+			BackupName:           backupName,
+			Directory:            tmpPath,
+			TarBallComposerMaker: composerMaker,
 		})
 	if err != nil {
 		return err
@@ -58,6 +66,7 @@ func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
 		args.MetaConstructor,
 		backupFilesListProvider,
 		filesPinner,
+		composerMaker,
 	)
 	if err != nil {
 		return err
