@@ -75,10 +75,12 @@ func calculateSum(checksum, value uint32) uint32 {
 func pgChecksumPage(blockNo uint32, pageBytes *PgDatabasePage) uint16 {
 	// Set pd_checksum to zero, so that the checksum calculation
 	// isn't affected by the checksum stored on the page.
+	storedChecksum := binary.LittleEndian.Uint16(pageBytes[PdChecksumOffset:])
 	for i := PdChecksumOffset; i < PdChecksumOffset+PdChecksumLen; i++ {
 		pageBytes[i] = 0
 	}
 	checksum := pgChecksumBlock(pageBytes)
+	binary.LittleEndian.PutUint16(pageBytes[PdChecksumOffset:], storedChecksum)
 
 	// Mix in the block number to detect transposed pages
 	checksum ^= blockNo
@@ -132,6 +134,10 @@ func pgChecksumBlockScalar(page *PgDatabasePage) uint32 {
 //
 // see:  src/backend/storage/page/bufpage.info
 func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, error) {
+	return checkPageCorruption(path, blockNo, page, true)
+}
+
+func checkPageCorruption(path string, blockNo uint32, page *PgDatabasePage, logMismatch bool) (bool, error) {
 	pageHeader, err := parsePostgresPageHeader(bytes.NewReader(page[:]))
 	if err != nil {
 		return false, err
@@ -173,7 +179,7 @@ func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, e
 	checksum := pgChecksumPage(segmentBlockOffset+blockNo, page)
 
 	corrupted := checksum != pageHeader.pdChecksum
-	if corrupted {
+	if corrupted && logMismatch {
 		tracelog.WarningLogger.Printf("Corruption found in %s/[%d], expected %x, found %x\n",
 			path, blockNo, pageHeader.pdChecksum, checksum)
 	}
