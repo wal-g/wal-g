@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -53,7 +54,10 @@ func PlanRecoveryDeletion(ctx context.Context, root storage.Folder, destination 
 }
 
 var recoveryBinlogName = regexp.MustCompile(`^([A-Za-z0-9_-][A-Za-z0-9_.-]*)\.([0-9]+)$`)
-var recoveryBinlogObject = regexp.MustCompile(`^([A-Za-z0-9_-][A-Za-z0-9_.-]*\.[0-9]+)(\.(lz4|lzma|lzo|br|zst|nop|gz|gzip))?$`)
+
+const recoveryBinlogCodecs = "lz4|lzma|lzo|br|zst|nop|gz|gzip"
+
+var recoveryBinlogObject = regexp.MustCompile(`^([A-Za-z0-9_-][A-Za-z0-9_.-]*\.[0-9]+)(\.(` + recoveryBinlogCodecs + `))?$`)
 
 func parseRecoveryBinlog(name string) (string, uint64, bool) {
 	m := recoveryBinlogName.FindStringSubmatch(name)
@@ -66,7 +70,8 @@ func parseRecoveryBinlog(name string) (string, uint64, bool) {
 
 func planRecoveryBinlogs(ctx context.Context, p *internal.DeletionPlan) error {
 	retention := deletionBinlogRetention{}
-	for _, b := range p.Retained() {
+	retained := p.Retained()
+	for _, b := range retained {
 		if err := retention.retainBackup(b); err != nil {
 			p.Defer(err.Error())
 			return nil
@@ -76,9 +81,108 @@ func planRecoveryBinlogs(ctx context.Context, p *internal.DeletionPlan) error {
 		p.Defer("binlogs retained: no ordinary retained backup establishes a boundary")
 		return nil
 	}
-	p.Details = append(p.Details, fmt.Sprintf("binlogs retain %s.%d and later, and other lineages",
-		retention.prefix, retention.cutoff))
-	return p.PlanObjects(ctx, "unneeded binlogs", p.Root.GetSubFolder(BinlogPath), retention.eligible)
+	cutoff, err := recoveryBinlogTimeCutoff(ctx, p.Root, retained)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return err
+		}
+		p.Defer("binlogs retained: unknown archive-time boundary: " + err.Error())
+		return nil
+	}
+	p.Details = append(p.Details, fmt.Sprintf("binlogs retain %s.%d and later, other lineages, and objects modified at or after %s",
+		retention.prefix, retention.cutoff, cutoff.UTC().Format(time.RFC3339Nano)))
+	unknownTimestamp := false
+	err = p.PlanObjects(ctx, "unneeded binlogs", p.Root.GetSubFolder(BinlogPath), func(obj storage.Object) bool {
+		if !retention.eligibleName(obj.GetName()) {
+			return false
+		}
+		if obj.GetLastModified().IsZero() {
+			unknownTimestamp = true
+			return false
+		}
+		return obj.GetLastModified().Before(cutoff)
+	})
+	if unknownTimestamp {
+		p.Defer("binlogs retained: candidate objects have unknown modification times")
+	}
+	return err
+}
+
+func recoveryBinlogTimeCutoff(ctx context.Context, root storage.Folder, retained []internal.DeletionBackup) (time.Time, error) {
+	base, logs := root.GetSubFolder(utility.BaseBackupPath), root.GetSubFolder(BinlogPath)
+	anchors := make(map[string]time.Time)
+	var cutoff time.Time
+	for _, b := range retained {
+		if b.Permanent {
+			continue
+		}
+		s, ok := b.Metadata.(StreamSentinelDto)
+		if !ok || s.BinLogStart == "" {
+			return time.Time{}, fmt.Errorf("missing BinLogStart for %s", b.Name)
+		}
+		anchor, found := anchors[s.BinLogStart]
+		if !found {
+			var err error
+			anchor, err = recoveryBinlogAnchorTime(ctx, logs, s.BinLogStart)
+			if err != nil {
+				return time.Time{}, fmt.Errorf("backup %s: %w", b.Name, err)
+			}
+			anchors[s.BinLogStart] = anchor
+		}
+		sentinel, err := recoveryObjectTime(ctx, base, b.Name+utility.SentinelSuffix)
+		if err != nil {
+			return time.Time{}, err
+		}
+		if sentinel.Before(anchor) {
+			anchor = sentinel
+		}
+		if cutoff.IsZero() || anchor.Before(cutoff) {
+			cutoff = anchor
+		}
+	}
+	return cutoff, nil
+}
+
+func recoveryBinlogAnchorTime(ctx context.Context, logs storage.Folder, name string) (time.Time, error) {
+	var earliest time.Time
+	for _, ext := range strings.Split("|"+recoveryBinlogCodecs, "|") {
+		key := name
+		if ext != "" {
+			key += "." + ext
+		}
+		modified, err := recoveryObjectTime(ctx, logs, key)
+		var missing storage.ObjectNotFoundError
+		if errors.As(err, &missing) {
+			continue
+		}
+		if err != nil {
+			return time.Time{}, err
+		}
+		if earliest.IsZero() || modified.Before(earliest) {
+			earliest = modified
+		}
+	}
+	if earliest.IsZero() {
+		return time.Time{}, fmt.Errorf("start binlog %s is absent", name)
+	}
+	return earliest, nil
+}
+
+func recoveryObjectTime(ctx context.Context, folder storage.Folder, key string) (time.Time, error) {
+	if err := ctx.Err(); err != nil {
+		return time.Time{}, err
+	}
+	obj, err := folder.StatObject(ctx, key)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("stat %s/%s: %w", strings.TrimRight(folder.GetPath(), "/"), key, err)
+	}
+	if obj.GetLastModified().IsZero() {
+		return time.Time{}, fmt.Errorf("unknown modification time for %s/%s", strings.TrimRight(folder.GetPath(), "/"), key)
+	}
+	return obj.GetLastModified(), nil
 }
 
 type deletionBinlogRetention struct {
@@ -126,8 +230,8 @@ func (r *deletionBinlogRetention) boundaries(s *StreamSentinelDto) (string, uint
 	}
 	return lineage, first, nil
 }
-func (r *deletionBinlogRetention) eligible(obj storage.Object) bool {
-	match := recoveryBinlogObject.FindStringSubmatch(strings.TrimLeft(obj.GetName(), "/"))
+func (r *deletionBinlogRetention) eligibleName(name string) bool {
+	match := recoveryBinlogObject.FindStringSubmatch(strings.TrimLeft(name, "/"))
 	if match == nil {
 		return false
 	}
