@@ -167,22 +167,21 @@ func sendFileCommands(ctx context.Context, encoder *gob.Encoder, directory strin
 	sendDeletedFiles(encoder, list, seenFiles)
 }
 
-
 func walkWithTablespaces(directory string, fn filepath.WalkFunc) error {
-    tablespaceDirectory := filepath.Join(directory, TablespaceFolder)
-    return filepath.Walk(directory, func(filePath string, info fs.FileInfo, err error) error {
-        if err != nil || info.IsDir() || filepath.Dir(filePath) != tablespaceDirectory {
-            return fn(filePath, info, err)
-        }
+	tablespaceDirectory := filepath.Join(directory, TablespaceFolder)
+	return filepath.Walk(directory, func(filePath string, info fs.FileInfo, err error) error {
+		if err != nil || info.IsDir() || filepath.Dir(filePath) != tablespaceDirectory {
+			return fn(filePath, info, err)
+		}
 
-        targetInfo, err := os.Stat(filePath)
-        if err != nil {
-            return err
-        }
-        if !targetInfo.IsDir() {
-            return fn(filePath, info, nil)
-        }
-        target, err := os.Readlink(filePath)
+		targetInfo, err := os.Stat(filePath)
+		if err != nil {
+			return err
+		}
+		if !targetInfo.IsDir() {
+			return fn(filePath, info, nil)
+		}
+		target, err := os.Readlink(filePath)
 		if err != nil {
 			return err
 		}
@@ -196,17 +195,16 @@ func walkWithTablespaces(directory string, fn filepath.WalkFunc) error {
 			return err
 		}
 
-        return filepath.Walk(target, func(targetPath string, targetInfo fs.FileInfo, walkErr error) error {
-            rel, err := filepath.Rel(target, targetPath)
-            if err != nil {
-                return err
-            }
+		return filepath.Walk(target, func(targetPath string, targetInfo fs.FileInfo, walkErr error) error {
+			rel, err := filepath.Rel(target, targetPath)
+			if err != nil {
+				return err
+			}
 
-            return fn(filepath.Join(filePath, rel), targetInfo, walkErr)
-        })
-    })
+			return fn(filepath.Join(filePath, rel), targetInfo, walkErr)
+		})
+	})
 }
-
 
 func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFiles map[string]bool) {
 	var filesToDelete []string
