@@ -123,21 +123,21 @@ func chooseCompression() (compression.Compressor, compression.Decompressor) {
 func sendFileCommands(ctx context.Context, encoder *gob.Encoder, directory string, list internal.BackupFileList, checkpoint LSN) {
 	extendExcludedFiles()
 	seenFiles := make(map[string]bool)
-	err := filepath.Walk(directory, func(path string, info fs.FileInfo, err error) error {
-		fullFileName := utility.GetSubdirectoryRelativePath(path, directory)
+	err := walkWithTablespaces(directory, func(filePath string, info fs.FileInfo, err error) error {
+		fullFileName := filepath.ToSlash(utility.GetSubdirectoryRelativePath(filePath, directory))
 		seenFiles[fullFileName] = true
 		if err != nil {
 			if os.IsNotExist(err) {
-				tracelog.WarningLogger.Println(path, " deleted during filepath walk")
+				tracelog.WarningLogger.Println(filePath, " deleted during filepath walk")
 				return nil
 			}
 			return err
 		}
-		if info.Name() == PgControl {
+		baseName := path.Base(fullFileName)
+		if baseName == PgControl {
 			return nil
 		}
-		fileName := info.Name()
-		_, excluded := ExcludedFilenames[fileName]
+		_, excluded := ExcludedFilenames[baseName]
 		isDir := info.IsDir()
 		if isDir && excluded {
 			return filepath.SkipDir
@@ -158,7 +158,7 @@ func sendFileCommands(ctx context.Context, encoder *gob.Encoder, directory strin
 			wasInBase = true
 		}
 
-		sendOneFile(ctx, path, info, wasInBase, checkpoint, encoder, fullFileName)
+		sendOneFile(ctx, filePath, info, wasInBase, checkpoint, encoder, fullFileName)
 
 		return nil
 	})
@@ -167,13 +167,29 @@ func sendFileCommands(ctx context.Context, encoder *gob.Encoder, directory strin
 	sendDeletedFiles(encoder, list, seenFiles)
 }
 
+func walkWithTablespaces(directory string, fn filepath.WalkFunc) error {
+	tablespaceDirectory := filepath.Join(directory, TablespaceFolder)
+	return filepath.Walk(directory, func(filePath string, info fs.FileInfo, err error) error {
+		if err != nil || info.Mode()&os.ModeSymlink == 0 || filepath.Dir(filePath) != tablespaceDirectory {
+			return fn(filePath, info, err)
+		}
+
+		if _, err := os.Stat(filePath); err != nil {
+			return err
+		}
+		return filepath.Walk(filePath+string(filepath.Separator), func(nestedPath string, nestedInfo fs.FileInfo, nestedErr error) error {
+			return fn(filepath.Clean(nestedPath), nestedInfo, nestedErr)
+		})
+	})
+}
+
 func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFiles map[string]bool) {
 	var filesToDelete []string
 	for k := range list {
 		if _, ok := seenFiles[k]; ok {
 			continue
 		}
-		if slices.ContainsFunc(strings.Split(k, string(os.PathSeparator)), func(e string) bool {
+		if slices.ContainsFunc(strings.Split(filepath.ToSlash(k), "/"), func(e string) bool {
 			_, ok := ExcludedFilenames[e]
 			return ok
 		}) {
@@ -189,7 +205,7 @@ func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFi
 
 func sendOneFile(ctx context.Context, path string, info fs.FileInfo, wasInBase bool, checkpoint LSN,
 	encoder *gob.Encoder, fullFileName string) {
-	increment := isPagedFile(info, path) && wasInBase
+	increment := isPagedFile(info, fullFileName) && wasInBase
 	var err error
 
 	var fd io.ReadCloser
@@ -303,16 +319,25 @@ func (d *DecoderReader) Read(bytes []byte) (n int, err error) {
 }
 
 func doRcvCommand(cmd CatchupCommandDto, directory string, decoder *gob.Decoder) {
+	if cmd.IsDelete {
+		tracelog.InfoLogger.Printf("Deleting files %v", cmd.FilesToDelete)
+		for _, f := range cmd.FilesToDelete {
+			err := os.Remove(path.Join(directory, f))
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+		return
+	}
+	targetPath := path.Join(directory, cmd.FileName)
 	if cmd.IsBinContents {
 		tracelog.InfoLogger.Printf("Writing file %v", cmd.FileName)
-		err := os.WriteFile(path.Join(directory, cmd.FileName), cmd.BinaryContents, 0666)
+		err := os.WriteFile(targetPath, cmd.BinaryContents, 0666)
 		tracelog.ErrorLogger.FatalOnError(err)
 		return
 	}
 
 	if cmd.IsFull {
 		tracelog.InfoLogger.Printf("Full file %v", cmd.FileName)
-		fd, err := os.Create(path.Join(directory, cmd.FileName))
+		fd, err := os.Create(targetPath)
 		tracelog.ErrorLogger.FatalOnError(err)
 		size := int64(cmd.FileSize)
 		for size != 0 {
@@ -333,17 +358,9 @@ func doRcvCommand(cmd CatchupCommandDto, directory string, decoder *gob.Decoder)
 	if cmd.IsIncremental {
 		tracelog.InfoLogger.Printf("Incremental file %v", cmd.FileName)
 
-		err := ApplyFileIncrement(path.Join(directory, cmd.FileName),
+		err := ApplyFileIncrement(targetPath,
 			&DecoderReader{decoder, nil, int64(cmd.FileSize)}, true, false)
 		tracelog.ErrorLogger.FatalOnError(err)
-		return
-	}
-	if cmd.IsDelete {
-		tracelog.InfoLogger.Printf("Deleting files %v", cmd.FilesToDelete)
-		for _, f := range cmd.FilesToDelete {
-			err := os.Remove(path.Join(directory, f))
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
 		return
 	}
 	tracelog.ErrorLogger.Fatal("Unknown command")
@@ -376,16 +393,17 @@ func sendControlAndFileList(pgDataDirectory string, encoder *gob.Encoder) {
 
 func receiveFileList(directory string) internal.BackupFileList {
 	var result = make(internal.BackupFileList)
-	err := filepath.Walk(directory, func(path string, info fs.FileInfo, err error) error {
+	err := walkWithTablespaces(directory, func(filePath string, info fs.FileInfo, err error) error {
 		if err != nil {
 			tracelog.WarningLogger.Println("Apparent concurrent modification")
 			return err
 		}
-		if info.Name() == PgControl {
+		fileName := filepath.ToSlash(utility.GetSubdirectoryRelativePath(filePath, directory))
+		baseName := path.Base(fileName)
+		if baseName == PgControl {
 			return nil
 		}
-		fileName := info.Name()
-		_, excluded := ExcludedFilenames[fileName]
+		_, excluded := ExcludedFilenames[baseName]
 		isDir := info.IsDir()
 		if isDir && excluded {
 			return filepath.SkipDir
@@ -393,7 +411,7 @@ func receiveFileList(directory string) internal.BackupFileList {
 		if excluded {
 			return nil
 		}
-		result[utility.GetSubdirectoryRelativePath(path, directory)] =
+		result[filepath.ToSlash(fileName)] =
 			internal.BackupFileDescription{MTime: info.ModTime(), IsSkipped: false, IsIncremented: false}
 
 		return nil
