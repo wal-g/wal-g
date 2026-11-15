@@ -167,21 +167,46 @@ func sendFileCommands(ctx context.Context, encoder *gob.Encoder, directory strin
 	sendDeletedFiles(encoder, list, seenFiles)
 }
 
-func walkWithTablespaces(directory string, fn filepath.WalkFunc) error {
-	tablespaceDirectory := filepath.Join(directory, TablespaceFolder)
-	return filepath.Walk(directory, func(filePath string, info fs.FileInfo, err error) error {
-		if err != nil || info.Mode()&os.ModeSymlink == 0 || filepath.Dir(filePath) != tablespaceDirectory {
-			return fn(filePath, info, err)
-		}
 
-		if _, err := os.Stat(filePath); err != nil {
+func walkWithTablespaces(directory string, fn filepath.WalkFunc) error {
+    tablespaceDirectory := filepath.Join(directory, TablespaceFolder)
+    return filepath.Walk(directory, func(filePath string, info fs.FileInfo, err error) error {
+        if err != nil || info.IsDir() || filepath.Dir(filePath) != tablespaceDirectory {
+            return fn(filePath, info, err)
+        }
+
+        targetInfo, err := os.Stat(filePath)
+        if err != nil {
+            return err
+        }
+        if !targetInfo.IsDir() {
+            return fn(filePath, info, nil)
+        }
+        target, err := os.Readlink(filePath)
+		if err != nil {
 			return err
 		}
-		return filepath.Walk(filePath+string(filepath.Separator), func(nestedPath string, nestedInfo fs.FileInfo, nestedErr error) error {
-			return fn(filepath.Clean(nestedPath), nestedInfo, nestedErr)
-		})
-	})
+
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(filepath.Dir(filePath), target)
+		}
+
+		target, err = filepath.Abs(target)
+		if err != nil {
+			return err
+		}
+
+        return filepath.Walk(target, func(targetPath string, targetInfo fs.FileInfo, walkErr error) error {
+            rel, err := filepath.Rel(target, targetPath)
+            if err != nil {
+                return err
+            }
+
+            return fn(filepath.Join(filePath, rel), targetInfo, walkErr)
+        })
+    })
 }
+
 
 func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFiles map[string]bool) {
 	var filesToDelete []string
