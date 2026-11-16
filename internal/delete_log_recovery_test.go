@@ -45,6 +45,62 @@ func TestRecoveryMySQLUsesBinlogNamesAndKeepsBoundary(t *testing.T) {
 	recoveryExists(t, logs, "other-lineage.000001.br", true)
 }
 
+func TestRecoveryMySQLKeepsBinlogsAfterNumberingReset(t *testing.T) {
+	root := fs.NewFolder(t.TempDir(), "")
+	base := root.GetSubFolder(utility.BaseBackupPath)
+	logs := root.GetSubFolder(mysql.BinlogPath)
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	putAt := func(directory, key, content string, hour int) {
+		t.Helper()
+		recoveryPut(t, root.GetSubFolder(directory), key, content)
+		modified := start.Add(time.Duration(hour) * time.Hour)
+		require.NoError(t, os.Chtimes(root.GetFilePath(path.Join(directory, key)), modified, modified))
+	}
+
+	// Before the reload: 000900 -> 000999 -> 001000, then backup B2.
+	// After the reload: 000001 -> 000002 -> 000100, backup B3, then 000101.
+	// The new sequence has not reached the old names, so no objects were overwritten.
+	// Legacy metadata without ServerUUID must still preserve the newer binlogs.
+	for i, number := range []int{1000, 100} {
+		name := fmt.Sprintf("stream_B%d", i+2)
+		binlog := fmt.Sprintf("mysql-bin.%06d", number)
+		putAt(utility.BaseBackupPath, name+utility.SentinelSuffix,
+			fmt.Sprintf(`{"IsPermanent":false,"IsIncremental":false,"BinLogStart":%q,"BinLogFileName":%q}`,
+				binlog, binlog), 3+i*4)
+		putAt(mysql.BinlogPath, binlog+".br", "retained backup start", 2+i*4)
+	}
+	putAt(utility.BaseBackupPath, "stream_B1/payload", "damaged backup without sentinel", 1)
+	candidates := []struct {
+		name string
+		hour int
+		keep bool
+	}{
+		{"mysql-bin.000900.br", 1, true}, // Old sequence; retained by the number guard.
+		{"mysql-bin.000999.br", 2, true}, // Old sequence, at the archive-time boundary.
+		{"mysql-bin.000001.br", 4, true}, // First binlog after the reset.
+		{"mysql-bin.000002.br", 5, true}, // Next binlog in the same new sequence.
+		{"mysql-bin.000101.br", 8, true}, // After the latest retained backup.
+	}
+	for _, candidate := range candidates {
+		putAt(mysql.BinlogPath, candidate.name, "binlog", candidate.hour)
+	}
+
+	p, err := mysql.PlanRecoveryDeletion(t.Context(), root, "default", []string{"stream_B1"}, true)
+	require.NoError(t, err)
+	defer p.Close()
+	require.NoError(t, p.Execute(t.Context(), true))
+	recoveryExists(t, base, "stream_B1/payload", false)
+	for i, number := range []int{1000, 100} {
+		recoveryExists(t, base, fmt.Sprintf("stream_B%d", i+2)+utility.SentinelSuffix, true)
+		recoveryExists(t, logs, fmt.Sprintf("mysql-bin.%06d.br", number), true)
+	}
+	for _, candidate := range candidates {
+		t.Run(candidate.name, func(t *testing.T) {
+			recoveryExists(t, logs, candidate.name, candidate.keep)
+		})
+	}
+}
+
 func TestRecoveryMongoKeepsBoundaryAndPermanentInterval(t *testing.T) {
 	root := fs.NewFolder(t.TempDir(), "")
 	base := root.GetSubFolder(utility.BaseBackupPath)

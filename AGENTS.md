@@ -99,6 +99,14 @@ Removing a sentinel also does not protect a restore that has already read it.
   no unexpected objects. Keep such checks scoped to the affected backup prefix,
   outside the steady-state hot path where possible, and account for their cost.
 
+## MySQL recovery deletion
+
+- Binlog numbers can reset between retained backups, including legacy backups
+  without `ServerUUID`. Recovery deletion must preserve newer low-numbered
+  binlogs and the archive-time boundary. See
+  `internal/delete_log_recovery_test.go:TestRecoveryMySQLKeepsBinlogsAfterNumberingReset`;
+  it reproduces data loss in the number-only `mysql/delete_recovery.go` implementation.
+
 ## WAL pipelines
 
 - Keep one `pgproto3.Backend` per `wal-send` connection, including startup and
