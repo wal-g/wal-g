@@ -42,3 +42,15 @@ jobs:
         with:
           version: v2.14
           working-directory: cmd/pg/exporter
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: 'cmd/mysql/exporter/go.mod'
+        id: go-mysql-exporter
+      # mysql/exporter is a separate module; lint it under the repo-root .golangci.yml
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9.3.0
+        with:
+          version: v2.14
+          working-directory: cmd/mysql/exporter

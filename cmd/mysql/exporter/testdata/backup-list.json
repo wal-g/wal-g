@@ -1,0 +1,41 @@
+[
+  {
+    "backup_name": "stream_20250220T020001Z",
+    "modify_time": "2025-02-20T02:01:30Z",
+    "binlog_start": "mariadb-bin.000012",
+    "binlog_end": "mariadb-bin.000014",
+    "start_local_time": "2025-02-20T02:00:01Z",
+    "stop_local_time": "2025-02-20T02:01:28Z",
+    "uncompressed_size": 2604967632,
+    "compressed_size": 858502390,
+    "hostname": "mariadb-primary-0",
+    "is_permanent": false,
+    "user_data": null
+  },
+  {
+    "backup_name": "stream_20250221T020001Z",
+    "modify_time": "2025-02-21T02:01:15Z",
+    "binlog_start": "mariadb-bin.000015",
+    "binlog_end": "mariadb-bin.000017",
+    "start_local_time": "2025-02-21T02:00:01Z",
+    "stop_local_time": "2025-02-21T02:01:12Z",
+    "uncompressed_size": 2716157648,
+    "compressed_size": 902940802,
+    "hostname": "mariadb-primary-0",
+    "is_permanent": false,
+    "user_data": null
+  },
+  {
+    "backup_name": "stream_20250222T020001Z",
+    "modify_time": "2025-02-22T02:01:45Z",
+    "binlog_start": "mariadb-bin.000018",
+    "binlog_end": "mariadb-bin.000020",
+    "start_local_time": "2025-02-22T02:00:01Z",
+    "stop_local_time": "2025-02-22T02:01:40Z",
+    "uncompressed_size": 2782971598,
+    "compressed_size": 927914660,
+    "hostname": "mariadb-primary-0",
+    "is_permanent": false,
+    "user_data": null
+  }
+]

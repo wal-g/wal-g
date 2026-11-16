@@ -1,0 +1,40 @@
+name: Build exporters
+
+on:
+  push:
+    branches: master
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-exporter:
+    name: build ${{ matrix.exporter }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # the exporters are separate Go modules, built and tested apart from the main one
+        exporter: [cmd/pg/exporter, cmd/mysql/exporter]
+    defaults:
+      run:
+        working-directory: ${{ matrix.exporter }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ matrix.exporter }}/go.mod
+          cache-dependency-path: ${{ matrix.exporter }}/go.sum
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
