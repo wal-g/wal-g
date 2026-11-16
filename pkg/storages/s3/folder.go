@@ -29,6 +29,10 @@ const (
 	VersioningDisabled = "disabled"
 )
 
+// defaultRequestTimeout bounds S3 API calls so that commands fail with an error
+// instead of hanging indefinitely when the endpoint is unreachable or unresponsive.
+const defaultRequestTimeout = 5 * time.Minute
+
 // TODO: Unit tests
 type Folder struct {
 	s3API       API
@@ -61,8 +65,16 @@ func GetSSECustomerKeyMD5(sseCustomerKey string) string {
 	return base64.StdEncoding.EncodeToString(hash[:])
 }
 
+// withTimeout bounds an S3 API call so that it fails instead of hanging forever.
+func (folder *Folder) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, defaultRequestTimeout)
+}
+
 // headObject performs a HEAD request for a single object. Returns a nil output if the object doesn't exist.
 func (folder *Folder) headObject(ctx context.Context, objectRelativePath string) (*s3.HeadObjectOutput, error) {
+	ctx, cancel := folder.withTimeout(ctx)
+	defer cancel()
+
 	objectPath := folder.path + objectRelativePath
 	input := &s3.HeadObjectInput{
 		Bucket: folder.bucket,
@@ -123,11 +135,17 @@ func (folder *Folder) StatObject(ctx context.Context, objectRelativePath string)
 }
 
 func (folder *Folder) PutObject(ctx context.Context, name string, content io.Reader) error {
+	ctx, cancel := folder.withTimeout(ctx)
+	defer cancel()
+
 	return folder.uploader.upload(ctx, *folder.bucket, folder.path+name, content)
 }
 
 func (folder *Folder) CopyObject(ctx context.Context, srcPath string, dstPath string) error {
 	if exists, err := folder.Exists(ctx, srcPath); !exists {
+	ctx, cancel := folder.withTimeout(ctx)
+	defer cancel()
+
 		if err == nil {
 			return storage.NewObjectNotFoundError(srcPath)
 		}
@@ -237,6 +255,9 @@ func (folder *Folder) showsAllVersions() bool {
 }
 
 func (folder *Folder) ListFolder(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
+	ctx, cancel := folder.withTimeout(ctx)
+	defer cancel()
+
 	prefix := aws.String(folder.path)
 	delimiter := aws.String("/")
 
@@ -282,6 +303,9 @@ func (folder *Folder) ListFolderSegment(
 	startAfterKey *string,
 	endBeforeKey *string,
 ) (objects []storage.Object, subFolders []storage.Folder, err error) {
+	ctx, cancel := folder.withTimeout(ctx)
+	defer cancel()
+
 	prefix := aws.String(folder.path)
 	delimiter := aws.String("/")
 	var startAfterPrefix *string
