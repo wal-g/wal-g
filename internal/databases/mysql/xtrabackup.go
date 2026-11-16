@@ -114,6 +114,13 @@ func isXtrabackup(cmd *exec.Cmd) bool {
 	})
 }
 
+// isMariaDBBackup reports whether a backup with this ServerVersion was taken from MariaDB.
+// mariabackup has no --apply-log-only option and rejects it as unknown; a backup it has
+// prepared still accepts further --incremental-dir prepares.
+func isMariaDBBackup(serverVersion string) bool {
+	return strings.Contains(serverVersion, "MariaDB")
+}
+
 //nolint:unparam
 func prepareTemporaryDirectory(tmpDirRoot string) (string, error) {
 	tmpDirPattern := "wal-g"
@@ -251,7 +258,7 @@ func xtrabackupFetchClassic(ctx context.Context, backup internal.Backup, restore
 		prepareCmd = cloneCommand(ctx, prepareCmd)
 		injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+tempDeltaDir)
 	}
-	if !isLast {
+	if !isLast && !isMariaDBBackup(sentinel.ServerVersion) {
 		prepareCmd = cloneCommand(ctx, prepareCmd)
 		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
 	}
@@ -327,7 +334,7 @@ func xtrabackupFetchInhouse(ctx context.Context, backup internal.Backup, prepare
 		prepareCmd = cloneCommand(ctx, prepareCmd)
 		injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+tempDeltaDir)
 	}
-	if !isLast {
+	if !isLast && !isMariaDBBackup(sentinel.ServerVersion) {
 		prepareCmd = cloneCommand(ctx, prepareCmd)
 		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
 	}
