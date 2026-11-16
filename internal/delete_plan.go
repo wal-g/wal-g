@@ -31,11 +31,15 @@ type RecoveryOptions struct {
 	TargetStorage                 string
 }
 
-func (o *RecoveryOptions) AddFlags(cmd *cobra.Command) {
+func (o *RecoveryOptions) AddFlagsWithoutLogs(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.AllowBroken, AllowBrokenFlag, false, "Delete explicitly named damaged backups during a maintenance window")
+	cmd.Flags().StringVar(&o.TargetStorage, "target-storage", "", "Recovery destination; required when several storages are configured")
+}
+
+func (o *RecoveryOptions) AddFlags(cmd *cobra.Command) {
+	o.AddFlagsWithoutLogs(cmd)
 	cmd.Flags().BoolVar(&o.DeleteUnusedLogs, DeleteUnusedLogsFlag, false,
 		"Also delete logs proven unnecessary for retained backups (requires --allow-broken)")
-	cmd.Flags().StringVar(&o.TargetStorage, "target-storage", "", "Recovery destination; required when several storages are configured")
 }
 
 func (o *RecoveryOptions) Validate(cmd *cobra.Command, args []string, normal cobra.PositionalArgs) error {

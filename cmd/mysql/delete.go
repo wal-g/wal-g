@@ -132,7 +132,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	recoveryDelete.AddFlags(deleteTargetCmd)
+	recoveryDelete.AddFlagsWithoutLogs(deleteTargetCmd)
 	cmd.AddCommand(deleteCmd)
 	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd, deleteTargetCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
