@@ -69,8 +69,11 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 		loadOpts = append(loadOpts, config.WithUseDualStackEndpoint(aws.DualStackEndpointStateEnabled))
 	}
 
-	if cfg.LogLevel == "DEVEL" {
+	switch cfg.LogLevel {
+	case "DEVEL":
 		loadOpts = append(loadOpts, config.WithClientLogMode(aws.LogRequest|aws.LogResponse|aws.LogRetries))
+	case "RETRIES":
+		loadOpts = append(loadOpts, config.WithClientLogMode(aws.LogRetries))
 	}
 
 	awsCfg, err := config.LoadDefaultConfig(ctx, loadOpts...)
