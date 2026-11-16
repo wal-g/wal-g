@@ -129,9 +129,6 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 
 	folder := configureFolder(cmd.Context())
 
-	permanentBackups, permanentWals, err := postgres.GetPermanentBackupsAndWalsChecked(cmd.Context(), folder)
-	tracelog.ErrorLogger.FatalOnError(err)
-
 	findFullBackup := false
 	modifier := internal.ExtractDeleteTargetModifierFromArgs(args)
 	if modifier == internal.FindFullDeleteModifier {
@@ -140,7 +137,7 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 		args = args[1:]
 	}
 
-	deleteHandler, err := postgres.NewDeleteHandler(cmd.Context(), folder, permanentBackups, permanentWals, useSentinelTime)
+	deleteHandler, err := postgres.NewDeleteHandler(cmd.Context(), folder, nil, nil, useSentinelTime)
 	tracelog.ErrorLogger.FatalOnError(err)
 	targetBackupSelector, err := internal.CreateTargetDeleteBackupSelector(cmd, args, deleteTargetUserData, postgres.NewGenericMetaFetcher())
 	tracelog.ErrorLogger.FatalOnError(err)

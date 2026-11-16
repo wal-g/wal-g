@@ -37,10 +37,14 @@ const (
 	delete every backup only if there is no permanent backups
   everything FORCE          delete every backup include permanents`
 
+	//nolint:lll
 	DeleteTargetExamples = `  target base_0000000100000000000000C4	delete base backup by name
   target --target-user-data "{ \"x\": [3], \"y\": 4 }"	delete backup specified by user data
-  target base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all dependant delta backups 
-  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all delta backups with the same base backup` //nolint:lll
+  target base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all dependant delta backups
+  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all delta backups with the same base backup
+
+Backups named by this command are deleted even if permanent; permanence only
+protects backups from retention-based deletion by the other delete modes.`
 
 	DeleteEverythingUsageExample = "everything [FORCE]"
 	DeleteRetainUsageExample     = "retain [FULL|FIND_FULL] backup_count"
@@ -476,9 +480,6 @@ func (h *DeleteHandler) PrepareDeleteTargets(ctx context.Context, targets []Back
 			backups = h.findDependantBackups(target)
 		}
 		for _, backup := range backups {
-			if h.isPermanent(deletionBackupObject{backup}) {
-				return nil, fmt.Errorf("unable to delete permanent backup %s", backup.GetName())
-			}
 			names := plan.destinations[index].backupNames
 			if !names[backup.GetBackupName()] {
 				names[backup.GetBackupName()] = true
@@ -493,7 +494,7 @@ func (p *TargetDeletionPlan) Execute(ctx context.Context, confirmed bool) error 
 	for _, destination := range p.destinations {
 		err := DeleteObjectsWhere(ctx, destination.folder, confirmed, func(object storage.Object) bool {
 			return multistorage.GetStorage(object) == destination.storageName &&
-				destination.backupNames[utility.StripLeftmostBackupName(object.GetName())] && !p.handler.isPermanent(object)
+				destination.backupNames[utility.StripLeftmostBackupName(object.GetName())]
 		}, p.handler.filterFolders(p.folderFilter))
 		if err != nil {
 			return err

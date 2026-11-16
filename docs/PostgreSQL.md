@@ -252,7 +252,7 @@ With this flag, WAL-G disables PostgreSQL's own archive wait when stopping a loc
 wal-g backup-push $PGDATA --wait-for-archive
 ```
 
-``backup-push`` can also be run with the ``--permanent`` flag, which will mark the backup as permanent and prevent it from being removed when running ``delete``.
+``backup-push`` can also be run with the ``--permanent`` flag, which will mark the backup as permanent and prevent it from being removed by retention-based deletion.
 
 #### Journal size (WAL volume) accounting
 
@@ -614,7 +614,7 @@ Notes:
 
 ### ``backup-mark``
 
-Backups can be marked as permanent to prevent them from being removed when running ``delete``. Backup permanence can be altered via this command by passing in the name of the backup (retrievable via `wal-g backup-list --pretty --detail --json`), which will mark the named backup and all previous related backups as permanent. The reverse is also possible by providing the `-i` flag.
+Backups can be marked as permanent to prevent them from being removed when running retention-based deletion. Backup permanence can be altered via this command by passing in the name of the backup (retrievable via `wal-g backup-list --pretty --detail --json`), which will mark the named backup and all previous related backups as permanent. The reverse is also possible by providing the `-i` flag.
 
 ```bash
 wal-g backup-mark example-backup -i

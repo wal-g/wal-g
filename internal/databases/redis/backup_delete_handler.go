@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -16,10 +15,6 @@ func HandleBackupDelete(ctx context.Context, folder storage.Folder, backupName s
 	if err != nil {
 		return err
 	}
-	if backup.Permanent {
-		return fmt.Errorf("cannot delete permanent backup %s", backup.Name())
-	}
-
 	if dryRun {
 		tracelog.InfoLogger.Printf("Skipping backup deletion due to dry-run: %+v", backup)
 		return nil

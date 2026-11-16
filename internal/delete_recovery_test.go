@@ -161,7 +161,7 @@ func TestRecoveryDependenciesAndProtectionPreflight(t *testing.T) {
 			if p != nil {
 				defer p.Close()
 			}
-			if scenario != "cascade" {
+			if scenario != "cascade" && scenario != "permanent" {
 				require.Error(t, err)
 				recoveryExists(t, base, "stream_B1/payload", true)
 				return
@@ -246,8 +246,12 @@ func TestRecoveryPostgresV2FallbackAndConflict(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, b.Permanent)
 	require.ErrorContains(t, b.Problem, "conflicting")
-	_, err = postgres.PlanRecoveryDeletion(t.Context(), root, "default", []string{name}, false)
-	require.ErrorContains(t, err, "permanent")
+	p, err := postgres.PlanRecoveryDeletion(t.Context(), root, "default", []string{name}, false)
+	require.NoError(t, err)
+	require.NotNil(t, p)
+	defer p.Close()
+	require.NotEmpty(t, p.Details)
+	require.NoError(t, p.Execute(t.Context(), false))
 }
 
 func TestRecoveryGreenplumDirectMappingAndUnknownReferences(t *testing.T) {
