@@ -70,7 +70,7 @@ require (
 	golang.org/x/time v0.16.0
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da
 	google.golang.org/api v0.307.0
-	gopkg.in/ini.v1 v1.67.3
+	gopkg.in/ini.v1 v1.68.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
