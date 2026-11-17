@@ -257,9 +257,6 @@ func NewDeletionPlan(ctx context.Context, root storage.Folder, storageName strin
 		}
 	}
 	for name := range p.Selected {
-		if p.Backups[name].Permanent {
-			return nil, fmt.Errorf("cannot delete known permanent backup %s", name)
-		}
 		if problem := p.Backups[name].Problem; problem != nil {
 			p.Details = append(p.Details, fmt.Sprintf("target=%s metadata unknown: %v", name, problem))
 		}

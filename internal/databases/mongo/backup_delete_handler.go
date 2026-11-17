@@ -53,9 +53,6 @@ func HandleBackupDelete(ctx context.Context, backupName string, downloader Delet
 	if err != nil {
 		return err
 	}
-	if backup.Permanent {
-		return fmt.Errorf("cannot delete permanent backup %s", backup.Name())
-	}
 	if backupName != "LATEST" && backup.Name() != backupName {
 		return fmt.Errorf("conflicting backup name %s in sentinel for %s", backup.Name(), backupName)
 	}

@@ -61,6 +61,79 @@ func TestDeleteTargetPreservesOtherStoragesAndSkippedFolders(t *testing.T) {
 	}
 }
 
+func TestDeleteTargetAllowsPermanentButSweepsProtectIt(t *testing.T) {
+	const permanentName = "base_000000010000000000000001"
+	const otherName = "base_000000010000000000000002"
+	isPermanent := func(object storage.Object) bool {
+		return strings.Contains(object.GetName(), permanentName)
+	}
+	assertDeleted := func(t *testing.T, folder storage.Folder) {
+		t.Helper()
+		for _, key := range []string{permanentName + utility.SentinelSuffix, permanentName + "/part_1"} {
+			exists, err := folder.Exists(t.Context(), utility.BaseBackupPath+key)
+			require.NoError(t, err)
+			require.False(t, exists, "%s should be deleted", key)
+		}
+	}
+	assertProtected := func(t *testing.T, folder storage.Folder) {
+		t.Helper()
+		for _, key := range []string{permanentName + utility.SentinelSuffix, permanentName + "/part_2"} {
+			exists, err := folder.Exists(t.Context(), utility.BaseBackupPath+key)
+			require.NoError(t, err)
+			require.True(t, exists, "%s should be protected", key)
+		}
+	}
+	newFolder := func() storage.Folder {
+		folder := memory.NewFolder("repository/", memory.NewKVS())
+		for _, name := range []string{permanentName, otherName} {
+			require.NoError(t, folder.PutObject(t.Context(),
+				utility.BaseBackupPath+name+utility.SentinelSuffix, strings.NewReader("{}")))
+		}
+		require.NoError(t, folder.PutObject(t.Context(), utility.BaseBackupPath+permanentName+"/part_1", strings.NewReader("data")))
+		require.NoError(t, folder.PutObject(t.Context(), utility.BaseBackupPath+permanentName+"/part_2", strings.NewReader("data")))
+		require.NoError(t, folder.PutObject(t.Context(), utility.BaseBackupPath+otherName+"/part_1", strings.NewReader("data")))
+		return folder
+	}
+	newBackups := func() []BackupObject {
+		backups := []BackupObject{}
+		for _, name := range []string{permanentName, otherName} {
+			backups = append(backups, storedDeleteBackup{
+				DefaultBackupObject{storage.NewLocalObject(name+utility.SentinelSuffix, time.Time{}, 0)}, "default"})
+		}
+		return backups
+	}
+	less := func(a, b storage.Object) bool { return a.GetName() < b.GetName() }
+
+	t.Run("target", func(t *testing.T) {
+		folder, backups := newFolder(), newBackups()
+		handler := NewDeleteHandler(folder, backups, less, IsPermanentFunc(isPermanent))
+		target, err := handler.FindTargetByName(permanentName)
+		require.NoError(t, err)
+		require.NoError(t, handler.DeleteTarget(t.Context(), target, true, false, func(string) bool { return true }))
+		assertDeleted(t, folder)
+		exists, err := folder.Exists(t.Context(), utility.BaseBackupPath+otherName+utility.SentinelSuffix)
+		require.NoError(t, err)
+		require.True(t, exists, "unrelated backup must be kept")
+	})
+
+	t.Run("before", func(t *testing.T) {
+		folder, backups := newFolder(), newBackups()
+		handler := NewDeleteHandler(folder, backups, less, IsPermanentFunc(isPermanent))
+		target, err := handler.FindTargetByName(otherName)
+		require.NoError(t, err)
+		require.NoError(t, handler.DeleteBeforeTarget(t.Context(), target, true))
+		assertProtected(t, folder)
+	})
+
+	t.Run("where", func(t *testing.T) {
+		folder, backups := newFolder(), newBackups()
+		handler := NewDeleteHandler(folder, backups, less, IsPermanentFunc(isPermanent))
+		require.NoError(t, handler.DeleteWhere(t.Context(), true,
+			func(object storage.Object) bool { return true }, func(string) bool { return true }))
+		assertProtected(t, folder)
+	})
+}
+
 func CreateMockStorageFolder(ctx context.Context) storage.Folder {
 	var folder = memory.NewFolder("in_memory/", memory.NewKVS())
 	subFolder := folder.GetSubFolder("basebackups_005/")
