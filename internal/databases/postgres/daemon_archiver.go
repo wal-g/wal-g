@@ -287,9 +287,6 @@ func (a *daemonArchiver) scan() {
 
 func (a *daemonArchiver) refill(anchor string, scan *daemonArchiveScan) {
 	scan.follow(anchor)
-	if !a.retryFailed(anchor) {
-		return
-	}
 	if len(scan.pending) == 0 {
 		scan.pending = a.candidates(anchor, scan)
 	}
@@ -306,6 +303,9 @@ func (a *daemonArchiver) refill(anchor string, scan *daemonArchiveScan) {
 		}
 		filename := scan.pending[0]
 		if filename > anchor && a.needsUpload(filename) {
+			if !a.retryFailed(anchor, filename) {
+				return
+			}
 			job, err := a.startJob(a.ctx, filename, true)
 			if err != nil || job == nil {
 				break // Keep this candidate until a worker becomes available.
@@ -316,8 +316,11 @@ func (a *daemonArchiver) refill(anchor string, scan *daemonArchiveScan) {
 			scan.cursor = max(scan.cursor, filename) // Follow the listed run after prediction ends.
 		}
 	}
-	if len(scan.pending) == 0 && (hadCandidates || scan.listing != nil) {
-		a.notify() // A batch is a memory bound, not an archival progress limit.
+	if len(scan.pending) == 0 {
+		a.retryFailed(anchor, "")
+		if hadCandidates || scan.listing != nil {
+			a.notify() // A batch is a memory bound, not an archival progress limit.
+		}
 	}
 }
 
@@ -365,10 +368,13 @@ func (a *daemonArchiver) retryCandidate(anchor string) string {
 	return oldest
 }
 
-// Retry known failures before consuming newer candidates. Busy uploads and
-// retry delays do not hold up the other workers.
-func (a *daemonArchiver) retryFailed(anchor string) bool {
+// Retry failures below before, or all due retries if before is empty.
+// Busy uploads and retry delays do not hold up the other workers.
+func (a *daemonArchiver) retryFailed(anchor, before string) bool {
 	for filename := a.retryCandidate(anchor); filename != ""; filename = a.retryCandidate(anchor) {
+		if before != "" && filename >= before {
+			return true
+		}
 		if !a.needsUpload(filename) {
 			a.mu.Lock()
 			if a.jobs[filename] == nil && !time.Now().Before(a.retryAfter[filename]) {

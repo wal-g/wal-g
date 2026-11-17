@@ -148,7 +148,8 @@ Removing a sentinel also does not protect a restore that has already read it.
 - Daemon reconciliation reads directory order, not WAL order. Retain and merge
   both bounded candidate batches. Before a far-ahead listed WAL, refill nearer
   sequential candidates; follow the listed run only after prediction is exhausted.
-  Prioritize due retries without blocking other workers on an earlier upload. See
+  Order eligible retries and pending candidates by filename without blocking
+  other workers on an earlier upload. See
   `daemon_archiver_progress_test.go` and its sequential-priority, retry-priority
   and blocked-upload regression tests.
 - When directory reconciliation is due, stop extending the current bounded

@@ -151,31 +151,54 @@ func TestDaemonArchiveScanKeepsSequentialPriorityDuringListing(t *testing.T) {
 	require.Equal(t, files[2], scan.cursor, "far-ahead listed entries must not move the sequential cursor")
 }
 
-func TestDaemonArchiverRetriesBeforePendingNewWAL(t *testing.T) {
-	archiveTestConfig(t)
-	files := archiveTestFiles(t, 5)
-	started := make(chan string, 2)
-	a := newDaemonArchiver(t.Context(), 2, 0, time.Minute, asm.NewFakeASM(), archiveTestFactory(
-		func(ctx context.Context, file ioextensions.NamedReader) error {
-			started <- file.Name()
-			<-ctx.Done()
-			return ctx.Err()
-		}))
-	defer a.Close()
-	// A known failure's backoff has expired while newer candidates remain.
-	a.mu.Lock()
-	a.retryAfter[files[1]] = time.Now().Add(-time.Second)
-	a.retryAfter[files[2]] = time.Now().Add(-time.Second)
-	a.mu.Unlock()
-	scan := daemonArchiveScan{dir: filepath.Dir(files[0]), cursor: files[3], pending: []string{files[4]}}
-	a.refill(files[0], &scan)
-	select {
-	case filename := <-started:
-		require.Equal(t, files[1], filename, "old retries must precede new pending WALs")
-	case <-time.After(3 * time.Second):
-		t.Fatal("no WAL upload started")
+func TestDaemonArchiverRetryAndPendingPriority(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		retries   []int
+		pending   []int
+		want      int
+		remaining []int
+	}{
+		{"older_retry", []int{1, 2}, []int{4}, 1, []int{4}},
+		{"older_pending", []int{3}, []int{1}, 1, nil},
+		{"retry_only", []int{3}, nil, 3, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			archiveTestConfig(t)
+			files := archiveTestFiles(t, 5)
+			started := make(chan string, 1)
+			a := newDaemonArchiver(t.Context(), 2, 0, time.Minute, asm.NewFakeASM(), archiveTestFactory(
+				func(ctx context.Context, file ioextensions.NamedReader) error {
+					started <- file.Name()
+					<-ctx.Done()
+					return ctx.Err()
+				}))
+			defer a.Close()
+			a.mu.Lock()
+			for _, index := range tc.retries {
+				a.retryAfter[files[index]] = time.Now().Add(-time.Second)
+			}
+			a.mu.Unlock()
+			scan := daemonArchiveScan{
+				dir: filepath.Dir(files[0]), cursor: files[3],
+				lastFullScan: time.Now(), nextRescan: time.Now().Add(time.Minute),
+			}
+			for _, index := range tc.pending {
+				scan.pending = append(scan.pending, files[index])
+			}
+			a.refill(files[0], &scan)
+			select {
+			case filename := <-started:
+				require.Equal(t, files[tc.want], filename, "prefer the older eligible WAL")
+			case <-time.After(3 * time.Second):
+				t.Fatal("no WAL upload started")
+			}
+			require.Len(t, scan.pending, len(tc.remaining))
+			for i, index := range tc.remaining {
+				require.Equal(t, files[index], scan.pending[i], "retain pending work while workers are busy")
+			}
+		})
 	}
-	require.Equal(t, []string{files[4]}, scan.pending, "busy workers must retain newer candidates")
 }
 
 func TestDaemonArchiverNewReadyWithoutClientRequest(t *testing.T) {
