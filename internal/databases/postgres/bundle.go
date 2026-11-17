@@ -255,7 +255,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 		return nil
 	}
 
-	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
+	fileInfoHeader, err := newTarHeader(path, info)
 	if err != nil {
 		return errors.Wrap(err, "addToBundle: could not grab header info")
 	}
@@ -292,6 +292,19 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 	}
 
 	return nil
+}
+
+// newTarHeader creates the tar header for a file, storing the actual target of symlinks
+// (tar.FileInfoHeader only fills Linkname from its link argument).
+func newTarHeader(path string, info os.FileInfo) (*tar.Header, error) {
+	linkTarget := ""
+	if info.Mode()&os.ModeSymlink != 0 {
+		var err error
+		if linkTarget, err = os.Readlink(path); err != nil {
+			return nil, fmt.Errorf("could not read symlink %s: %w", path, err)
+		}
+	}
+	return tar.FileInfoHeader(info, linkTarget)
 }
 
 // isPagedFile checks basic expectations for paged file
