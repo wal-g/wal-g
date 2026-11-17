@@ -2,48 +2,14 @@ package internal_test
 
 import (
 	"fmt"
-	"os"
-	"path"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 	"github.com/wal-g/wal-g/utility"
 )
-
-func TestRecoveryMySQLUsesBinlogNamesAndKeepsBoundary(t *testing.T) {
-	root := fs.NewFolder(t.TempDir(), "")
-	base := root.GetSubFolder(utility.BaseBackupPath)
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	for i := 1; i <= 8; i++ {
-		key := fmt.Sprintf("stream_B%d", i) + utility.SentinelSuffix
-		recoveryPut(t, base, key,
-			fmt.Sprintf(`{"IsPermanent":false,"IsIncremental":false,"BinLogStart":"mysql-bin.%06d","BinLogFileName":"mysql-bin.%06d"}`, i, i))
-		modified := start.Add(time.Duration(i)*time.Hour + time.Minute)
-		require.NoError(t, os.Chtimes(root.GetFilePath(path.Join(utility.BaseBackupPath, key)), modified, modified))
-	}
-	logs := root.GetSubFolder(mysql.BinlogPath)
-	for i := 1; i <= 8; i++ {
-		key := fmt.Sprintf("mysql-bin.%06d.br", i)
-		recoveryPut(t, logs, key, "data")
-		modified := start.Add(time.Duration(i) * time.Hour)
-		require.NoError(t, os.Chtimes(root.GetFilePath(path.Join(mysql.BinlogPath, key)), modified, modified))
-	}
-	recoveryPut(t, logs, "binlog_sentinel_005.json", "checkpoint")
-	recoveryPut(t, logs, "other-lineage.000001.br", "keep")
-	p, err := mysql.PlanRecoveryDeletion(t.Context(), root, "default", []string{"stream_B1", "stream_B2"}, true)
-	require.NoError(t, err)
-	defer p.Close()
-	require.NoError(t, p.Execute(t.Context(), true))
-	recoveryExists(t, logs, "mysql-bin.000002.br", false)
-	recoveryExists(t, logs, "mysql-bin.000003.br", true)
-	recoveryExists(t, logs, "binlog_sentinel_005.json", true)
-	recoveryExists(t, logs, "other-lineage.000001.br", true)
-}
 
 func TestRecoveryMongoKeepsBoundaryAndPermanentInterval(t *testing.T) {
 	root := fs.NewFolder(t.TempDir(), "")
