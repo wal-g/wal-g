@@ -2,8 +2,12 @@ package internal_test
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -319,4 +323,102 @@ func TestSplitPush_Synchronous_With_Error_2(t *testing.T) {
 
 func TestSplitPush_MaxFileSize_Equal_BlockSize(t *testing.T) {
 	checkSplitPush(t, 3, 7919, 7919, 0, 1000*1000)
+}
+
+func newTestUploader(folder storage.Folder) *RegularUploader {
+	compressor := compression.Compressors[compression.CompressingAlgorithms[0]]
+	return NewRegularUploader(compressor, folder)
+}
+
+func TestRegularUploader_PushStream(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	uploader := newTestUploader(folder)
+	sample := getByteSampleArray(1000)
+
+	name, err := uploader.PushStream(t.Context(), bytes.NewReader(sample))
+	assert.NoError(t, err)
+	assert.True(t, strings.HasPrefix(name, StreamPrefix))
+	assert.Len(t, name, StreamBackupNameLength)
+
+	writer := newTestWriter()
+	err = DownloadAndDecompressStream(t.Context(), Backup{Name: name, Folder: folder}, writer)
+	assert.NoError(t, err)
+	assert.Equal(t, sample, writer.Result)
+}
+
+type failingFolder struct {
+	storage.Folder
+}
+
+func (f failingFolder) PutObject(ctx context.Context, name string, content io.Reader) error {
+	_, _ = io.Copy(io.Discard, content)
+	return errors.New("put failed")
+}
+
+func TestRegularUploader_PushStream_UploadError(t *testing.T) {
+	folder := failingFolder{testtools.MakeDefaultInMemoryStorageFolder()}
+	uploader := newTestUploader(folder)
+
+	_, err := uploader.PushStream(t.Context(), bytes.NewReader(getByteSampleArray(100)))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "put failed")
+}
+
+func TestRegularUploader_PushStream_EmptyStream(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	uploader := newTestUploader(folder)
+
+	name, err := uploader.PushStream(
+		t.Context(),
+		bytes.NewReader(nil),
+	)
+	assert.NoError(t, err)
+	assert.True(t, strings.HasPrefix(name, StreamPrefix))
+
+	writer := newTestWriter()
+	err = DownloadAndDecompressStream(
+		t.Context(),
+		Backup{Name: name, Folder: folder},
+		writer,
+	)
+	assert.NoError(t, err)
+	assert.Empty(t, writer.Result)
+	assert.Len(t, name, StreamBackupNameLength)
+}
+
+func TestRegularUploader_PushStreamToDestination_Content(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	uploader := newTestUploader(folder)
+
+	sample := getByteSampleArray(1000)
+	dst := GetStreamName("test_backup", uploader.Compressor.FileExtension())
+
+	err := uploader.PushStreamToDestination(
+		t.Context(),
+		bytes.NewReader(sample),
+		dst,
+	)
+	assert.NoError(t, err)
+
+	writer := newTestWriter()
+	err = DownloadAndDecompressStream(
+		t.Context(),
+		Backup{Name: "test_backup", Folder: folder},
+		writer,
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, sample, writer.Result)
+}
+
+func TestRegularUploader_PushStreamToDestination_UploadError(t *testing.T) {
+	folder := failingFolder{testtools.MakeDefaultInMemoryStorageFolder()}
+	uploader := newTestUploader(folder)
+
+	err := uploader.PushStreamToDestination(
+		t.Context(),
+		bytes.NewReader(getByteSampleArray(100)),
+		"some/path",
+	)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "put failed")
 }
