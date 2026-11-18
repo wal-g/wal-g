@@ -165,7 +165,7 @@ func TestGreenplumCopyFiltersHistoryPerSegment(t *testing.T) {
 	}
 }
 
-func TestGreenplumPlainCopyReadsOnlySelectedRestorePoints(t *testing.T) {
+func TestGreenplumPlainCopyReadsOnlyRequiredRestorePoints(t *testing.T) {
 	backups := []greenplumBackupFixture{
 		{topName: "backup_20260721T140000Z", segmentName: "base_000000010000000000000001"},
 		{topName: "backup_20260721T150000Z", segmentName: "base_000000010000000000000002_D_000000010000000000000001"},
@@ -176,8 +176,8 @@ func TestGreenplumPlainCopyReadsOnlySelectedRestorePoints(t *testing.T) {
 		wanted   []string
 	}{
 		{name: "specific", selected: backups[0].topName, wanted: []string{backups[0].topName}},
-		{name: "incremental", selected: backups[1].topName, wanted: []string{backups[1].topName}},
-		{name: "latest", selected: "LATEST", wanted: []string{backups[1].topName}},
+		{name: "incremental", selected: backups[1].topName, wanted: []string{backups[0].topName, backups[1].topName}},
+		{name: "latest", selected: "LATEST", wanted: []string{backups[0].topName, backups[1].topName}},
 		{name: "all", wanted: []string{backups[0].topName, backups[1].topName}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
