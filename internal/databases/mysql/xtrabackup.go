@@ -223,6 +223,23 @@ func xtrabackupFetch(
 	return xtrabackupFetchClassic(ctx, backup, restoreCmd, prepareCmd, isLast)
 }
 
+// buildPrepareCommand returns the prepare command for one backup of a restore chain.
+// Incremental backups are applied from deltaDir. Every backup but the last one is
+// prepared with --apply-log-only, except on MariaDB: mariadb-backup has no such
+// option and uses the same --prepare call for every step of the chain.
+func buildPrepareCommand(ctx context.Context, prepareCmd *exec.Cmd, sentinel *StreamSentinelDto,
+	deltaDir string, isLast bool) *exec.Cmd {
+	if sentinel.IsIncremental {
+		prepareCmd = cloneCommand(ctx, prepareCmd)
+		injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+deltaDir)
+	}
+	if !isLast && !strings.Contains(sentinel.ServerVersion, "MariaDB") {
+		prepareCmd = cloneCommand(ctx, prepareCmd)
+		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
+	}
+	return prepareCmd
+}
+
 func xtrabackupFetchClassic(ctx context.Context, backup internal.Backup, restoreCmd *exec.Cmd, prepareCmd *exec.Cmd, isLast bool) error {
 	// Manually we will do the following:
 	//
@@ -247,14 +264,8 @@ func xtrabackupFetchClassic(ctx context.Context, backup internal.Backup, restore
 		restoreCmd = cloneCommand(ctx, restoreCmd)
 		restoreArgs := strings.Fields(restoreCmd.Args[len(restoreCmd.Args)-1])
 		replaceCommandArgument(restoreCmd, restoreArgs[len(restoreArgs)-1], tempDeltaDir)
-
-		prepareCmd = cloneCommand(ctx, prepareCmd)
-		injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+tempDeltaDir)
 	}
-	if !isLast {
-		prepareCmd = cloneCommand(ctx, prepareCmd)
-		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
-	}
+	prepareCmd = buildPrepareCommand(ctx, prepareCmd, &sentinel, tempDeltaDir, isLast)
 
 	stdin, err := restoreCmd.StdinPipe()
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
@@ -323,14 +334,7 @@ func xtrabackupFetchInhouse(ctx context.Context, backup internal.Backup, prepare
 	tempDeltaDir, err := prepareTemporaryDirectory(incrementalBackupDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to prepare temp dir: %v", err)
 
-	if sentinel.IsIncremental {
-		prepareCmd = cloneCommand(ctx, prepareCmd)
-		injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+tempDeltaDir)
-	}
-	if !isLast {
-		prepareCmd = cloneCommand(ctx, prepareCmd)
-		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
-	}
+	prepareCmd = buildPrepareCommand(ctx, prepareCmd, &sentinel, tempDeltaDir, isLast)
 
 	fetcher, err := internal.GetBackupStreamFetcher(ctx, backup)
 	if err != nil {
