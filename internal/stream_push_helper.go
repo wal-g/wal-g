@@ -20,7 +20,6 @@ const (
 	StreamBackupNameLength = 23 // len(StreamPrefix) + len(utility.BackupTimeFormat)
 )
 
-// TODO : unit tests
 // PushStream compresses a stream and push it
 func (uploader *RegularUploader) PushStream(ctx context.Context, stream io.Reader) (string, error) {
 	return uploader.PushStreamWithName(ctx, stream, StreamPrefix+utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat))
@@ -98,7 +97,6 @@ func (uploader *SplitStreamUploader) PushStreamWithName(ctx context.Context, str
 	return backupName, err
 }
 
-// TODO : unit tests
 // PushStreamToDestination compresses a stream and push it to specifyed destination
 func (uploader *RegularUploader) PushStreamToDestination(ctx context.Context, stream io.Reader, dstPath string) error {
 	if uploader.dataSize != nil {
