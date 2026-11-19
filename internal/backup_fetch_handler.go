@@ -3,11 +3,12 @@ package internal
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
 
-	"github.com/pkg/errors"
+	pkgerrors "github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -19,7 +20,7 @@ type BackupNonExistenceError struct {
 type StreamFetcher = func(ctx context.Context, backup Backup, writeCloser io.WriteCloser) error
 
 func NewBackupNonExistenceError(backupName string) BackupNonExistenceError {
-	return BackupNonExistenceError{errors.Errorf("Backup '%s' does not exist.", backupName)}
+	return BackupNonExistenceError{pkgerrors.Errorf("Backup '%s' does not exist.", backupName)}
 }
 
 func (err BackupNonExistenceError) Error() string {
@@ -39,19 +40,15 @@ func GetBackupToCommandFetcher(cmd *exec.Cmd) func(ctx context.Context, folder s
 		fetcher, err := GetBackupStreamFetcher(ctx, backup)
 		tracelog.ErrorLogger.FatalfOnError("Failed to detect backup format: %v\n", err)
 
-		err = fetcher(ctx, backup, stdin)
-
+		fetchErr := fetcher(ctx, backup, stdin)
+		if fetchErr != nil {
+			tracelog.ErrorLogger.Printf("Failed to fetch backup: %v", fetchErr)
+		}
 		cmdErr := cmd.Wait()
-		if err != nil || cmdErr != nil {
+		if fetchErr != nil || cmdErr != nil {
 			tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())
 		}
-		if cmdErr != nil {
-			if err != nil {
-				tracelog.ErrorLogger.Printf("Failed to fetch backup: %v\n", err)
-			}
-			err = cmdErr
-		}
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", errors.Join(fetchErr, cmdErr))
 	}
 }
 
@@ -68,7 +65,7 @@ func StreamBackupToCommandStdin(ctx context.Context, cmd *exec.Cmd, backup Backu
 	}
 	err = DownloadAndDecompressStream(ctx, backup, stdin)
 	if err != nil {
-		return errors.Wrap(err, "failed to download and decompress stream")
+		return pkgerrors.Wrap(err, "failed to download and decompress stream")
 	}
 	err = cmd.Wait()
 	if err != nil {

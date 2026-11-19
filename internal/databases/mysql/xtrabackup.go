@@ -3,6 +3,7 @@ package mysql
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -271,14 +272,14 @@ func xtrabackupFetchClassic(ctx context.Context, backup internal.Backup, restore
 		tracelog.ErrorLogger.Printf("Failed to detect backup format: %v\n", err)
 		return err
 	}
-	err = fetcher(ctx, backup, stdin)
-	cmdErr := restoreCmd.Wait()
-	if cmdErr != nil {
-		tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())
-		err = cmdErr
+	fetchErr := fetcher(ctx, backup, stdin)
+	if fetchErr != nil {
+		tracelog.ErrorLogger.Printf("Failed to fetch backup: %v", fetchErr)
 	}
-	if err != nil {
-		return err
+	cmdErr := restoreCmd.Wait()
+	if fetchErr != nil || cmdErr != nil {
+		tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())
+		return errors.Join(fetchErr, cmdErr)
 	}
 	tracelog.InfoLogger.Printf("Restored %s", backup.Name)
 

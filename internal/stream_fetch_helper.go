@@ -74,11 +74,13 @@ func DownloadAndDecompressSplittedStream(ctx context.Context, backup Backup, blo
 	writeCloser io.WriteCloser, maxDownloadRetry int) error {
 	decompressor := compression.FindDecompressor(extension)
 	if decompressor == nil {
+		utility.LoggedClose(writeCloser, "")
 		return fmt.Errorf("decompressor for file type '%s' not found", extension)
 	}
 
 	files, err := GetPartitionedBackupFileNames(ctx, backup, decompressor)
 	if err != nil {
+		utility.LoggedClose(writeCloser, "")
 		return err
 	}
 
