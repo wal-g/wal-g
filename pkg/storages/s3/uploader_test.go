@@ -98,12 +98,23 @@ func TestCreateUploadInput_WithoutServerSideEncryption(t *testing.T) {
 		serverSideEncryption: "",
 	}
 
-	uploadInput := uploader.createUploadInput(dummyBucket, dummyPath, dummyContent)
+	uploadInput := uploader.createUploadInput(t.Context(), dummyBucket, dummyPath, dummyContent)
 
 	assert.Equal(t, aws.String(dummyBucket), uploadInput.Bucket)
 	assert.Equal(t, aws.String(dummyPath), uploadInput.Key)
 	assert.Equal(t, dummyContent, uploadInput.Body)
 	assert.Equal(t, types.StorageClass(dummyStorageClass), uploadInput.StorageClass)
+}
+
+func TestCreateUploadInput_StorageClassOverride(t *testing.T) {
+	uploader := &Uploader{StorageClass: "STANDARD_IA"}
+	ctx := t.Context()
+	withClass := storage.WithStorageClass(ctx, "STANDARD")
+	input := uploader.createUploadInput(withClass, dummyBucket, dummyPath, dummyContent)
+	require.Equal(t, types.StorageClassStandard, input.StorageClass)
+
+	input = uploader.createUploadInput(ctx, dummyBucket, dummyPath, dummyContent)
+	require.Equal(t, types.StorageClassStandardIa, input.StorageClass)
 }
 
 type capturingUploaderAPI struct {
@@ -183,7 +194,7 @@ func TestCreateUploadInput_WithServerSideEncryptionAndWithCustomerKey(t *testing
 		SSECustomerKey:       dummySSECustomerKey,
 	}
 
-	uploadInput := uploader.createUploadInput(dummyBucket, dummyPath, dummyContent)
+	uploadInput := uploader.createUploadInput(t.Context(), dummyBucket, dummyPath, dummyContent)
 
 	assert.Equal(t, aws.String(dummyBucket), uploadInput.Bucket)
 	assert.Equal(t, aws.String(dummyPath), uploadInput.Key)
@@ -203,7 +214,7 @@ func TestCreateUploadInput_WithServerSideEncryptionAndWithoutCustomerKey(t *test
 		serverSideEncryption: dummyServerSideEncryption,
 	}
 
-	uploadInput := uploader.createUploadInput(dummyBucket, dummyPath, dummyContent)
+	uploadInput := uploader.createUploadInput(t.Context(), dummyBucket, dummyPath, dummyContent)
 
 	assert.Equal(t, aws.String(dummyBucket), uploadInput.Bucket)
 	assert.Equal(t, aws.String(dummyPath), uploadInput.Key)
@@ -219,7 +230,7 @@ func TestCreateUploadInput_WithServerSideEncryptionAndWithKMSKeyID(t *testing.T)
 		SSEKMSKeyID:          dummySSEKMSKeyID,
 	}
 
-	uploadInput := uploader.createUploadInput(dummyBucket, dummyPath, dummyContent)
+	uploadInput := uploader.createUploadInput(t.Context(), dummyBucket, dummyPath, dummyContent)
 
 	assert.Equal(t, aws.String(dummyBucket), uploadInput.Bucket)
 	assert.Equal(t, aws.String(dummyPath), uploadInput.Key)
