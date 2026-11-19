@@ -23,6 +23,7 @@ const (
 	secretAccessKeySetting            = "AWS_SECRET_ACCESS_KEY"
 	secretKeySetting                  = "AWS_SECRET_KEY"
 	sessionTokenSetting               = "AWS_SESSION_TOKEN"
+	sharedConfigFileSetting           = "AWS_CONFIG_FILE"
 	sessionNameSetting                = "AWS_ROLE_SESSION_NAME"
 	roleARNSetting                    = "AWS_ROLE_ARN"
 	dualStackSetting                  = "AWS_DUAL_STACK"
@@ -69,6 +70,7 @@ var SettingList = []string{
 	secretAccessKeySetting,
 	secretKeySetting,
 	sessionTokenSetting,
+	sharedConfigFileSetting,
 	sessionNameSetting,
 	roleARNSetting,
 	dualStackSetting,
@@ -233,6 +235,7 @@ func configureStorage(
 		RootPath:                   rootPath,
 		AccessKey:                  strings.TrimSpace(setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting)),
 		SessionToken:               settings[sessionTokenSetting],
+		SharedConfigFile:           settings[sharedConfigFileSetting],
 		RoleARN:                    settings[roleARNSetting],
 		DualStack:                  dualStack,
 		SessionName:                settings[sessionNameSetting],

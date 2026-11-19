@@ -49,6 +49,10 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 		config.WithRetryer(newRetryerFunc(cfg)),
 	}
 
+	if cfg.SharedConfigFile != "" {
+		loadOpts = append(loadOpts, config.WithSharedConfigFiles([]string{cfg.SharedConfigFile}))
+	}
+
 	requestChecksumCalculation, err := parseRequestChecksumCalculation(cfg.RequestChecksumCalculation)
 	if err != nil {
 		return aws.Config{}, nil, err

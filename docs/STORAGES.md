@@ -25,6 +25,10 @@ Set this variable along with `AWS_ROLE_SESSION_NAME` if you are using [AWS IAM](
 
 Specifies the name to attach to the role session. Useful only when `AWS_ROLE_ARN` is set.
 
+* `AWS_CONFIG_FILE`
+
+Path to the AWS shared config file, `~/.aws/config` by default. Can be set in individual storage configs, for example to use different `credential_process` settings in the `--from` and `--to` configs of `wal-g copy`. `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, including values inherited from the main config or environment, take precedence over credentials from this file.
+
 * `AWS_REGION`
 (e.g. `us-west-2`)
 
