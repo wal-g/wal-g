@@ -103,6 +103,13 @@ func (walgRetryables) IsErrorRetryable(err error) aws.Ternary {
 			if _, ok := retryableShortRequestBody(respErr); ok {
 				return aws.TrueTernary
 			}
+			// S3 occasionally answers CompleteMultipartUpload with MalformedXML
+			// although the request was valid. The parts are already stored, so
+			// replaying the same request is safe. UploadPart and other requests
+			// keep their current behavior.
+			if isCompleteMultipartUploadMalformedXML(respErr) {
+				return aws.TrueTernary
+			}
 		case 409:
 			return aws.TrueTernary
 		case 429:
@@ -139,6 +146,24 @@ func retryableShortRequestBody(err error) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// isCompleteMultipartUploadMalformedXML reports whether respErr is a MalformedXML
+// response to a CompleteMultipartUpload request: a POST that carries uploadId
+// but neither partNumber (UploadPart) nor uploads (CreateMultipartUpload).
+func isCompleteMultipartUploadMalformedXML(respErr *smithyhttp.ResponseError) bool {
+	apiErr, ok := errors.AsType[smithy.APIError](respErr)
+	if !ok || apiErr.ErrorCode() != "MalformedXML" {
+		return false
+	}
+	if respErr.Response == nil || respErr.Response.Response == nil || respErr.Response.Request == nil ||
+		respErr.Response.Request.URL == nil {
+		return false
+	}
+	req := respErr.Response.Request
+	query := req.URL.Query()
+	return req.Method == http.MethodPost && query.Has("uploadId") &&
+		!query.Has("partNumber") && !query.Has("uploads")
 }
 
 // isShortRequestBodyMessage reports whether message is the Backblaze
