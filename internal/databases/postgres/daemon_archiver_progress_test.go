@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -173,7 +174,7 @@ func TestDaemonArchiverRetryAndPendingPriority(t *testing.T) {
 			for _, index := range tc.uploaded {
 				require.NoError(t, manager.MarkWalUploaded(files[index]))
 			}
-			a := newDaemonArchiver(t.Context(), 2, 1, time.Minute, manager, archiveTestFactory(
+			a := archiveTestManualArchiver(t, 2, 1, manager, archiveTestFactory(
 				func(ctx context.Context, file ioextensions.NamedReader) error {
 					started <- file.Name()
 					<-ctx.Done()
@@ -212,42 +213,57 @@ func TestDaemonArchiverRetryPriorityAcrossBatches(t *testing.T) {
 		name        string
 		concurrency int
 		completed   bool
+		gap         bool
 	}{
-		{"free_background_worker", 3, false},
-		{"completed_batch", 2, true},
+		{"free_background_worker", 3, false, false},
+		{"completed_batch", 2, true, false},
+		{"prediction_gap", 2, true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			archiveTestConfig(t)
-			files := archiveTestFiles(t, 8)
-			manager := asm.NewFakeASM()
-			if tc.completed {
-				require.NoError(t, manager.MarkWalUploaded(files[1]))
-			}
-			a := newDaemonArchiver(t.Context(), tc.concurrency, 1, time.Minute, manager, archiveTestFactory(
-				func(ctx context.Context, _ ioextensions.NamedReader) error {
-					<-ctx.Done()
-					return ctx.Err()
-				}))
-			defer a.Close()
-			// No client anchor: only this test drives scheduling.
-			a.mu.Lock()
-			a.retryAfter[files[7]] = time.Now().Add(-time.Second)
-			a.mu.Unlock()
-			scan := daemonArchiveScan{
-				dir: filepath.Dir(files[0]), cursor: files[0],
-				lastFullScan: time.Now(), nextRescan: time.Now().Add(time.Minute),
-			}
-			for batch := 1; batch <= 2; batch++ {
-				a.refill(files[0], &scan)
-				a.mu.Lock()
-				_, retried := a.jobs[files[7]]
-				_, nextStarted := a.jobs[files[2]]
-				a.mu.Unlock()
-				require.False(t, retried, "a newer retry must not overtake the next prediction batch")
-				if batch == 2 {
-					require.True(t, nextStarted, "the next batch must use the available background worker")
+			synctest.Test(t, func(t *testing.T) {
+				archiveTestConfig(t)
+				files := archiveTestFiles(t, 8)
+				manager := asm.NewFakeASM()
+				if tc.completed {
+					require.NoError(t, manager.MarkWalUploaded(files[1]))
 				}
-			}
+				if tc.gap {
+					for _, filename := range files[2:7] {
+						require.NoError(t, os.Remove(filepath.Join(filepath.Dir(filename), archiveStatusDir,
+							filepath.Base(filename)+readySuffix)))
+					}
+				}
+				a := archiveTestManualArchiver(t, tc.concurrency, 1, manager, archiveTestFactory(
+					func(ctx context.Context, _ ioextensions.NamedReader) error {
+						<-ctx.Done()
+						return ctx.Err()
+					}))
+				defer a.Close()
+				a.mu.Lock()
+				a.retryAfter[files[7]] = time.Now().Add(-time.Second)
+				a.mu.Unlock()
+				scan := daemonArchiveScan{
+					dir: filepath.Dir(files[0]), cursor: files[0],
+					lastFullScan: time.Now(), nextRescan: time.Now().Add(time.Minute),
+				}
+				for batch := 1; batch <= 2; batch++ {
+					a.refill(files[0], &scan)
+					// Wait for uploads to block. A stray scanner would process the notification too.
+					synctest.Wait()
+					a.mu.Lock()
+					_, retried := a.jobs[files[7]]
+					_, queued := a.retryAfter[files[7]]
+					_, nextStarted := a.jobs[files[2]]
+					a.mu.Unlock()
+					require.Equal(t, tc.gap && batch == 2, retried,
+						"defer the newer retry until discovery finds no next prediction batch")
+					if batch == 1 {
+						require.True(t, queued, "deferring a retry must preserve it in the queue")
+					} else if !tc.gap {
+						require.True(t, nextStarted, "the next batch must use the available background worker")
+					}
+				}
+			})
 		})
 	}
 }
@@ -368,7 +384,7 @@ func TestDaemonArchiverRefillsBeforeFarListedWAL(t *testing.T) {
 	archiveTestConfig(t)
 	files := archiveTestFiles(t, 8)
 	started, release := make(chan string, 1), make(chan struct{})
-	a := newDaemonArchiver(t.Context(), 2, 2, time.Minute, asm.NewFakeASM(), archiveTestFactory(
+	a := archiveTestManualArchiver(t, 2, 2, asm.NewFakeASM(), archiveTestFactory(
 		func(ctx context.Context, file ioextensions.NamedReader) error {
 			started <- file.Name()
 			select {
@@ -379,7 +395,6 @@ func TestDaemonArchiverRefillsBeforeFarListedWAL(t *testing.T) {
 			}
 		}))
 	defer a.Close()
-	// No Push establishes an anchor, so the scanner cannot add any jobs.
 	var scan daemonArchiveScan
 	scan.follow(files[0])
 	listingDir := t.TempDir()
@@ -417,7 +432,7 @@ func TestDaemonArchiverReconcilesRetainedBatch(t *testing.T) {
 			lateReady := filepath.Join(filepath.Dir(files[0]), archiveStatusDir, filepath.Base(files[1])+readySuffix)
 			require.NoError(t, os.Remove(lateReady))
 			started, release := make(chan string, 1), make(chan struct{})
-			a := newDaemonArchiver(t.Context(), 2, 2, time.Minute, asm.NewFakeASM(), archiveTestFactory(
+			a := archiveTestManualArchiver(t, 2, 2, asm.NewFakeASM(), archiveTestFactory(
 				func(ctx context.Context, file ioextensions.NamedReader) error {
 					started <- file.Name()
 					select {
@@ -428,8 +443,7 @@ func TestDaemonArchiverReconcilesRetainedBatch(t *testing.T) {
 					}
 				}))
 			defer a.Close()
-			// No client anchor: only this test drives scheduling. Start with
-			// a full merged batch, retaining two far-ahead directory entries.
+			// Start with a full merged batch, retaining two far-ahead directory entries.
 			var scan daemonArchiveScan
 			scan.follow(files[0])
 			defer scan.closeListing()

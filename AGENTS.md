@@ -184,6 +184,9 @@ Removing a sentinel also does not protect a restore that has already read it.
   race tests for concurrency changes. Use the current Makefile/CI recipes for
   native dependencies and integration tests. Include Greenplum where shared
   PostgreSQL behavior changes.
+- Tests that drive `refill()` manually use `archiveTestManualArchiver` in
+  `daemon_archiver_test.go`. An empty client anchor does not stop the scanner
+  from pruning retries after a notification.
 - PostgreSQL package test initializers export Viper defaults to the environment.
   CLI integration tests must isolate inherited configuration variables; otherwise
   defaults such as `WALG_PG_WAL_SIZE=16` override an explicit 64 MiB config file.
