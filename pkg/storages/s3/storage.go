@@ -29,6 +29,7 @@ type Config struct {
 	RootPath                   string
 	AccessKey                  string
 	SessionToken               string
+	SharedConfigFile           string
 	RoleARN                    string
 	DualStack                  bool
 	SessionName                string
