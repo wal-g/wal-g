@@ -162,7 +162,7 @@ services:
     container_name: wal-g_pg10_tests_template
     <<: *s3_common_depends
 
-  # One build for any version: PG_MAJOR chooses the release, and 14-18 are
+  # One build for any version: PG_MAJOR chooses the release, and 14-19 are
   # installed from PGDG on ubuntu 22.04. PG 10 has its own services above,
   # because the wale_* tests need wal-e, which only runs on python3.7.
   pg:
@@ -531,7 +531,7 @@ services:
     command: /tmp/tests/daemon_client_test.sh
 
   # The PG 10 bionic image uses pgBackRest 2.36, because 2.54 and later need
-  # meson; 14-18 use 2.59.0. The build image must use the same Ubuntu version as
+  # meson; 14-19 use 2.59.0. The build image must use the same Ubuntu version as
   # the target image, or the binary will not run.
   pg_pgbackrest:
     build:

@@ -1,6 +1,6 @@
 # pgBackRest is built from source and added to a wal-g pg test image. The base
 # image and the version are arguments, because they differ per version: PG 10
-# uses bionic and 2.36, PG 14-18 use jammy and 2.59.0. Both ARGs are used by
+# uses bionic and 2.36, PG 14-19 use jammy and 2.59.0. Both ARGs are used by
 # FROM, so they must be declared before the first FROM.
 ARG PGBACKREST_BUILD_BASE=ubuntu:22.04
 ARG PG_TESTS_IMAGE=wal-g/pg10_tests:latest
