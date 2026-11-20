@@ -76,8 +76,8 @@ func TestWalSegmentRunner_SwitchTimelines(t *testing.T) {
 		},
 	}
 
-	timelineSwitchMap := map[postgres.WalSegmentNo]*postgres.TimelineHistoryRecord{
-		5: postgres.NewTimelineHistoryRecord(1, postgres.LSN(5*postgres.WalSegmentSize+1), ""),
+	timelineSwitchMap := map[postgres.WalSegmentNo][]*postgres.TimelineHistoryRecord{
+		5: {postgres.NewTimelineHistoryRecord(1, postgres.LSN(5*postgres.WalSegmentSize+1), "")},
 	}
 
 	testWalSegmentRunnerMultipleTimelines(t, stopSegmentNo, startSegment, timelineSwitchMap,
@@ -112,8 +112,8 @@ func TestWalSegmentRunner_SwitchTimelinesMissingSegments(t *testing.T) {
 		},
 	}
 
-	timelineSwitchMap := map[postgres.WalSegmentNo]*postgres.TimelineHistoryRecord{
-		5: postgres.NewTimelineHistoryRecord(1, postgres.LSN(5*postgres.WalSegmentSize+1), ""),
+	timelineSwitchMap := map[postgres.WalSegmentNo][]*postgres.TimelineHistoryRecord{
+		5: {postgres.NewTimelineHistoryRecord(1, postgres.LSN(5*postgres.WalSegmentSize+1), "")},
 	}
 
 	testWalSegmentRunnerMultipleTimelines(t, stopSegmentNo, startSegment, timelineSwitchMap,
@@ -121,7 +121,7 @@ func TestWalSegmentRunner_SwitchTimelinesMissingSegments(t *testing.T) {
 }
 
 func testWalSegmentRunnerMultipleTimelines(t *testing.T, stopSegmentNo postgres.WalSegmentNo,
-	startSegment postgres.WalSegmentDescription, timelineSwitchMap map[postgres.WalSegmentNo]*postgres.TimelineHistoryRecord,
+	startSegment postgres.WalSegmentDescription, timelineSwitchMap map[postgres.WalSegmentNo][]*postgres.TimelineHistoryRecord,
 	storageSegmentsByTimeline, expectedSegmentsByTimeline map[uint32][]postgres.WalSegmentNo) {
 
 	// convert segments grouped by timeline to segments set

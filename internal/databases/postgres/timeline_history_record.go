@@ -66,8 +66,8 @@ func newHistoryRecordFromString(row string) (*TimelineHistoryRecord, error) {
 // by WalSegmentNo. So we can use this map to do a fast lookup
 // and check if there was a timeline switch on the provided segment number.
 func createTimelineSwitchMap(ctx context.Context, startTimeline uint32,
-	walFolder storage.Folder) (map[WalSegmentNo]*TimelineHistoryRecord, error) {
-	timeLineHistoryMap := make(map[WalSegmentNo]*TimelineHistoryRecord)
+	walFolder storage.Folder) (map[WalSegmentNo][]*TimelineHistoryRecord, error) {
+	timeLineHistoryMap := make(map[WalSegmentNo][]*TimelineHistoryRecord)
 	historyRecords, err := GetTimeLineHistoryRecords(ctx, startTimeline, walFolder)
 	if _, ok := err.(HistoryFileNotFoundError); ok {
 		// return empty map if not found any history
@@ -77,9 +77,11 @@ func createTimelineSwitchMap(ctx context.Context, startTimeline uint32,
 		return nil, err
 	}
 	// store records in a map for fast lookup by wal segment number
+	// Several switches may fall into the same segment (e.g. consecutive promotions),
+	// so keep all of them, in the order of the .history file.
 	for _, record := range historyRecords {
 		walSegmentNo := NewWalSegmentNo(record.lsn)
-		timeLineHistoryMap[walSegmentNo] = record
+		timeLineHistoryMap[walSegmentNo] = append(timeLineHistoryMap[walSegmentNo], record)
 	}
 	return timeLineHistoryMap, nil
 }

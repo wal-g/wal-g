@@ -45,7 +45,7 @@ type IntegrityCheckRunner struct {
 	uploadingSegmentRangeSize int
 	delayedSegmentRangeSize   int
 	walFolderFilenames        []string
-	timelineSwitchMap         map[WalSegmentNo]*TimelineHistoryRecord
+	timelineSwitchMap         map[WalSegmentNo][]*TimelineHistoryRecord
 	noBackupsFound            bool
 }
 
@@ -243,8 +243,20 @@ func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescrip
 	return segmentSequences
 }
 
+// switchSegNoByTimeline maps each timeline from .history to the segment where it ended.
+// It must see every record, including several switches in the same segment.
+func switchSegNoByTimeline(timelineSwitchMap map[WalSegmentNo][]*TimelineHistoryRecord) map[uint32]WalSegmentNo {
+	result := make(map[uint32]WalSegmentNo, len(timelineSwitchMap))
+	for _, historyRecords := range timelineSwitchMap {
+		for _, historyRecord := range historyRecords {
+			result[historyRecord.timeline] = NewWalSegmentNo(historyRecord.lsn)
+		}
+	}
+	return result
+}
+
 // getEarliestBackupStartSegmentNo returns the starting segmentNo of the earliest available correct backup
-func getEarliestBackupStartSegmentNo(ctx context.Context, timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
+func getEarliestBackupStartSegmentNo(ctx context.Context, timelineSwitchMap map[WalSegmentNo][]*TimelineHistoryRecord,
 	currentTimeline uint32,
 	rootFolder storage.Folder) (WalSegmentNo, error) {
 	backups, err := internal.GetBackups(ctx, rootFolder.GetSubFolder(utility.BaseBackupPath))
@@ -258,10 +270,7 @@ func getEarliestBackupStartSegmentNo(ctx context.Context, timelineSwitchMap map[
 	}
 
 	// switchLsnBySegNo is used for fast lookup of the timeline switch segment
-	switchLsnBySegNo := make(map[uint32]WalSegmentNo, len(timelineSwitchMap))
-	for _, historyRecord := range timelineSwitchMap {
-		switchLsnBySegNo[historyRecord.timeline] = NewWalSegmentNo(historyRecord.lsn)
-	}
+	switchLsnBySegNo := switchSegNoByTimeline(timelineSwitchMap)
 	earliestBackup, earliestBackupSegNo, err :=
 		findEarliestBackup(currentTimeline, backupDetails, switchLsnBySegNo)
 	if err != nil {
@@ -276,7 +285,7 @@ func getEarliestBackupStartSegmentNo(ctx context.Context, timelineSwitchMap map[
 // getSpecifiedBackupStartSegmentNo returns the starting segmentNo of the available correct backup with specified name
 func getSpecifiedBackupStartSegmentNo(
 	ctx context.Context,
-	timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
+	timelineSwitchMap map[WalSegmentNo][]*TimelineHistoryRecord,
 	currentTimeline uint32,
 	backupSearchParams BackupSearchParams,
 	rootFolder storage.Folder,
@@ -295,10 +304,7 @@ func getSpecifiedBackupStartSegmentNo(
 	}
 
 	// switchLsnBySegNo is used for fast lookup of the timeline switch segment
-	switchLsnBySegNo := make(map[uint32]WalSegmentNo, len(timelineSwitchMap))
-	for _, historyRecord := range timelineSwitchMap {
-		switchLsnBySegNo[historyRecord.timeline] = NewWalSegmentNo(historyRecord.lsn)
-	}
+	switchLsnBySegNo := switchSegNoByTimeline(timelineSwitchMap)
 
 	backupTimelineID, backupLogSegNoInt, err := ParseWALFilename(backupDetails.WalFileName)
 	if err != nil {
