@@ -663,6 +663,10 @@ wal-g catchup-send ${PGDATA_PRIMARY} hostname:1337
 
 This command copies restorable backup closures between storages without decrypting, decompressing, recompressing, or re-encrypting their payload objects. Existing destination objects with the same path and size are skipped. For example, `wal-g copy --from=config_from.json --to=config_to.json` copies all backups and their exact-restore WAL.
 
+Planning lists selected backup payload prefixes and the WAL directory, not the
+entire source storage. Destination checks use HEAD/stat only for planned keys.
+WAL/history discovery still enumerates the WAL directory, which can be large.
+
 `--with-history` synchronizes continuous WAL from the selected backup recovery point through the latest archived WAL visible when the command starts. The command is resumable: run it again later to add newly archived WAL without retransferring existing immutable objects.
 
 In both modes, timeline history files with IDs below the first required WAL's timeline are omitted: the starting timeline's history already contains its ancestry. That timeline's history and all later history files are retained so recovery can discover later timelines with `recovery_target_timeline=latest`. Unrecognized history filenames are retained conservatively. Selection uses filenames without opening or decrypting the files.
