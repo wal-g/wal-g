@@ -602,13 +602,13 @@ Notes:
 * `SHOW data_directory_mode` and `SHOW wal_segment_size` support stock
   `pg_receivewal`. Set `WALG_TEST_PG_BIN` to a PostgreSQL `bin` directory to run
   the opt-in stock-client and real-standby tests in `TestWalSend*`. Docker CI
-  runs them with the race detector on PostgreSQL 14–18 via
+  runs them with the race detector on PostgreSQL 14–19 via
   `docker/pg_tests/scripts/tests/wal_send_stock_clients_test.sh`.
   `TestWalSendCLIStandby` additionally requires `WALG_TEST_WALG_BIN` and
   `WALG_TEST_CLI_CONFIG` (a self-contained S3 or filesystem config with a PGP key).
   It runs backup/restore and streaming through the CLI with encrypted LZ4 WAL;
   Docker CI supplies the S3 service via `wal_send_cli_test.sh` and repeats the
-  CLI recovery with 64 MiB WAL on PostgreSQL 14–18. Regular unit CI also checks
+  CLI recovery with 64 MiB WAL on PostgreSQL 14–19. Regular unit CI also checks
   64 MiB prefetch and the WAL filename rollover at `1/0`.
 
 

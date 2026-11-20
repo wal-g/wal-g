@@ -108,7 +108,7 @@ pg10_build_image: go_deps load_ubuntu_18_04 load_golang_image
 	docker compose build pg10
 	docker compose build pg10_tests_template
 
-# Builds the image for any PostgreSQL 14-18, chosen by PG_MAJOR (ubuntu 22.04 and
+# Builds the image for any PostgreSQL 14-19, chosen by PG_MAJOR (ubuntu 22.04 and
 # PGDG). PG 10 still uses pg10_build_image above, because wal-e needs python3.7
 # and only the bionic image has it.
 pg_build_image: go_deps load_docker_common
@@ -124,7 +124,7 @@ endif
 
 # Default CI matrix, also used by pg_matrix_test. PG 10 can still be requested
 # explicitly with PG_MAJOR=10 or PG_VERSIONS="10" for a compatibility run.
-PG_VERSIONS ?= 14 15 16 17 18
+PG_VERSIONS ?= 14 15 16 17 18 19
 
 .PHONY: print_pg_versions
 print_pg_versions:
@@ -133,7 +133,7 @@ print_pg_versions:
 # Run the whole suite sequentially for each version in PG_VERSIONS.
 #   make pg_matrix_test                       # default CI versions
 #   make PG_VERSIONS="17" pg_matrix_test      # just one
-#   make PG_VERSIONS="14 18" pg_matrix_test   # the edges
+#   make PG_VERSIONS="14 19" pg_matrix_test   # the edges
 pg_matrix_test:
 	@for v in $(PG_VERSIONS); do \
 		echo "=============== PostgreSQL $$v ==============="; \
