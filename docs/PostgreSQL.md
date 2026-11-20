@@ -700,6 +700,50 @@ Use the ``--use-sentinel-time`` flag on ``wal-g delete`` so WAL-G orders backups
 wal-g delete retain FULL 5 --use-sentinel-time --confirm
 ```
 
+### Experimental deletion without archive listings
+
+`delete before` and `delete retain` accept `--no-list` in this prototype:
+
+```sh
+wal-g delete retain FULL 3 --no-list
+wal-g delete retain FULL 3 --no-list --confirm
+```
+
+The planner makes one shallow listing of `basebackups_005/`, proportional to the
+number of backup catalog entries, and reads existing sentinels and compact metadata
+directly to check incremental dependencies and permanence. It then walks each selected
+backup subtree once: typically a few metadata files and tens to thousands of tar parts,
+depending on backup size and tar settings. Retained backup subtrees, reservations and
+`wal_005/` are not listed. Payload keys are spooled to disk; listing memory usage depends
+on the backend's walker or the size of a single directory listing. No backup format
+or sentinel changes are required, including for backups made with file metadata disabled.
+
+For each timeline with selected backups, the inclusive WAL lower bound comes from
+the earliest selected backup's start LSN. The exclusive upper bound is the earliest
+WAL needed by retained ordinary backups and their ancestors, across timelines. Existing
+WAL filenames validate the segment size; exact LSN boundaries use the preceding WAL
+segment. Permanent backup WAL intervals are preserved. Missing WALs do not stop
+enumeration. Known compression suffixes, partial delta records and individual/bulk
+WAL metadata are covered; a bulk object is deleted only if its entire interval is
+eligible. Timeline history, unknown timelines and WALs before the lower bound remain.
+With no selected backups, no WAL keys are deleted.
+
+The default is a dry run. With `--confirm`, sentinels are deleted and their absence
+checked before payload removal; backup metadata is removed after the payload succeeds.
+WAL keys are generated lazily and sent in batches of at most 500, including keys that
+may not exist. This trades WAL LIST requests for DELETE requests proportional to the
+derived interval and format variants. Name reservations remain.
+Use `--target-storage` when multiple destinations are configured; the whole operation
+is pinned to that destination and prefix.
+
+This PoC rejects versioned storage and insufficient or conflicting backup/WAL metadata.
+Orphaned backup folders and WALs outside the derived intervals still need ordinary
+garbage cleanup. It does not recalculate surviving journal size accounting or coordinate
+concurrent backup marking/cleanup. After a failed confirmed run, a fresh catalog may
+no longer contain unpublished targets: keep their printed names and use
+`delete target NAME --allow-broken` to finish backup cleanup, followed by ordinary
+`delete garbage ARCHIVES` for leftover WALs.
+
 ### ``delete garbage``
 
 Deletes outdated WAL archives and backups leftover files from storage, e.g. unsuccessfully backups or partially deleted ones. Will remove all non-permanent objects before the earliest non-permanent backup. This command is useful when backups are being deleted by the `delete target` command.

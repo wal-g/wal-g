@@ -55,11 +55,8 @@ review aids, not a substitute for reading the code on the branch being changed.
 is separate from sentinel-based publication. Check which parts your branch
 actually implements. A HEAD/Exists followed by PUT is not an exclusive claim.
 
-The proposed deletion ordering is: remove the sentinel and confirm success,
-remove the payload and confirm success, then release the reservation. This is
-not guaranteed by the current shared `internal/delete_handler.go`, which passes
-selected objects together to `DeleteObjects`. Sorting one batch is not a
-transaction or a barrier between these phases. Safe release also requires
+`internal/delete_phases.go` removes sentinels and confirms their absence before
+deleting payload. Permanent name reservations remain. Releasing them also requires
 excluding stale writers and overlapping cleanup; a missing sentinel or an old
 timestamp alone cannot establish that. Reservation release remains a separate
 protocol change, not a consequence of ignoring empty directories.
@@ -98,6 +95,11 @@ Removing a sentinel also does not protect a restore that has already read it.
 - Listings can still be appropriate, for example to verify that deletion left
   no unexpected objects. Keep such checks scoped to the affected backup prefix,
   outside the steady-state hot path where possible, and account for their cost.
+- The PostgreSQL no-list prototype derives WAL ranges from existing backup metadata;
+  keep sentinels compact. Walk only selected backup subtrees to include unrecorded
+  tar parts and backups without file metadata. Preserve permanent WAL intervals and
+  whole bulk-record ranges; see `delete_no_list_test.go` and the experimental deletion
+  section in `docs/PostgreSQL.md`.
 
 ## WAL pipelines
 
