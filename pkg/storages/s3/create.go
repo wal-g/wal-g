@@ -20,7 +20,7 @@ func (folder *Folder) CreateObject(ctx context.Context, name string, content []b
 	if !ok {
 		return fmt.Errorf("S3 client does not support conditional PutObject")
 	}
-	input := folder.uploader.createUploadInput(*folder.bucket, folder.path+name, bytes.NewReader(content))
+	input := folder.uploader.createUploadInput(ctx, *folder.bucket, folder.path+name, bytes.NewReader(content))
 	input.IfNoneMatch = aws.String("*")
 	_, err := client.PutObject(ctx, input)
 	var apiErr smithy.APIError

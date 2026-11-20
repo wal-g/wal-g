@@ -204,3 +204,37 @@ func TestS3FolderEndpointSource(t *testing.T) {
 
 	storage.RunFolderTest(st.RootFolder(), t)
 }
+
+func TestAdditionalRetention(t *testing.T) {
+	const day = 24 * time.Hour
+	for _, tc := range []struct {
+		name, mode  string
+		baseSeconds int
+		extra, want time.Duration
+	}{
+		{"ordinary upload", "COMPLIANCE", 604800, 0, 7 * day},
+		{"shared file", "COMPLIANCE", 604800, 31 * day, 38 * day},
+		{"different destination", "COMPLIANCE", 86400, 31 * day, 32 * day},
+		{"negative extension", "COMPLIANCE", 604800, -time.Second, 7 * day},
+		{"governance", "GOVERNANCE", 604800, day, 7 * day},
+		{"bucket default", "COMPLIANCE", -1, day, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			uploader := NewUploader(nil, "", "", "", "", tc.mode, tc.baseSeconds)
+			ctx := t.Context()
+			if tc.extra != 0 {
+				ctx = storage.WithAdditionalRetention(ctx, tc.extra)
+			}
+			before := time.Now()
+			input := uploader.createUploadInput(ctx, "bucket", "key", strings.NewReader("data"))
+			if tc.baseSeconds == -1 {
+				require.Nil(t, input.ObjectLockRetainUntilDate)
+				require.Empty(t, input.ObjectLockMode)
+				return
+			}
+			require.Equal(t, tc.mode, string(input.ObjectLockMode))
+			require.NotNil(t, input.ObjectLockRetainUntilDate)
+			require.WithinRange(t, *input.ObjectLockRetainUntilDate, before.Add(tc.want), time.Now().Add(tc.want))
+		})
+	}
+}
