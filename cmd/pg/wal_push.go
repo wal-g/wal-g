@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
@@ -21,9 +22,13 @@ var walPushCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
-		if timeout > 0 {
+
+		pushTimeout, err := getWalPushTimeout(cmd)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		if pushTimeout > 0 {
 			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, timeout)
+			ctx, cancel = context.WithTimeout(ctx, pushTimeout)
 			defer cancel()
 		}
 
@@ -36,6 +41,13 @@ var walPushCmd = &cobra.Command{
 		err = postgres.HandleWALPush(ctx, walUploader, args[0])
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
+}
+
+func getWalPushTimeout(cmd *cobra.Command) (time.Duration, error) {
+	if cmd.Flags().Changed("timeout") || timeout > 0 {
+		return timeout, nil
+	}
+	return config.GetDurationSettingDefault(config.WalPushTimeoutSetting, 0)
 }
 
 func init() {
