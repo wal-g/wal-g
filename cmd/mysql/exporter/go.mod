@@ -1,6 +1,6 @@
 module github.com/wal-g/wal-g/cmd/mysql/exporter
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/prometheus/client_golang v1.25.0
