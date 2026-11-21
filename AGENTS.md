@@ -154,9 +154,10 @@ Removing a sentinel also does not protect a restore that has already read it.
   both bounded candidate batches. Before a far-ahead listed WAL, refill nearer
   sequential candidates; follow the listed run only after prediction is exhausted.
   Order eligible retries and pending candidates by filename without blocking
-  other workers on an earlier upload. See
-  `daemon_archiver_progress_test.go` and its sequential-priority, retry-priority
-  and blocked-upload regression tests.
+  other workers on an earlier upload. Refill the next prediction batch before
+  draining newer retries, even when ASM hits consumed the current batch. See
+  `TestDaemonArchiverRetryPriorityAcrossBatches` in `daemon_archiver_progress_test.go`,
+  alongside its sequential-priority and blocked-upload regression tests.
 - When directory reconciliation is due, stop extending the current bounded
   batch so retained far-ahead WALs cannot postpone it indefinitely. Preserve
   the sequential cursor while draining that batch, and track progress for an
@@ -188,6 +189,9 @@ Removing a sentinel also does not protect a restore that has already read it.
   race tests for concurrency changes. Use the current Makefile/CI recipes for
   native dependencies and integration tests. Include Greenplum where shared
   PostgreSQL behavior changes.
+- Tests that drive `refill()` manually use `archiveTestManualArchiver` in
+  `daemon_archiver_test.go`. An empty client anchor does not stop the scanner
+  from pruning retries after a notification.
 - PostgreSQL package test initializers export Viper defaults to the environment.
   CLI integration tests must isolate inherited configuration variables; otherwise
   defaults such as `WALG_PG_WAL_SIZE=16` override an explicit 64 MiB config file.
