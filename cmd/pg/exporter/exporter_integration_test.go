@@ -119,6 +119,11 @@ func TestBackupMetricsIntegration(t *testing.T) {
 	require.True(t, foundFull, "Metric for full backups not found")
 	require.True(t, foundDelta, "Metric for delta backups not found")
 
+	// Check walg_orphaned_backups: every delta backup in testdata reaches a full backup
+	orphanedMetric := metricFamilies["walg_orphaned_backups"]
+	require.NotNil(t, orphanedMetric)
+	require.Equal(t, 0.0, orphanedMetric.GetMetric()[0].GetGauge().GetValue(), "Expected no orphaned backups")
+
 	// Check for a specific backup's compressed size
 	compressedSizeMetric := metricFamilies["walg_backup_compressed_size_bytes"]
 	require.NotNil(t, compressedSizeMetric)
@@ -133,11 +138,11 @@ func TestBackupMetricsIntegration(t *testing.T) {
 		}
 	}
 
-	// Check for walg_backup_info with delta_origin
+	// Check for walg_backup_info with delta_origin and hostname
 	backupInfoMetric := metricFamilies["walg_backup_info"]
 	require.NotNil(t, backupInfoMetric)
 	for _, m := range backupInfoMetric.GetMetric() {
-		var backupName, deltaOrigin string
+		var backupName, deltaOrigin, hostname string
 		for _, l := range m.GetLabel() {
 			if l.GetName() == "backup_name" {
 				backupName = l.GetValue()
@@ -145,7 +150,11 @@ func TestBackupMetricsIntegration(t *testing.T) {
 			if l.GetName() == "delta_origin" {
 				deltaOrigin = l.GetValue()
 			}
+			if l.GetName() == "hostname" {
+				hostname = l.GetValue()
+			}
 		}
+		require.Equal(t, "superpg", hostname, "Incorrect hostname for backup %s", backupName)
 		if backupName == "base_0000004300000388000000BB_D_0000004300000388000000AC" {
 			require.Equal(t, "base_0000004300000388000000AC_D_000000430000038500000003", deltaOrigin, "Incorrect delta_origin for delta backup")
 		}

@@ -18,20 +18,22 @@ The exporter provides the following metrics:
 
 ### Backup Metrics
 
-- `walg_backup_info{backup_name, backup_type, wal_file, pg_version, start_lsn, finish_lsn, is_permanent, delta_origin}`: Information about stored backups. Value is always 1.
+- `walg_backup_info{backup_name, backup_type, wal_file, pg_version, start_lsn, finish_lsn, is_permanent, delta_origin, hostname}`: Information about stored backups. Value is always 1.
 - `walg_backup_start_timestamp{backup_name}`: Unix timestamp when backup started.
 - `walg_backup_finish_timestamp{backup_name}`: Unix timestamp when backup completed successfully.
 - `walg_backup_compressed_size_bytes{backup_name}`: Compressed size of the backup in bytes.
 - `walg_backup_uncompressed_size_bytes{backup_name}`: Uncompressed size of the backup in bytes.
 - `walg_backups{backup_type}`: Number of successful backups (full/delta).
+- `walg_orphaned_backups`: Number of delta backups whose chain of parents does not reach a full backup, e.g. because the full backup was deleted bypassing WAL-G. Such backups cannot be restored. Delta backups whose parent cannot be determined from the backup names are counted too.
 
 **Label Details:**
 
 - `backup_name`: Full backup name (e.g., `base_000000010000000000000025` or `base_000000010000000500000007_D_000000010000000000000025`)
 - `backup_type`: `full` or `delta` (determined by presence of `_D_` in backup name)
-- `delta_origin`: For delta backups, shows the base backup name they're built on (empty for full backups)
+- `delta_origin`: For delta backups, shows the base backup name they're built on (empty for full backups and when the base backup cannot be determined)
   - Full Backup ← Delta 1 ← Delta 2 ← Delta 3 (chaining increments)
   - Full Backup (Base) ← Delta N
+- `hostname`: Host where `backup-push` made the backup (from the backup metadata), not the host where the exporter runs
 
 ### WAL Metrics
 
@@ -45,7 +47,7 @@ The exporter provides the following metrics:
 
 ### PITR Metrics
 
-- `walg_pitr_window_seconds` - Point-in-time recovery window size in seconds
+- `walg_pitr_window_seconds` - Point-in-time recovery window size in seconds, counted from the earliest backup that is not permanent and can be restored (0 if there is no such backup)
 
 ### Error Metrics
 
@@ -302,17 +304,17 @@ walg_backup_finish_timestamp{backup_name="base_0000004300000388000000C1_D_000000
 walg_backup_finish_timestamp{backup_name="base_0000004400000388000000C7"} 1.767089767e+09
 # HELP walg_backup_info Information about stored backups. Value is always 1.
 # TYPE walg_backup_info gauge
-walg_backup_info{backup_name="base_000000430000030600000060",backup_type="full",delta_origin="",finish_lsn="306/600BEAC0",is_permanent="false",pg_version="150015",start_lsn="306/60000028",wal_file="000000430000030600000060"} 1
-walg_backup_info{backup_name="base_000000430000035900000062",backup_type="full",delta_origin="",finish_lsn="359/620DB728",is_permanent="false",pg_version="150015",start_lsn="359/62000028",wal_file="000000430000035900000062"} 1
-walg_backup_info{backup_name="base_0000004300000371000000AB",backup_type="full",delta_origin="",finish_lsn="371/AB0C7F40",is_permanent="false",pg_version="150015",start_lsn="371/AB000028",wal_file="0000004300000371000000AB"} 1
-walg_backup_info{backup_name="base_000000430000037B00000083",backup_type="full",delta_origin="",finish_lsn="37B/830D5690",is_permanent="false",pg_version="150015",start_lsn="37B/83000028",wal_file="000000430000037B00000083"} 1
-walg_backup_info{backup_name="base_000000430000038500000003",backup_type="full",delta_origin="",finish_lsn="385/30C4AA0",is_permanent="false",pg_version="150015",start_lsn="385/30025B8",wal_file="000000430000038500000003"} 1
-walg_backup_info{backup_name="base_0000004300000388000000AC_D_000000430000038500000003",backup_type="delta",delta_origin="base_000000430000038500000003",finish_lsn="388/AC06D190",is_permanent="false",pg_version="150015",start_lsn="388/AC0000D8",wal_file="0000004300000388000000AC"} 1
-walg_backup_info{backup_name="base_0000004300000388000000BB_D_0000004300000388000000AC",backup_type="delta",delta_origin="base_0000004300000388000000AC_D_000000430000038500000003",finish_lsn="388/BB02B7D0",is_permanent="false",pg_version="150015",start_lsn="388/BB000028",wal_file="0000004300000388000000BB"} 1
-walg_backup_info{backup_name="base_0000004300000388000000BD",backup_type="full",delta_origin="",finish_lsn="388/BD025830",is_permanent="false",pg_version="150015",start_lsn="388/BD000028",wal_file="0000004300000388000000BD"} 1
-walg_backup_info{backup_name="base_0000004300000388000000BF_D_0000004300000388000000BD",backup_type="delta",delta_origin="base_0000004300000388000000BD",finish_lsn="388/BF001F18",is_permanent="false",pg_version="150015",start_lsn="388/BF000028",wal_file="0000004300000388000000BF"} 1
-walg_backup_info{backup_name="base_0000004300000388000000C1_D_0000004300000388000000BF",backup_type="delta",delta_origin="base_0000004300000388000000BF_D_0000004300000388000000BD",finish_lsn="388/C100A418",is_permanent="false",pg_version="150015",start_lsn="388/C1000028",wal_file="0000004300000388000000C1"} 1
-walg_backup_info{backup_name="base_0000004400000388000000C7",backup_type="full",delta_origin="",finish_lsn="388/C70DD4F0",is_permanent="false",pg_version="150015",start_lsn="388/C7000028",wal_file="0000004400000388000000C7"} 1
+walg_backup_info{backup_name="base_000000430000030600000060",backup_type="full",delta_origin="",finish_lsn="306/600BEAC0",hostname="superpg",is_permanent="false",pg_version="150015",start_lsn="306/60000028",wal_file="000000430000030600000060"} 1
+walg_backup_info{backup_name="base_000000430000035900000062",backup_type="full",delta_origin="",finish_lsn="359/620DB728",hostname="superpg",is_permanent="false",pg_version="150015",start_lsn="359/62000028",wal_file="000000430000035900000062"} 1
+walg_backup_info{backup_name="base_0000004300000371000000AB",backup_type="full",delta_origin="",finish_lsn="371/AB0C7F40",hostname="superpg",is_permanent="false",pg_version="150015",start_lsn="371/AB000028",wal_file="0000004300000371000000AB"} 1
+walg_backup_info{backup_name="base_000000430000037B00000083",backup_type="full",delta_origin="",finish_lsn="37B/830D5690",hostname="superpg",is_permanent="false",pg_version="150015",start_lsn="37B/83000028",wal_file="000000430000037B00000083"} 1
+walg_backup_info{backup_name="base_000000430000038500000003",backup_type="full",delta_origin="",finish_lsn="385/30C4AA0",hostname="superpg",is_permanent="false",pg_version="150015",start_lsn="385/30025B8",wal_file="000000430000038500000003"} 1
+walg_backup_info{backup_name="base_0000004300000388000000AC_D_000000430000038500000003",backup_type="delta",delta_origin="base_000000430000038500000003",finish_lsn="388/AC06D190",hostname="superpg",is_permanent="false",pg_version="150015",start_lsn="388/AC0000D8",wal_file="0000004300000388000000AC"} 1
+walg_backup_info{backup_name="base_0000004300000388000000BB_D_0000004300000388000000AC",backup_type="delta",delta_origin="base_0000004300000388000000AC_D_000000430000038500000003",finish_lsn="388/BB02B7D0",hostname="superpg",is_permanent="false",pg_version="150015",start_lsn="388/BB000028",wal_file="0000004300000388000000BB"} 1
+walg_backup_info{backup_name="base_0000004300000388000000BD",backup_type="full",delta_origin="",finish_lsn="388/BD025830",hostname="superpg",is_permanent="false",pg_version="150015",start_lsn="388/BD000028",wal_file="0000004300000388000000BD"} 1
+walg_backup_info{backup_name="base_0000004300000388000000BF_D_0000004300000388000000BD",backup_type="delta",delta_origin="base_0000004300000388000000BD",finish_lsn="388/BF001F18",hostname="superpg",is_permanent="false",pg_version="150015",start_lsn="388/BF000028",wal_file="0000004300000388000000BF"} 1
+walg_backup_info{backup_name="base_0000004300000388000000C1_D_0000004300000388000000BF",backup_type="delta",delta_origin="base_0000004300000388000000BF_D_0000004300000388000000BD",finish_lsn="388/C100A418",hostname="superpg",is_permanent="false",pg_version="150015",start_lsn="388/C1000028",wal_file="0000004300000388000000C1"} 1
+walg_backup_info{backup_name="base_0000004400000388000000C7",backup_type="full",delta_origin="",finish_lsn="388/C70DD4F0",hostname="superpg",is_permanent="false",pg_version="150015",start_lsn="388/C7000028",wal_file="0000004400000388000000C7"} 1
 # HELP walg_backup_list_duration_seconds Time taken to execute 'backup-list' during the last collector run.
 # TYPE walg_backup_list_duration_seconds gauge
 walg_backup_list_duration_seconds 2.007721887
@@ -346,6 +348,9 @@ walg_backup_uncompressed_size_bytes{backup_name="base_0000004400000388000000C7"}
 # TYPE walg_backups gauge
 walg_backups{backup_type="delta"} 4
 walg_backups{backup_type="full"} 7
+# HELP walg_orphaned_backups Number of delta backups whose chain of parents does not reach a full backup
+# TYPE walg_orphaned_backups gauge
+walg_orphaned_backups 0
 # HELP walg_pitr_window_seconds Point-in-time recovery window size in seconds
 # TYPE walg_pitr_window_seconds gauge
 walg_pitr_window_seconds 1.158221840144585e+06
