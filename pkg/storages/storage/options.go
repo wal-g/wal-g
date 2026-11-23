@@ -7,6 +7,19 @@ import (
 
 type additionalRetentionKey struct{}
 
+type skipRetentionKey struct{}
+
+// WithoutRetention omits WAL-G's configured retention for one write.
+// Bucket-level default retention may still apply.
+func WithoutRetention(ctx context.Context) context.Context {
+	return context.WithValue(ctx, skipRetentionKey{}, true)
+}
+
+func SkipRetentionFromContext(ctx context.Context) bool {
+	skip, _ := ctx.Value(skipRetentionKey{}).(bool)
+	return skip
+}
+
 // WithAdditionalRetention extends the destination's compliance retention for one write.
 func WithAdditionalRetention(ctx context.Context, extra time.Duration) context.Context {
 	return context.WithValue(ctx, additionalRetentionKey{}, extra)

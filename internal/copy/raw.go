@@ -52,13 +52,14 @@ const (
 
 // Entry describes one byte-preserving object transfer.
 type Entry struct {
-	SourcePath string
-	TargetPath string
-	Size       int64
-	Phase      Phase
-	Sequence   int
-	Mutable    bool
-	inline     []byte
+	SourcePath    string
+	TargetPath    string
+	Size          int64
+	Phase         Phase
+	Sequence      int
+	Mutable       bool
+	inline        []byte
+	skipRetention bool
 }
 
 // AddInline replaces a manifest destination with small planner-generated
@@ -72,6 +73,15 @@ func (p *Plan) AddInline(targetPath string, content []byte, phase Phase, mutable
 		Mutable:    mutable,
 		inline:     slices.Clone(content),
 	}
+}
+
+// AddInlineWithoutRetention publishes metadata without WAL-G's configured retention.
+func (p *Plan) AddInlineWithoutRetention(targetPath string, content []byte, phase Phase, mutable bool) {
+	p.AddInline(targetPath, content, phase, mutable)
+	targetPath = path.Clean(targetPath)
+	entry := p.entries[targetPath]
+	entry.skipRetention = true
+	p.entries[targetPath] = entry
 }
 
 // SetOrder adjusts publication order for an entry already in the manifest.
@@ -536,6 +546,9 @@ func copyObjectWithoutMetrics(ctx context.Context, from, to storage.Folder, entr
 func copyObjectAttempt(ctx context.Context, from, to storage.Folder, entry Entry,
 	options *ExecuteOptions, serverCopyErr *error) error {
 	if entry.inline != nil {
+		if entry.skipRetention {
+			ctx = storage.WithoutRetention(ctx)
+		}
 		if err := to.PutObject(ctx, entry.TargetPath, bytes.NewReader(entry.inline)); err != nil {
 			return &transferError{"write destination metadata", to, err}
 		}

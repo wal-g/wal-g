@@ -181,6 +181,12 @@ Example:
 
 Sends (not yet archived) binlogs to storage. Typically run in CRON.
 
+WAL-G omits `S3_RETENTION_PERIOD` and `S3_RETENTION_MODE` for uploads of
+`binlog_sentinel_005.json`, including copies made with `--with-history`.
+Binlog and backup objects keep their configured retention. Bucket-level default
+Object Lock retention still applies to the sentinel if configured; this exception
+does not change bucket policies or existing object versions.
+
 ```bash
 wal-g binlog-push
 ```
