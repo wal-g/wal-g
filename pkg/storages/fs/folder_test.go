@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -91,6 +92,37 @@ func TestDeleteObjectsKeepsNonEmptyDirs(t *testing.T) {
 	// backup_002 subtree must still be intact.
 	_, statErr := os.Stat(filepath.Join(tmpDir, "backup_002/pg_data"))
 	assert.NoError(t, statErr, "backup_002/pg_data should still exist")
+}
+
+func TestListingSkipsFilesDeletedDuringTheListing(t *testing.T) {
+	tmpDir := setupTmpDir(t)
+	defer os.RemoveAll(tmpDir)
+
+	dir := filepath.Join(tmpDir, "pieces")
+	assert.NoError(t, os.MkdirAll(dir, 0o755))
+	const files = 2000
+	for i := 0; i < files; i++ {
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("piece-%05d", i)), []byte("x"), 0o644))
+	}
+	folder := NewFolder(tmpDir, "pieces/")
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < files; i++ {
+			_ = os.Remove(filepath.Join(dir, fmt.Sprintf("piece-%05d", i)))
+		}
+	}()
+	for running := true; running; {
+		select {
+		case <-done:
+			running = false
+		default:
+		}
+		_, _, err := folder.ListFolder(t.Context())
+		assert.NoError(t, err)
+		assert.NoError(t, folder.WalkObjects(t.Context(), func(storage.Object) error { return nil }))
+	}
 }
 
 func setupTmpDir(t *testing.T) string {
