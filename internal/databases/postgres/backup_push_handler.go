@@ -799,6 +799,8 @@ func GetPgServerInfo(ctx context.Context, keepRunner bool) (pgInfo BackupPgInfo,
 }
 
 // TODO : unit tests
+//
+//nolint:gocritic // hugeParam
 func (bh *BackupHandler) uploadExtendedMetadata(ctx context.Context, meta ExtendedMetadataDto) (err error) {
 	metaFile := storage.JoinPath(bh.CurBackupInfo.Name, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)

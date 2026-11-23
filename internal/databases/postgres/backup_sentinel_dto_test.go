@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,6 +52,22 @@ func TestNewBackupSentinelDto_EndWalFileNameBoundary(t *testing.T) {
 			assert.Equal(t, tt.want, dto.EndWalFileName)
 		})
 	}
+}
+
+func TestNewExtendedMetadataDto_KeepsExactDeltaParent(t *testing.T) {
+	parent := "base_000000010000000000000002"
+	start, finish := LSN(10), LSN(20)
+	meta := NewExtendedMetadataDto(false, "", time.Time{}, BackupSentinelDto{
+		BackupStartLSN: &start, BackupFinishLSN: &finish, IncrementFrom: &parent,
+	})
+	require.Equal(t, &parent, meta.IncrementFrom)
+	encoded, err := json.Marshal(BackupDetail{ExtendedMetadataDto: meta})
+	require.NoError(t, err)
+	var listed struct {
+		Parent string `json:"delta_from"`
+	}
+	require.NoError(t, json.Unmarshal(encoded, &listed))
+	require.Equal(t, parent, listed.Parent)
 }
 
 func TestBackupSentinelDto_IsIncremental(t *testing.T) {
