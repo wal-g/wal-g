@@ -29,6 +29,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/sync/semaphore"
 )
 
 type archiveTestUploader struct {
@@ -75,6 +76,29 @@ func archiveTestFactory(upload func(context.Context, ioextensions.NamedReader) e
 	return func(context.Context) (*WalUploader, error) {
 		return &WalUploader{Uploader: archiveTestUploader{upload: upload}, PGArchiveStatusManager: asm.NewNopASM()}, nil
 	}
+}
+
+// For tests that call refill directly, do not start scan: even an empty
+// client anchor lets scanAnchor prune retries after a notification.
+func archiveTestManualArchiver(t *testing.T, concurrency, window int, manager asm.ArchiveStatusManager,
+	makeUploader func(context.Context) (*WalUploader, error)) *daemonArchiver {
+	t.Helper()
+	ctx, cancel := context.WithCancel(t.Context())
+	a := &daemonArchiver{
+		ctx: ctx, cancel: cancel, makeUploader: makeUploader, manager: manager,
+		workers:    semaphore.NewWeighted(int64(concurrency)),
+		background: semaphore.NewWeighted(int64(concurrency - 1)),
+		window:     window, timeout: time.Minute,
+		preventOverwrite: viper.GetBool(conf.PreventWalOverwriteSetting),
+		readyRename:      viper.GetBool(conf.PgReadyRename),
+		foreground:       make(chan struct{}, 1), wake: make(chan struct{}, 1), stopped: make(chan struct{}),
+		jobs: make(map[string]*daemonArchiveJob), retryAfter: make(map[string]time.Time),
+	}
+	if concurrency < 2 {
+		a.window = 0
+	}
+	close(a.stopped) // No scanner to join; Close still cancels and joins uploads.
+	return a
 }
 
 func archiveTestWait(t *testing.T, done <-chan struct{}) {

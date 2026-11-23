@@ -317,7 +317,13 @@ func (a *daemonArchiver) refill(anchor string, scan *daemonArchiveScan) {
 		}
 	}
 	if len(scan.pending) == 0 {
-		a.retryFailed(anchor, "")
+		before := ""
+		if hadCandidates {
+			// Keep older retries moving, but discover the next batch before
+			// allowing retries beyond the sequential cursor to take its slots.
+			before = scan.cursor
+		}
+		a.retryFailed(anchor, before)
 		if hadCandidates || scan.listing != nil {
 			a.notify() // A batch is a memory bound, not an archival progress limit.
 		}
