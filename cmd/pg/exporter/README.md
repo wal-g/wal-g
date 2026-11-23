@@ -71,7 +71,10 @@ The exporter correctly identifies backup types using WAL-G's actual naming conve
 
 ### From Source
 
+For compatibility, build the exporter from the same tag as the WAL-G version you run. The exporter is available since WAL-G v3.0.8. For example, for WAL-G v3.0.10:
+
 ```bash
+git checkout v3.0.10
 cd cmd/pg/exporter/
 go build -o walg-exporter .
 ```
