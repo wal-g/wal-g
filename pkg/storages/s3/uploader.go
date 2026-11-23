@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -80,18 +81,28 @@ func NewUploader(uploaderAPI UploaderAPI, serverSideEncryption, sseCustomerKey, 
 	}
 }
 
-func (uploader *Uploader) createUploadInput(bucket, path string, content io.Reader) *s3.PutObjectInput {
+func (uploader *Uploader) objectLock(ctx context.Context) (types.ObjectLockMode, *time.Time) {
+	if uploader.RetentionPeriod == defaultDisabledRetentionPeriod {
+		return "", nil
+	}
+	until := time.Now().Add(time.Second * uploader.RetentionPeriod)
+	if uploader.RetentionMode == string(types.ObjectLockModeCompliance) {
+		extra := storage.AdditionalRetentionFromContext(ctx)
+		if extra > 0 {
+			until = until.Add(extra)
+		}
+	}
+	return types.ObjectLockMode(uploader.RetentionMode), &until
+}
+
+func (uploader *Uploader) createUploadInput(ctx context.Context, bucket, path string, content io.Reader) *s3.PutObjectInput {
 	uploadInput := &s3.PutObjectInput{
 		Bucket:       aws.String(bucket),
 		Key:          aws.String(path),
 		Body:         content,
-		StorageClass: types.StorageClass(uploader.StorageClass),
+		StorageClass: types.StorageClass(cmp.Or(storage.StorageClassFromContext(ctx), uploader.StorageClass)),
 	}
-	if uploader.RetentionPeriod != defaultDisabledRetentionPeriod {
-		mytime := time.Now().Add(time.Second * uploader.RetentionPeriod)
-		uploadInput.ObjectLockMode = types.ObjectLockMode(uploader.RetentionMode)
-		uploadInput.ObjectLockRetainUntilDate = &mytime
-	}
+	uploadInput.ObjectLockMode, uploadInput.ObjectLockRetainUntilDate = uploader.objectLock(ctx)
 
 	if uploader.serverSideEncryption != "" {
 		if uploader.SSECustomerKey != "" {
@@ -113,7 +124,7 @@ func (uploader *Uploader) createUploadInput(bucket, path string, content io.Read
 }
 
 func (uploader *Uploader) upload(ctx context.Context, bucket, path string, content io.Reader) error {
-	input := uploader.createUploadInput(bucket, path, content)
+	input := uploader.createUploadInput(ctx, bucket, path, content)
 	if !uploader.autoPartSize {
 		_, err := uploader.uploaderAPI.Upload(ctx, input)
 		return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)

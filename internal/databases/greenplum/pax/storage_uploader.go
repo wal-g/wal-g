@@ -9,6 +9,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -16,14 +17,15 @@ import (
 // and decides per file whether to skip (already in storage from a prior backup)
 // or upload whole.
 type StorageUploader struct {
-	uploader            internal.Uploader
-	baseFiles           BackupFiles
-	meta                *FilesMetadataDTO
-	metaMutex           sync.Mutex
-	crypter             crypto.Crypter
-	bundleFiles         internal.BundleFiles
-	deduplicationMinAge time.Time
-	newPaxFilesID       string
+	uploader              internal.Uploader
+	baseFiles             BackupFiles
+	meta                  *FilesMetadataDTO
+	metaMutex             sync.Mutex
+	crypter               crypto.Crypter
+	bundleFiles           internal.BundleFiles
+	deduplicationAgeLimit time.Duration
+	deduplicationMinAge   time.Time
+	newPaxFilesID         string
 }
 
 func NewStorageUploader(uploader internal.Uploader, baseFiles BackupFiles, crypter crypto.Crypter,
@@ -33,13 +35,14 @@ func NewStorageUploader(uploader internal.Uploader, baseFiles BackupFiles, crypt
 	paxFileUploader := internal.NewRegularUploader(nil, uploader.Folder())
 
 	return &StorageUploader{
-		uploader:            paxFileUploader,
-		baseFiles:           baseFiles,
-		meta:                NewFilesMetadataDTO(),
-		crypter:             crypter,
-		bundleFiles:         files,
-		deduplicationMinAge: time.Now().Add(-deduplicationAgeLimit),
-		newPaxFilesID:       newPaxFilesID,
+		uploader:              paxFileUploader,
+		baseFiles:             baseFiles,
+		meta:                  NewFilesMetadataDTO(),
+		crypter:               crypter,
+		bundleFiles:           files,
+		deduplicationAgeLimit: deduplicationAgeLimit,
+		deduplicationMinAge:   time.Now().Add(-deduplicationAgeLimit),
+		newPaxFilesID:         newPaxFilesID,
 	}
 }
 
@@ -107,6 +110,7 @@ func (u *StorageUploader) regularUpload(ctx context.Context,
 	storageKey := MakeFileStorageKey(meta.RelNameMd5, fileKey, u.newPaxFilesID)
 	tracelog.DebugLogger.Printf("Uploading %s PAX file to %s", cfi.Path, storageKey)
 
+	ctx = storage.WithAdditionalRetention(ctx, 24*time.Hour+u.deduplicationAgeLimit)
 	fileReadCloser, err := internal.StartReadingFile(ctx, cfi.Header, cfi.FileInfo, cfi.Path)
 	if err != nil {
 		return err

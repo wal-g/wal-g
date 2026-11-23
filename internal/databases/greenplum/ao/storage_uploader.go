@@ -17,6 +17,7 @@ import (
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 	"github.com/zeebo/xxh3"
 )
@@ -30,7 +31,8 @@ type StorageUploader struct {
 	bundleFiles   internal.BundleFiles
 	isIncremental bool
 	// minimal age to use the AO/AOCS file deduplication
-	deduplicationMinAge time.Time
+	deduplicationMinAge   time.Time
+	deduplicationAgeLimit time.Duration
 	// unique identifier of the new AO/AOCS segments created by this uploader
 	newAoSegFilesID string
 }
@@ -46,14 +48,15 @@ func NewStorageUploader(uploader internal.Uploader, baseAoFiles BackupFiles,
 	aoSegUploader := internal.NewRegularUploader(nil, uploader.Folder())
 
 	return &StorageUploader{
-		uploader:            aoSegUploader,
-		baseAoFiles:         baseAoFiles,
-		meta:                NewFilesMetadataDTO(),
-		crypter:             crypter,
-		bundleFiles:         files,
-		isIncremental:       isIncremental,
-		deduplicationMinAge: time.Now().Add(-deduplicationAgeLimit),
-		newAoSegFilesID:     newAoSegFilesID,
+		uploader:              aoSegUploader,
+		baseAoFiles:           baseAoFiles,
+		meta:                  NewFilesMetadataDTO(),
+		crypter:               crypter,
+		bundleFiles:           files,
+		isIncremental:         isIncremental,
+		deduplicationAgeLimit: deduplicationAgeLimit,
+		deduplicationMinAge:   time.Now().Add(-deduplicationAgeLimit),
+		newAoSegFilesID:       newAoSegFilesID,
 	}
 }
 
@@ -267,6 +270,7 @@ func (u *StorageUploader) incrementalAoUpload(ctx context.Context,
 }
 
 func (u *StorageUploader) upload(ctx context.Context, reader io.Reader, storageKey string) error {
+	ctx = storage.WithAdditionalRetention(ctx, 24*time.Hour+u.deduplicationAgeLimit)
 	uploadContents := internal.CompressAndEncrypt(ctx, reader, u.uploader.Compression(), u.crypter)
 	uploadPath := path.Join(StoragePath, storageKey)
 	return u.uploader.Upload(ctx, uploadPath, uploadContents)
