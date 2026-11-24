@@ -102,25 +102,25 @@ aocs_output=$(psql -p 6000 -t -c "SELECT count(*) FROM co_to_skip;" -d db -A 2>&
 set -e
 
 if ! echo $heap_output | grep -q "$EXPECTED_HEAP_ERROR_MSG"; then
-  echo "Error: to_skip database directory must be emtpy after partial fetch"
+  echo "Error: to_skip database directory must be empty after partial fetch"
   echo $heap_output
   exit 1
 elif ! echo $ao_output | grep -q "$EXPECTED_AO_ERROR_MSG"; then
-  echo "Error: to_skip database directory must be emtpy after partial fetch"
+  echo "Error: to_skip database directory must be empty after partial fetch"
   echo $ao_output
   exit 1
 elif ! echo $aocs_output | grep -q "$EXPECTED_AO_ERROR_MSG"; then
-  echo "Error: to_skip database directory must be emtpy after partial fetch"
+  echo "Error: to_skip database directory must be empty after partial fetch"
   echo $aocs_output
   exit 1
 fi
 
 if ! psql -p 6000 -t -c "select * from table1;" -d skip1 -A 2>&1 | grep -q "$EXPECTED_HEAP_ERROR_MSG"; then
-  echo "Error: skip1 database directory must be emtpy after partial fetch"
+  echo "Error: skip1 database directory must be empty after partial fetch"
   echo "$(psql -p 6000 -t -c "select * from table1;" -d skip1 -A)"
   exit 1
 elif ! psql -p 6000 -t -c "select * from table1;" -d skip2 -A 2>&1 | grep "$EXPECTED_HEAP_ERROR_MSG"; then
-  echo "Error: skip2 database directory must be emtpy after partial fetch"
+  echo "Error: skip2 database directory must be empty after partial fetch"
   echo "$(psql -p 6000 -t -c "select * from table1;" -d skip2 -A)"
   exit 1
 fi
