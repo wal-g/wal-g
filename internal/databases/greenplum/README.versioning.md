@@ -19,7 +19,7 @@ S3_RETENTION_PERIOD: 604800  # seconds
 | Shared AO data in `aosegments/` | `S3_RETENTION_PERIOD` + 1 day + `WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT` |
 | Shared PAX data in `paxfiles/` | `S3_RETENTION_PERIOD` + 1 day + `WALG_GP_PAXFILE_DEDUPLICATION_AGE_LIMIT` |
 | Cluster-level `ao_files_metadata.json` and `pax_files_metadata.json` (shared-size accounting) | `S3_RETENTION_PERIOD` |
-| Cluster and segment WAL-size journals (`basebackups_005/journal_<backup>`) | `S3_RETENTION_PERIOD` |
+| Cluster and segment WAL-size journals (`basebackups_005/journal_<backup>`) | No explicit WAL-G retention |
 
 These periods apply when WAL-G uploads a new version with explicit compliance retention.
 For size accounting and segment manifests, see [shared size objects](README.journal.md#shared-size).

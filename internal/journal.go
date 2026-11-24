@@ -112,7 +112,7 @@ func (ji *JournalInfo) Upload(ctx context.Context, folder storage.Folder) error 
 		return err
 	}
 
-	return folder.PutObject(ctx, ji.JournalName, bytes.NewBuffer(rawJournalInfo))
+	return folder.PutObject(storage.WithoutRetention(ctx), ji.JournalName, bytes.NewBuffer(rawJournalInfo))
 }
 
 // GetNext retrieves the JournalInfo that is immediately older/newer than the current one from S3
