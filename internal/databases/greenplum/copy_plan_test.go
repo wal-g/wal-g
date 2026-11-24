@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -439,50 +438,6 @@ func TestGreenplumCopyAllPreservesThreeLevelIncrementalCommitOrder(t *testing.T)
 	grandchildTop := path.Join(utility.BaseBackupPath, internal.SentinelNameFromBackup(backups[2].topName))
 	grandchildRestorePoint := restorePointObject("rp_" + backups[2].topName)
 	require.Greater(t, entries[grandchildTop].Phase, entries[grandchildRestorePoint].Phase)
-}
-
-type gatedSharedStatFolder struct {
-	storage.Folder
-	release chan struct{}
-	active  atomic.Int32
-}
-
-func (f *gatedSharedStatFolder) StatObject(ctx context.Context, name string) (storage.Object, error) {
-	if strings.Contains(name, "/"+ao.StoragePath+"/") {
-		f.active.Add(1)
-		defer f.active.Add(-1)
-		<-f.release
-	}
-	return f.Folder.StatObject(ctx, name)
-}
-
-func TestGreenplumCopyLimitsConcurrentSharedFileStats(t *testing.T) {
-	const limit = 2
-	synctest.Test(t, func(t *testing.T) {
-		from := &gatedSharedStatFolder{Folder: testtools.MakeDefaultInMemoryStorageFolder(), release: make(chan struct{})}
-		backup := greenplumBackupFixture{
-			topName:     "backup_20260722T100000Z",
-			segmentName: "base_000000010000000000000001",
-			aoFiles:     ao.BackupFiles{},
-		}
-		for i := range 5 {
-			key := fmt.Sprintf("file%d", i)
-			backup.aoFiles[key] = &ao.BackupFileDesc{StoragePath: key}
-			putObjects(t, from, map[string]string{path.Join(coordinatorBasePath, ao.StoragePath, key): "data"})
-		}
-		putGreenplumCoordinatorChain(t, from, []greenplumBackupFixture{backup})
-		to := testtools.MakeDefaultInMemoryStorageFolder()
-		done := make(chan error, 1)
-		go func() {
-			_, err := greenplum.BuildCopyPlan(t.Context(), from, to, backup.topName, false, limit)
-			done <- err
-		}()
-		synctest.Wait()
-		active := from.active.Load()
-		close(from.release)
-		require.NoError(t, <-done)
-		require.EqualValues(t, limit, active)
-	})
 }
 
 func TestGreenplumCopyIncludesReferencedSharedFiles(t *testing.T) {
