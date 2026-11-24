@@ -1,5 +1,5 @@
 #!/bin/sh
-# Differences between PostgreSQL 10 and 18, kept in one place instead of in 20+
+# Differences between PostgreSQL 10 and 19, kept in one place instead of in 20+
 # tests. POSIX sh only: the tests run under dash.
 # NOTE: do not move this file to scripts/scripts/ - that directory is copied
 # into the Greenplum and Cloudberry images, which are PG 9.4.

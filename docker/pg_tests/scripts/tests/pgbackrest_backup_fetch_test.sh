@@ -3,6 +3,11 @@ set -e -x
 
 . /tmp/tests/test_functions/pg_compat.sh
 
+# pgBackRest 2.60.1 and older know only the 19beta catalog and refuse a 19.0
+# cluster. Remove this once PGBACKREST_VERSION is a release with the final one
+# (pgbackrest/pgbackrest@228203e).
+skip_pg 19
+
 PGBACKREST_CONFIG="/tmp/configs/pgbackrest_backup_fetch_config.ini"
 
 . /tmp/tests/test_functions/prepare_config.sh
