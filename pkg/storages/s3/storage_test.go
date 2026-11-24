@@ -238,3 +238,20 @@ func TestAdditionalRetention(t *testing.T) {
 		})
 	}
 }
+
+func TestUploadWithoutRetention(t *testing.T) {
+	for _, mode := range []string{"GOVERNANCE", "COMPLIANCE"} {
+		t.Run(mode, func(t *testing.T) {
+			uploader := NewUploader(nil, "", "", "", "", mode, 604800)
+			ctx := storage.WithAdditionalRetention(t.Context(), 24*time.Hour)
+			input := uploader.createUploadInput(storage.WithoutRetention(ctx), "bucket", "sentinel", strings.NewReader("{}"))
+			require.Empty(t, input.ObjectLockMode)
+			require.Nil(t, input.ObjectLockRetainUntilDate)
+
+			// The override must not change the shared uploader or caller's context.
+			input = uploader.createUploadInput(ctx, "bucket", "binlog", strings.NewReader("data"))
+			require.Equal(t, mode, string(input.ObjectLockMode))
+			require.NotNil(t, input.ObjectLockRetainUntilDate)
+		})
+	}
+}

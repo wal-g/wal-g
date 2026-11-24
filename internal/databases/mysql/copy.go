@@ -119,7 +119,7 @@ func addMySQLHistoriesToPlan(
 		}
 	}
 	if hasBinlogSentinel {
-		plan.AddInline(BinlogSentinelPath, binlogSentinelSnapshot, copy.RecoveryMetadataPhase, true)
+		plan.AddInlineWithoutRetention(BinlogSentinelPath, binlogSentinelSnapshot, copy.RecoveryMetadataPhase, true)
 	}
 	return nil
 }

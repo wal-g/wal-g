@@ -60,7 +60,7 @@ func UploadBinlogSentinel(ctx context.Context, folder storage.Folder, sentinelDt
 		return internal.NewSentinelMarshallingError(sentinelName, err)
 	}
 
-	return folder.PutObject(ctx, sentinelName, bytes.NewReader(dtoBody))
+	return folder.PutObject(storage.WithoutRetention(ctx), sentinelName, bytes.NewReader(dtoBody))
 }
 
 func GetBinlogPreviousGTIDs(filename string, flavor string) (mysql.GTIDSet, error) {

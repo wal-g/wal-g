@@ -82,7 +82,7 @@ func NewUploader(uploaderAPI UploaderAPI, serverSideEncryption, sseCustomerKey, 
 }
 
 func (uploader *Uploader) objectLock(ctx context.Context) (types.ObjectLockMode, *time.Time) {
-	if uploader.RetentionPeriod == defaultDisabledRetentionPeriod {
+	if storage.SkipRetentionFromContext(ctx) || uploader.RetentionPeriod == defaultDisabledRetentionPeriod {
 		return "", nil
 	}
 	until := time.Now().Add(time.Second * uploader.RetentionPeriod)
