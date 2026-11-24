@@ -44,10 +44,10 @@ func HandleCopyWithHistory(
 	tracelog.ErrorLogger.FatalOnError(err)
 	to, toConfig, err := internal.StorageAndConfigFromFile(ctx, toConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
-	plan, err := buildCopyPlanWaiting(
-		ctx, from.RootFolder(), to.RootFolder(), backupName, withHistory, walWaitTimeout, sleepContext)
-	tracelog.ErrorLogger.FatalOnError(err)
 	options, err := copy.OptionsFromConfigs(fromConfig, toConfig)
+	tracelog.ErrorLogger.FatalOnError(err)
+	plan, err := buildCopyPlanWaiting(
+		ctx, from.RootFolder(), to.RootFolder(), backupName, withHistory, options.Concurrency, walWaitTimeout, sleepContext)
 	tracelog.ErrorLogger.FatalOnError(err)
 	options.SkipErrorsFor, err = copy.DisasterCopyPattern(fromConfig, toConfig)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -68,13 +68,14 @@ func buildCopyPlanWaiting(
 	from, to storage.Folder,
 	backupName string,
 	withHistory bool,
+	copyConcurrency int,
 	timeout time.Duration,
 	sleep func(context.Context, time.Duration) error,
 ) (*copy.Plan, error) {
 	deadline := time.Now().Add(timeout)
 	delay := copyWaitInitialDelay
 	for {
-		plan, err := BuildCopyPlan(ctx, from, to, backupName, withHistory)
+		plan, err := BuildCopyPlan(ctx, from, to, backupName, withHistory, copyConcurrency)
 		var notPublished notPublishedError
 		if !errors.As(err, &notPublished) {
 			return plan, err
@@ -107,6 +108,8 @@ func sleepContext(ctx context.Context, delay time.Duration) error {
 }
 
 type greenplumCopyState struct {
+	copyConcurrency int
+
 	backupState    map[string]uint8
 	backupDepths   map[string]int
 	segmentState   map[string]uint8
@@ -127,8 +130,12 @@ func (index walFolderIndex) has(walName string) bool {
 	return ok
 }
 
-func newGreenplumCopyState(ctx context.Context, plan *copy.Plan, withHistory bool) (*greenplumCopyState, error) {
+func newGreenplumCopyState(
+	ctx context.Context, plan *copy.Plan, withHistory bool, copyConcurrency int,
+) (*greenplumCopyState, error) {
 	state := &greenplumCopyState{
+		copyConcurrency: copyConcurrency,
+
 		backupState:    make(map[string]uint8),
 		backupDepths:   make(map[string]int),
 		segmentState:   make(map[string]uint8),
@@ -220,6 +227,7 @@ func BuildCopyPlan(
 	from, to storage.Folder,
 	backupName string,
 	withHistory bool,
+	copyConcurrency int,
 ) (*copy.Plan, error) {
 	plan := copy.NewScopedPlan(from, to)
 	names, err := plan.ResolveBackupNames(ctx, backupName)
@@ -227,7 +235,7 @@ func BuildCopyPlan(
 		return nil, err
 	}
 
-	state, err := newGreenplumCopyState(ctx, plan, withHistory)
+	state, err := newGreenplumCopyState(ctx, plan, withHistory, copyConcurrency)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +388,7 @@ func addGreenplumSegmentChain(
 	if err := plan.AddBackupAt(basePath, name, name); err != nil {
 		return 0, err
 	}
-	if err := addGreenplumSegmentSharedFiles(ctx, plan, basePath, backup); err != nil {
+	if err := addGreenplumSegmentSharedFiles(ctx, plan, basePath, backup, state.copyConcurrency); err != nil {
 		return 0, fmt.Errorf("plan shared files for Greenplum segment %d backup %q: %w", contentID, name, err)
 	}
 	targetSentinel := path.Join(basePath, internal.SentinelNameFromBackup(name))
@@ -398,6 +406,7 @@ func addGreenplumSegmentSharedFiles(
 	plan *copy.Plan,
 	basePath string,
 	backup internal.Backup,
+	copyConcurrency int,
 ) error {
 	baseBackupsFolder := plan.From.GetSubFolder(basePath)
 	backupTime := internal.BackupTime{BackupName: backup.Name, StorageName: backup.GetStorageName()}
@@ -421,11 +430,12 @@ func addGreenplumSegmentSharedFiles(
 		if err != nil {
 			return fmt.Errorf("read %s files metadata: %w", shared.storagePath, err)
 		}
+		paths := make([]string, 0, len(files))
 		for storagePath := range files {
-			name := path.Join(basePath, shared.storagePath, storagePath)
-			if err := plan.AddSourceObject(ctx, name, name, copy.PayloadPhase, false); err != nil {
-				return err
-			}
+			paths = append(paths, path.Join(basePath, shared.storagePath, storagePath))
+		}
+		if err := plan.AddSourceObjects(ctx, paths, paths, copy.PayloadPhase, false, copyConcurrency); err != nil {
+			return err
 		}
 	}
 	return nil

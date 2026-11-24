@@ -120,7 +120,7 @@ func TestSelectedGreenplumCopyDoesNotScanStorageRoot(t *testing.T) {
 	guard := guardListings(from, func(prefix string) bool {
 		return prefix == selected || strings.HasPrefix(prefix, selected+"/") || prefix == wal
 	})
-	plan, err := greenplum.BuildCopyPlan(t.Context(), guard, to, backup, false)
+	plan, err := greenplum.BuildCopyPlan(t.Context(), guard, to, backup, false, 2)
 	require.NoError(t, err)
 	var shared bool
 	for _, entry := range plan.Entries() {
