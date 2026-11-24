@@ -47,7 +47,7 @@ func (f *mariadbGtidFilter) isValid() bool {
 // 1. Extract GTIDs from the NEXT binlog (MARIADB_GTID_LIST_EVENT)
 // 2. This represents the end-state checkpoint of the CURRENT binlog
 // 3. If archived checkpoint already contains this end-state → skip (already uploaded)
-// 4. Otherwise → upload and update archived checkpoint
+// 4. Otherwise → upload; checkpoint updates happen after each upload
 //
 // Why check the NEXT binlog?
 //   - Each binlog starts with MARIADB_GTID_LIST_EVENT containing all GTIDs
@@ -86,43 +86,22 @@ func (f *mariadbGtidFilter) shouldUpload(binlog, nextBinlog string) bool {
 
 	// First run - no archived checkpoint yet
 	if f.gtidArchived == nil || f.gtidArchived.String() == "" {
-		tracelog.DebugLogger.Printf("First binlog - initializing archived checkpoint. (mariadb gtid check)\n")
-		cloned, ok := nextPreviousGTIDs.Clone().(*mysql.MariadbGTIDSet)
-		if !ok || cloned == nil {
-			tracelog.InfoLogger.Printf(
-				"Cannot clone GTID set for binlog %s. Upload to be safe. (mariadb gtid check)\n", binlog)
-			return true
-		}
-		f.gtidArchived = cloned
+		tracelog.DebugLogger.Printf("No archived checkpoint; upload binlog. (mariadb gtid check)\n")
 		return true
 	}
+
+	metadata := &BinlogMetadata{NextPreviousGTIDs: nextPreviousGTIDs}
+	binlogGTIDs := metadata.GTIDs(f.flavor)
 
 	// Check if archived checkpoint already covers this binlog's end-state
 	// If gtidArchived.Contain(endState) → we already uploaded a binlog that reached this state
-	if f.gtidArchived.Contain(nextPreviousGTIDs) {
+	if f.gtidArchived.Contain(binlogGTIDs) {
 		tracelog.InfoLogger.Printf("Binlog %s end-state %s already covered by archived checkpoint %s. Skip. (mariadb gtid check)\n",
-			binlog, nextPreviousGTIDs.String(), f.gtidArchived.String())
+			binlog, binlogGTIDs.String(), f.gtidArchived.String())
 		return false
 	}
 
-	// New checkpoint - update archived state
-	// Merge the new checkpoint into our archived set
-	err = f.gtidArchived.Update(nextPreviousGTIDs.String())
-	if err != nil {
-		tracelog.WarningLogger.Printf("Cannot update archived checkpoint with %s: %v. Upload %s to be safe. (mariadb gtid check)\n",
-			nextPreviousGTIDs.String(), err, binlog)
-		return true
-	}
-
 	tracelog.InfoLogger.Printf("Should upload binlog %s with end-state checkpoint: %s (mariadb gtid check)\n",
-		binlog, nextPreviousGTIDs.String())
+		binlog, binlogGTIDs.String())
 	return true
-}
-
-// getArchivedGTIDString returns the string representation of the archived GTID checkpoint for MariaDB
-func (f *mariadbGtidFilter) getArchivedGTIDString() string {
-	if f.gtidArchived == nil {
-		return ""
-	}
-	return f.gtidArchived.String()
 }

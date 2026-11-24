@@ -67,7 +67,7 @@ if [ "$binlogs_cnt1" -ne "$binlogs_cnt2" ]; then
 fi
 
 echo "Revert GTIDs in cache, so all binlogs should be uploaded"
-echo "${current_sentinel}}" | s3cmd put - "${WALE_S3_PREFIX}/binlog_sentinel_005.json"
+echo "${current_sentinel}" | s3cmd put - "${WALE_S3_PREFIX}/binlog_sentinel_005.json"
 rm -f "$HOME/.walg_mysql_binlogs_cache"
 wal-g binlog-push
 binlogs_cnt3=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
