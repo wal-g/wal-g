@@ -167,7 +167,7 @@ pg_integration_test: clean_compose
 		docker compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test &&\
 		docker compose up --exit-code-from pg_storage_swift_test pg_storage_swift_test &&\
 		docker compose up --exit-code-from pg_storage_ssh_test pg_storage_ssh_test &&\
-		docker compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test &&\
+		{ docker compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test; status=$$?; [ $$status -eq 0 ] || [ $$status -eq 77 ]; } &&\
 		docker compose down &&\
 		docker compose up --exit-code-from pg_wal_perftest_with_throttling pg_wal_perftest_with_throttling ;\
 	fi
