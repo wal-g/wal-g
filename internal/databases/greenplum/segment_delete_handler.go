@@ -261,11 +261,11 @@ func getPermanentBackupsAndWalsChecked(ctx context.Context, root storage.Folder,
 		if err != nil {
 			return nil, nil, err
 		}
-		for name, b := range seg.backups {
-			if !b.Permanent {
+		for name := range seg.backups {
+			if !seg.backups[name].Permanent {
 				continue
 			}
-			data := b.Metadata.(postgres.DeletionBackupMetadata)
+			data := seg.backups[name].Metadata.(postgres.DeletionBackupMetadata)
 			if !associated[name] || !data.LogsKnown {
 				return nil, nil, fmt.Errorf("unknown restore point for permanent segment backup %s", name)
 			}

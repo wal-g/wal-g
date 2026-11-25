@@ -62,12 +62,7 @@ func (folder *Folder) ListFolder(_ context.Context) (objects []storage.Object, s
 			continue // Do not list objects that have not been written yet, like S3.
 		}
 
-		object := storage.NewLocalObject(
-			fileInfo.Name(),
-			fileInfo.ModTime(),
-			fileInfo.Size(),
-		)
-		objects = append(objects, object)
+		objects = append(objects, storage.NewLocalObjectFromInfo(fileInfo))
 	}
 
 	return objects, subFolders, err
@@ -165,8 +160,11 @@ func (folder *Folder) ReadObject(_ context.Context, objectRelativePath string) (
 
 	objPath := path.Join(folder.path, objectRelativePath)
 	file, err := client.Open(objPath)
-	if err != nil {
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, storage.NewObjectNotFoundError(objPath)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("open SFTP object %q: %w", objPath, err)
 	}
 
 	return struct {

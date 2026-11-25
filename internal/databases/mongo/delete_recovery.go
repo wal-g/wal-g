@@ -16,7 +16,7 @@ import (
 func PlanRecoveryDeletion(ctx context.Context, root storage.Folder, destination string,
 	names []string, logs bool) (*internal.DeletionPlan, error) {
 	p, err := internal.NewDeletionPlan(ctx, root, destination, names, false, func(name string) bool {
-		return strings.HasPrefix(name, "stream_") || strings.HasPrefix(name, "binary_") || strings.HasPrefix(name, "base_")
+		return logs && (strings.HasPrefix(name, "stream_") || strings.HasPrefix(name, "binary_") || strings.HasPrefix(name, "base_"))
 	}, func(ctx context.Context, root storage.Folder, name string) (internal.DeletionBackup, error) {
 		var s models.Backup
 		doc, err := internal.ReadDeletionMetadata(ctx, root.GetSubFolder(utility.BaseBackupPath), name+utility.SentinelSuffix, &s)
@@ -45,7 +45,9 @@ func planRecoveryOplogs(ctx context.Context, p *internal.DeletionPlan) error {
 	var cutoff models.Timestamp
 	var backups []*models.Backup
 	hasCutoff := false
-	for _, b := range p.Retained() {
+	retained := p.Retained()
+	for i := range retained {
+		b := &retained[i]
 		s, ok := b.Metadata.(models.Backup)
 		if !ok || b.Problem != nil || !b.ProtectionKnown || s.MongoMeta.Before.LastMajTS == (models.Timestamp{}) ||
 			models.LessTS(s.MongoMeta.After.LastMajTS, s.MongoMeta.Before.LastMajTS) {

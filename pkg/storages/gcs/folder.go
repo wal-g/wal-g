@@ -41,6 +41,8 @@ type Folder struct {
 	config        *Config
 }
 
+func (*Folder) HasCaseSensitiveKeys() bool { return true }
+
 func (folder *Folder) GetPath() string {
 	return folder.path
 }

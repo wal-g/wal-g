@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -32,7 +34,8 @@ type RecoveryOptions struct {
 }
 
 func (o *RecoveryOptions) AddFlagsWithoutLogs(cmd *cobra.Command) {
-	cmd.Flags().BoolVar(&o.AllowBroken, AllowBrokenFlag, false, "Delete explicitly named damaged backups during a maintenance window")
+	cmd.Flags().BoolVar(&o.AllowBroken, AllowBrokenFlag, false,
+		"Delete named backups and known dependents during a maintenance window. Backups with unreadable ancestry may depend on the targets")
 	cmd.Flags().StringVar(&o.TargetStorage, "target-storage", "", "Recovery destination; required when several storages are configured")
 }
 
@@ -107,8 +110,10 @@ func RunRecoveryDeletion(ctx context.Context, options RecoveryOptions, names []s
 }
 
 type DeletionMetadata struct {
-	Fields  map[string]json.RawMessage
-	Problem error
+	Fields         map[string]json.RawMessage
+	Problem        error
+	CanRewrite     bool
+	dependencyRefs []string
 }
 
 type UnavailableDeletionMetadataError struct {
@@ -121,7 +126,8 @@ func (e *UnavailableDeletionMetadataError) Error() string {
 }
 func (e *UnavailableDeletionMetadataError) Unwrap() error { return e.Err }
 
-func ReadDeletionMetadata(ctx context.Context, folder storage.Folder, key string, dto interface{}) (DeletionMetadata, error) {
+func ReadDeletionMetadata(ctx context.Context, folder storage.Folder, key string, dto any,
+	dependencyFields ...string) (DeletionMetadata, error) {
 	if err := ctx.Err(); err != nil {
 		return DeletionMetadata{}, err
 	}
@@ -148,21 +154,36 @@ func ReadDeletionMetadata(ctx context.Context, folder storage.Folder, key string
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return DeletionMetadata{}, err
 		}
-		return DeletionMetadata{Problem: &UnavailableDeletionMetadataError{key, err}}, nil
+		return DeletionMetadata{Problem: &UnavailableDeletionMetadataError{key, err},
+			dependencyRefs: partialDependencyRefs(data, dependencyFields)}, nil
 	}
+	return decodeDeletionMetadata(data, key, dto, dependencyFields), nil
+}
+
+func decodeDeletionMetadata(data []byte, key string, dto any, dependencyFields []string) DeletionMetadata {
 	var result DeletionMetadata
 	if err := jsonv2.Unmarshal(data, &result.Fields); err != nil {
 		result.Problem = fmt.Errorf("invalid %s: %w", key, err)
-		return result, nil
+		if dto != nil && json.Valid(data) {
+			_ = json.Unmarshal(data, dto)
+		}
+		result.dependencyRefs = partialDependencyRefs(data, dependencyFields)
+		return result
 	}
 	if len(result.Fields) == 0 {
 		result.Problem = fmt.Errorf("empty metadata %s", key)
-	} else if dto != nil {
+		return result
+	}
+	result.CanRewrite = true
+	if dto != nil {
 		if err := json.Unmarshal(data, dto); err != nil {
 			result.Problem = fmt.Errorf("invalid %s: %w", key, err)
 		}
 	}
-	return result, nil
+	for _, field := range dependencyFields {
+		result.collectDependencyField(field)
+	}
+	return result
 }
 
 func (m DeletionMetadata) Bool(key string) (value, known bool) {
@@ -179,26 +200,44 @@ func (m DeletionMetadata) Bool(key string) (value, known bool) {
 type DeletionBackup struct {
 	Name, Parent, Base         string
 	DependenciesKnown          bool
+	uncertainReferences        []string
 	Permanent, ProtectionKnown bool
 	Problem                    error
 	FinishTime                 time.Time
 	Metadata                   interface{}
 }
 
+func (b *DeletionBackup) SetDependencyNames(parent, base *string, doc DeletionMetadata) {
+	if b.DependenciesKnown {
+		if parent != nil && base != nil {
+			b.Parent, b.Base = *parent, *base
+		}
+		return
+	}
+	b.uncertainReferences = doc.dependencyRefs
+	for _, ref := range []*string{parent, base} {
+		if ref != nil && !slices.Contains(b.uncertainReferences, *ref) {
+			b.uncertainReferences = append(b.uncertainReferences, *ref)
+		}
+	}
+}
+
 type DeletionLoader func(context.Context, storage.Folder, string) (DeletionBackup, error)
 
 type DeletionPlan struct {
-	Root        storage.Folder
-	StorageName string
-	Backups     map[string]DeletionBackup
-	Selected    map[string]bool
-	Unresolved  []string
-	Details     []string
-	Stages      []*DeletionStage
-	Before      []func(context.Context) error
-	Updates     []func(context.Context) error
-	Finalizers  []func(context.Context) error
-	Results     []*DeletionResult
+	Root              storage.Folder
+	StorageName       string
+	Backups           map[string]DeletionBackup
+	Selected          map[string]bool
+	Warnings          []string
+	Unresolved        []string
+	Details           []string
+	Stages            []*DeletionStage
+	Before            []func(context.Context) error
+	Updates           []func(context.Context) error
+	Finalizers        []func(context.Context) error
+	Results           []*DeletionResult
+	uncheckedPrefixes []storage.Folder
 }
 
 type DeletionResult struct {
@@ -212,6 +251,8 @@ func (p *DeletionPlan) Absorb(child *DeletionPlan) {
 	p.Finalizers = append(p.Finalizers, child.Finalizers...)
 	p.Unresolved = append(p.Unresolved, child.Unresolved...)
 	p.Details = append(p.Details, child.Details...)
+	p.Warnings = append(p.Warnings, child.Warnings...)
+	child.Warnings = nil
 	p.Results = append(p.Results, child.Results...)
 	child.Results = nil
 	child.Before, child.Finalizers = nil, nil
@@ -234,7 +275,7 @@ type deletionObject struct {
 }
 
 func NewDeletionPlan(ctx context.Context, root storage.Folder, storageName string, names []string,
-	incremental bool, isBackupName func(string) bool, load DeletionLoader, additionalCatalogNames ...string) (*DeletionPlan, error) {
+	incremental bool, inspectUnpublished func(string) bool, load DeletionLoader, additionalCatalogNames ...string) (*DeletionPlan, error) {
 	if err := multistorage.EnsureSingleStorageIsUsed(root); err != nil {
 		return nil, err
 	}
@@ -248,7 +289,7 @@ func NewDeletionPlan(ctx context.Context, root storage.Folder, storageName strin
 	if len(p.Selected) == 0 {
 		return nil, fmt.Errorf("no explicit recovery targets")
 	}
-	if err := p.discoverBackups(ctx, isBackupName, load, additionalCatalogNames); err != nil {
+	if err := p.discoverBackups(ctx, inspectUnpublished, load, additionalCatalogNames); err != nil {
 		return nil, err
 	}
 	if incremental {
@@ -264,38 +305,101 @@ func NewDeletionPlan(ctx context.Context, root storage.Folder, storageName strin
 	return p, nil
 }
 
-func (p *DeletionPlan) discoverBackups(ctx context.Context, isBackupName func(string) bool, load DeletionLoader,
+func addRecoverySentinels(catalog map[string]bool, objects []storage.Object, checkAliases bool) error {
+	for _, object := range objects {
+		key := strings.TrimLeft(object.GetName(), "/")
+		if object.GetAdditionalInfo() == storage.SymlinkInfo {
+			return fmt.Errorf("cannot establish backup ownership through symbolic link %q", key)
+		}
+		if strings.HasSuffix(key, utility.SentinelSuffix) {
+			catalog[strings.TrimSuffix(key, utility.SentinelSuffix)] = true
+		} else if checkAliases && strings.HasSuffix(strings.ToLower(key), utility.SentinelSuffix) {
+			return fmt.Errorf("noncanonical sentinel suffix in %q", key)
+		}
+	}
+	return nil
+}
+
+type recoveryNameSpellings map[string]string
+
+func (s recoveryNameSpellings) add(names ...string) error {
+	for _, name := range names {
+		folded := strings.ToLower(name)
+		if other, ok := s[folded]; ok && other != name {
+			return fmt.Errorf("ambiguous backup names %q and %q", other, name)
+		}
+		s[folded] = name
+	}
+	return nil
+}
+
+func (s recoveryNameSpellings) checkPrefixes(ctx context.Context, folders []storage.Folder) error {
+	for _, folder := range folders {
+		name := path.Base(folder.GetPath())
+		other, relevant := s[strings.ToLower(name)]
+		if !relevant || other == name {
+			continue
+		}
+		hasPayload, err := recoveryPrefixHasPayload(ctx, folder)
+		if err != nil {
+			return err
+		}
+		if hasPayload {
+			return s.add(name)
+		}
+	}
+	return nil
+}
+
+var errRecoveryPayloadFound = errors.New("backup payload found")
+
+func recoveryPrefixHasPayload(ctx context.Context, folder storage.Folder) (bool, error) {
+	err := storage.WalkObjects(ctx, storage.WithAllVersions(folder), func(storage.Object) error { return errRecoveryPayloadFound })
+	if errors.Is(err, errRecoveryPayloadFound) {
+		return true, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("inspect backup prefix %s: %w", folder.GetPath(), err)
+	}
+	return false, nil
+}
+
+func (p *DeletionPlan) discoverBackups(ctx context.Context, inspectUnpublished func(string) bool, load DeletionLoader,
 	additionalCatalogNames []string) error {
-	base := p.Root.GetSubFolder(utility.BaseBackupPath)
-	objects, folders, err := base.ListFolder(ctx)
+	objects, folders, err := p.Root.GetSubFolder(utility.BaseBackupPath).ListFolder(ctx)
 	if err != nil {
 		return err
 	}
-	catalog := map[string]bool{}
+	catalog := maps.Clone(p.Selected)
 	for _, name := range additionalCatalogNames {
 		catalog[name] = true
 	}
-	for name := range p.Selected {
-		catalog[name] = true
-	}
-	for _, object := range objects {
-		key := strings.TrimLeft(object.GetName(), "/")
-		if strings.HasSuffix(key, utility.SentinelSuffix) {
-			catalog[strings.TrimSuffix(key, utility.SentinelSuffix)] = true
-		}
+	checkAliases := !storage.HasCaseSensitiveKeys(p.Root)
+	if err := addRecoverySentinels(catalog, objects, checkAliases); err != nil {
+		return err
 	}
 	for _, folder := range folders {
-		name := path.Base(strings.TrimSuffix(folder.GetPath(), "/"))
-		if isBackupName(name) && !catalog[name] {
-			found := errors.New("backup payload found")
-			err := storage.WalkObjects(ctx, storage.WithAllVersions(folder), func(storage.Object) error { return found })
-			if errors.Is(err, found) {
-				catalog[name] = true
-			} else if err != nil {
-				return fmt.Errorf("inspect backup prefix %s: %w", name, err)
-			}
+		name := path.Base(folder.GetPath())
+		if catalog[name] {
+			continue
+		}
+		if inspectUnpublished == nil || !inspectUnpublished(name) {
+			p.uncheckedPrefixes = append(p.uncheckedPrefixes, folder)
+			continue
+		}
+		hasPayload, err := recoveryPrefixHasPayload(ctx, folder)
+		if err != nil {
+			return err
+		}
+		if hasPayload {
+			catalog[name] = true
 		}
 	}
+	return p.loadRecoveryCatalog(ctx, catalog, load, checkAliases)
+}
+
+func (p *DeletionPlan) loadRecoveryCatalog(ctx context.Context, catalog map[string]bool, load DeletionLoader, checkAliases bool) error {
+	spellings := recoveryNameSpellings{}
 	for _, name := range sortedDeletionNames(catalog) {
 		if err := ValidateRecoveryName(name); err != nil {
 			return err
@@ -305,31 +409,100 @@ func (p *DeletionPlan) discoverBackups(ctx context.Context, isBackupName func(st
 			return fmt.Errorf("inspect backup %s: %w", name, err)
 		}
 		b.Name = name
-		p.Backups[name] = b
-	}
-	return nil
-}
-func (p *DeletionPlan) selectDependents() error {
-	for changed := true; changed; {
-		changed = false
-		for name, b := range p.Backups {
-			if !p.Selected[name] && (p.Selected[b.Parent] || p.Selected[b.Base]) {
-				p.Selected[name], changed = true, true
+		if checkAliases {
+			refs := append([]string{name, b.Parent, b.Base}, b.uncertainReferences...)
+			if err := spellings.add(refs...); err != nil {
+				return err
 			}
 		}
+		p.Backups[name] = b
 	}
-	for name, b := range p.Backups {
-		if !p.Selected[name] && !b.DependenciesKnown {
-			return fmt.Errorf("cannot establish dependencies of retained backup %s: %v", name, b.Problem)
-		}
-	}
-	if err := p.validateGraph(); err != nil {
-		return err
+	if checkAliases {
+		return spellings.checkPrefixes(ctx, p.uncheckedPrefixes)
 	}
 	return nil
 }
 
-func (p *DeletionPlan) validateGraph() error {
+func (p *DeletionPlan) selectDependents() error {
+	children := map[string][]string{}
+	roots := map[string]string{}
+	for name := range p.Backups {
+		b := p.Backups[name]
+		if !b.DependenciesKnown {
+			continue
+		}
+		root := name
+		if b.Parent != "" {
+			root = b.Base
+			children[b.Parent] = append(children[b.Parent], name)
+			if b.Base != b.Parent {
+				children[b.Base] = append(children[b.Base], name)
+			}
+		}
+		for _, member := range []string{name, b.Parent, root} {
+			if member == "" {
+				continue
+			}
+			if other, ok := roots[member]; ok && other != root {
+				return fmt.Errorf("conflicting full backups for %s: %s and %s", member, other, root)
+			}
+			roots[member] = root
+		}
+	}
+	queue := p.TargetNames()
+	for len(queue) > 0 {
+		name := queue[0]
+		queue = queue[1:]
+		for _, child := range children[name] {
+			if !p.Selected[child] {
+				p.Selected[child] = true
+				queue = append(queue, child)
+			}
+		}
+	}
+	return p.validateSelection(roots)
+}
+
+func (p *DeletionPlan) validateSelection(roots map[string]string) error {
+	for name := range p.Selected {
+		if slices.Contains(p.Backups[name].uncertainReferences, name) {
+			return fmt.Errorf("self dependency in %s", name)
+		}
+	}
+	retained := p.Retained()
+	for i := range retained {
+		b := &retained[i]
+		if root := roots[b.Name]; !b.DependenciesKnown && p.Selected[root] {
+			return fmt.Errorf("child metadata identifies deletion target %s as the full backup of retained backup %s", root, b.Name)
+		}
+		for _, ref := range b.uncertainReferences {
+			if err := ValidateRecoveryName(ref); err != nil {
+				return fmt.Errorf("retained backup %s has an ambiguous dependency: %w", b.Name, err)
+			}
+			if p.Selected[ref] {
+				return fmt.Errorf("retained backup %s has incomplete dependency metadata referring to deletion target %s", b.Name, ref)
+			}
+		}
+		if err := p.CheckRetainedAncestry(*b); err != nil {
+			p.Warnings = append(p.Warnings, err.Error())
+		}
+	}
+	return p.validateGraph(false)
+}
+
+func (p *DeletionPlan) CheckRetainedAncestry(b DeletionBackup) error {
+	if !b.DependenciesKnown {
+		return errors.Join(fmt.Errorf("retaining %s with unknown ancestry", b.Name), b.Problem)
+	}
+	for _, ref := range []string{b.Parent, b.Base} {
+		if _, exists := p.Backups[ref]; ref != "" && !exists {
+			return fmt.Errorf("unknown ancestor %s of retained backup %s", ref, b.Name)
+		}
+	}
+	return nil
+}
+
+func (p *DeletionPlan) validateGraph(requireAncestors bool) error {
 	colors := map[string]int{}
 	var visit func(string) error
 	visit = func(name string) error {
@@ -352,7 +525,7 @@ func (p *DeletionPlan) validateGraph() error {
 				if err := visit(b.Parent); err != nil {
 					return err
 				}
-			} else if !p.Selected[name] {
+			} else if requireAncestors {
 				return fmt.Errorf("unknown ancestor %s of retained backup %s", b.Parent, name)
 			}
 		}
@@ -577,6 +750,9 @@ func (p *DeletionPlan) Print() {
 	}
 	for _, stage := range p.Stages {
 		tracelog.InfoLogger.Printf("  %s: %d objects in %s", stage.Label, stage.Count, stage.Folder.GetPath())
+	}
+	for _, warning := range p.Warnings {
+		tracelog.WarningLogger.Println(warning)
 	}
 	for _, reason := range p.Unresolved {
 		tracelog.WarningLogger.Printf("Unresolved: %s", reason)

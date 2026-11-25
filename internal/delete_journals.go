@@ -28,7 +28,7 @@ func PlanDeletionJournals(ctx context.Context, p *DeletionPlan, archivePath stri
 		journals[i].SizeToNextBackup = 0
 		if i > 0 {
 			if journals[i].CurrentBackupEnd.Equal(journals[i-1].CurrentBackupEnd) {
-				p.Defer("journal accounting unchanged: ambiguous survivor order")
+				p.Warnings = append(p.Warnings, "journal accounting unchanged: ambiguous survivor order")
 				return nil
 			}
 			journals[i].PriorBackupEnd = journals[i-1].CurrentBackupEnd
@@ -70,7 +70,7 @@ func loadDeletionJournals(ctx context.Context, p *DeletionPlan, archivePath stri
 		}
 		if !exists || b.Problem != nil || doc.Problem != nil || j.CurrentBackupEnd.IsZero() ||
 			j.PriorBackupEnd.After(j.CurrentBackupEnd) || j.SizeToNextBackup < 0 {
-			p.Defer("journal accounting unchanged: unknown survivor interval for " + backupName)
+			p.Warnings = append(p.Warnings, "journal accounting unchanged: unknown survivor interval for "+backupName)
 			return nil, nil
 		}
 		j.JournalName, j.JournalDirectoryName = name, archivePath

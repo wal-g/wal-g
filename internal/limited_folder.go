@@ -45,6 +45,10 @@ func (lf *LimitedFolder) SupportsCreateObject() bool {
 	return storage.SupportsCreateObject(lf.Folder)
 }
 
+func (lf *LimitedFolder) HasCaseSensitiveKeys() bool {
+	return storage.HasCaseSensitiveKeys(lf.Folder)
+}
+
 func (lf *LimitedFolder) CreateObject(ctx context.Context, name string, content []byte) error {
 	// Reservations are small buffered objects. Account for their bytes before
 	// delegating the indivisible conditional write to the underlying storage.

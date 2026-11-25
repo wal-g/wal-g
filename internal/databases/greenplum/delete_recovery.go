@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -22,14 +23,15 @@ func loadDeletionBackup(ctx context.Context, root storage.Folder, name string) (
 	if err != nil {
 		return internal.DeletionBackup{}, err
 	}
+	if !doc.CanRewrite {
+		s.Segments = nil
+	}
 	b := internal.DeletionBackup{Name: name, Problem: doc.Problem, FinishTime: s.FinishTime, Metadata: s}
 	b.Permanent, b.ProtectionKnown = doc.Bool("is_permanent")
 	incErr := internal.ValidateDeletionIncrement(name, s.IncrementFrom, s.IncrementFullName, s.IncrementCount, false, false)
 	b.Problem = errors.Join(b.Problem, incErr)
 	b.DependenciesKnown = doc.Problem == nil && incErr == nil
-	if b.DependenciesKnown && s.IncrementFrom != nil {
-		b.Parent, b.Base = *s.IncrementFrom, *s.IncrementFullName
-	}
+	b.SetDependencyNames(s.IncrementFrom, s.IncrementFullName, doc)
 	return b, nil
 }
 
@@ -41,6 +43,15 @@ type deletionSegment struct {
 	plan     *internal.DeletionPlan
 }
 
+var recoveryClusterDelta = regexp.MustCompile(`^backup_[0-9]{8}T[0-9]{6}Z_D_([0-9]{8}T[0-9]{6}Z)$`)
+
+func clusterBackupTimestamp(name string) string {
+	if len(name) < BackupNameLength || !strings.HasPrefix(name, BackupNamePrefix) {
+		return ""
+	}
+	return name[len(BackupNamePrefix):BackupNameLength]
+}
+
 func PlanRecoveryDeletion(ctx context.Context, root storage.Folder, destination string,
 	names []string, logs bool) (*internal.DeletionPlan, error) {
 	isBackupName := func(name string) bool { return strings.HasPrefix(name, "backup_") }
@@ -50,6 +61,9 @@ func PlanRecoveryDeletion(ctx context.Context, root storage.Folder, destination 
 	}
 	p, err := internal.NewDeletionPlan(ctx, root, destination, names, true, isBackupName, loadDeletionBackup, pending...)
 	if err != nil {
+		return p, err
+	}
+	if err := p.CheckDeltaParents(ctx, clusterBackupTimestamp, recoveryClusterDelta); err != nil {
 		return p, err
 	}
 	state := greenplumDeletionPlanner{plan: p, segments: map[int]*deletionSegment{},
@@ -120,10 +134,10 @@ func (g *greenplumDeletionPlanner) loadSegment(ctx context.Context, id int) (*de
 }
 
 func (g *greenplumDeletionPlanner) resolveMappings(ctx context.Context) error {
-	for name, b := range g.plan.Backups {
-		s := b.Metadata.(BackupSentinelDto)
+	for name := range g.plan.Backups {
+		s := g.plan.Backups[name].Metadata.(BackupSentinelDto)
 		g.mappings[name] = map[int]string{}
-		if b.Problem != nil || len(s.Segments) == 0 {
+		if len(s.Segments) == 0 {
 			g.plan.Defer("segment mapping unavailable for cluster backup " + name)
 			if !g.plan.Selected[name] {
 				g.retainedMappingsKnown = false
@@ -178,12 +192,14 @@ func (g *greenplumDeletionPlanner) resolveSegment(ctx context.Context, name stri
 
 func (g *greenplumDeletionPlanner) prepareCluster(ctx context.Context) error {
 	var sidecars []string
+	retained := g.plan.Retained()
 	for _, name := range g.plan.TargetNames() {
 		shared := !g.retainedMappingsKnown
-		for _, survivor := range g.plan.Retained() {
-			s := survivor.Metadata.(BackupSentinelDto)
+		for i := range retained {
+			s := retained[i].Metadata.(BackupSentinelDto)
 			if s.RestorePoint != nil && *s.RestorePoint == name {
 				shared = true
+				break
 			}
 		}
 		if !shared {
@@ -223,8 +239,15 @@ func (g *greenplumDeletionPlanner) prepareSegment(ctx context.Context, id int) e
 		return postgres.LoadDeletionBackup(ctx, root, name)
 	}
 	isBackupName := func(name string) bool { return strings.HasPrefix(name, "base_") }
-	sp, err := internal.NewDeletionPlan(ctx, seg.root, g.plan.StorageName, targets, true, isBackupName, loader)
+	var retained []string
+	for name := range seg.retained {
+		retained = append(retained, name)
+	}
+	sp, err := internal.NewDeletionPlan(ctx, seg.root, g.plan.StorageName, targets, true, isBackupName, loader, retained...)
 	if err != nil {
+		return err
+	}
+	if err := postgres.CheckRecoveryDeltaNames(ctx, sp); err != nil {
 		return err
 	}
 	for name := range sp.Selected {
@@ -245,6 +268,16 @@ func (g *greenplumDeletionPlanner) prepareReclamation(ctx context.Context, id in
 		return nil
 	}
 	defer g.plan.Absorb(sp)
+	retained := sp.Retained()
+	for i := range retained {
+		if err := sp.CheckRetainedAncestry(retained[i]); err != nil {
+			sp.Defer(fmt.Sprintf("segment %d shared files retained: %v", id, err))
+			if logs {
+				sp.Defer(fmt.Sprintf("segment %d WALs retained: %v", id, err))
+			}
+			return nil
+		}
+	}
 	if err := planSegmentShared(ctx, sp, ao.StoragePath, ao.FilesMetadataName, ao.KeySuffix); err != nil {
 		return err
 	}
@@ -267,11 +300,9 @@ func resolveDeletionSegment(meta SegmentMetadata, catalog map[string]internal.De
 		if !strings.HasPrefix(meta.BackupName, "base_") {
 			return "", fmt.Errorf("invalid segment backup name %s", meta.BackupName)
 		}
-		if b, exists := catalog[meta.BackupName]; exists {
-			id := segmentDeletionID(b)
-			if id != "" && meta.BackupID != "" && id != meta.BackupID {
-				return "", fmt.Errorf("conflicting segment name/ID for %s", meta.BackupName)
-			}
+		id := segmentDeletionID(catalog[meta.BackupName].Metadata)
+		if id != "" && meta.BackupID != "" && id != meta.BackupID {
+			return "", fmt.Errorf("conflicting segment name/ID for %s", meta.BackupName)
 		}
 		return meta.BackupName, nil
 	}
@@ -279,8 +310,8 @@ func resolveDeletionSegment(meta SegmentMetadata, catalog map[string]internal.De
 		return "", nil
 	}
 	match := ""
-	for name, b := range catalog {
-		if segmentDeletionID(b) == meta.BackupID {
+	for name := range catalog {
+		if segmentDeletionID(catalog[name].Metadata) == meta.BackupID {
 			if match != "" {
 				return "", fmt.Errorf("ambiguous segment backup ID %s", meta.BackupID)
 			}
@@ -290,8 +321,8 @@ func resolveDeletionSegment(meta SegmentMetadata, catalog map[string]internal.De
 	return match, nil
 }
 
-func segmentDeletionID(b internal.DeletionBackup) string {
-	data, ok := b.Metadata.(postgres.DeletionBackupMetadata)
+func segmentDeletionID(metadata any) string {
+	data, ok := metadata.(postgres.DeletionBackupMetadata)
 	if !ok {
 		return ""
 	}
@@ -344,13 +375,15 @@ func planSegmentShared(ctx context.Context, p *internal.DeletionPlan, family, ma
 		return err
 	}
 	defer refs.Close()
-	for _, b := range p.Retained() {
-		problem, err := walkSharedManifest(ctx, base, b.Name+"/"+manifest, refs.Add)
+	retained := p.Retained()
+	for i := range retained {
+		name := retained[i].Name
+		problem, err := walkSharedManifest(ctx, base, name+"/"+manifest, refs.Add)
 		if err != nil {
 			return err
 		}
 		if problem != nil {
-			p.Defer(family + " retained: unknown references for " + b.Name + ": " + problem.Error())
+			p.Defer(family + " retained: unknown references for " + name + ": " + problem.Error())
 			return nil
 		}
 	}

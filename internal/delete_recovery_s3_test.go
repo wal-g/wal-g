@@ -30,6 +30,17 @@ func TestRecoveryS3GET500StillAllowsDeletion(t *testing.T) {
 			var mu sync.Mutex
 			keys := map[string]bool{utility.BaseBackupPath + "B1" + utility.SentinelSuffix: true, utility.BaseBackupPath + "B1/metadata.json": true,
 				utility.BaseBackupPath + "B1/payload": true, utility.BaseBackupPath + "B1/": true, utility.BaseBackupPath + "journal_B1": true, utility.BaseBackupPath + "unrelated/payload": true}
+			expected := map[string]bool{utility.BaseBackupPath + "unrelated/payload": true}
+			if db == "mysql" {
+				for _, name := range []string{"Prod_stream_B", "prod_stream_B"} {
+					for _, suffix := range []string{utility.SentinelSuffix, "/payload"} {
+						keys[utility.BaseBackupPath+name+suffix] = true
+						expected[utility.BaseBackupPath+name+suffix] = true
+					}
+				}
+				key := utility.BaseBackupPath + "B1" + strings.ToUpper(utility.SentinelSuffix)
+				keys[key], expected[key] = true, true
+			}
 			reads, deletes := 0, 0
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				mu.Lock()
@@ -94,7 +105,8 @@ func TestRecoveryS3GET500StillAllowsDeletion(t *testing.T) {
 				o.RetryMaxAttempts = 1
 			})
 			root := walgs3.NewFolder(client, nil, "", &walgs3.Config{Bucket: "test", EnableVersioning: "disabled", DeleteBatchSize: 500})
-			plan, err := build(t.Context(), internal.NewLimitedFolder(root, rate.NewLimiter(rate.Inf, 1)), "default", []string{"B1"}, false)
+			limited := internal.NewLimitedFolder(root, rate.NewLimiter(rate.Inf, 1))
+			plan, err := build(t.Context(), limited, "default", []string{"B1"}, false)
 			require.NoError(t, err)
 			defer plan.Close()
 			_ = plan.Execute(t.Context(), false)
@@ -106,8 +118,16 @@ func TestRecoveryS3GET500StillAllowsDeletion(t *testing.T) {
 				require.NoError(t, err)
 			}
 			require.Positive(t, reads)
-			expected := map[string]bool{utility.BaseBackupPath + "unrelated/payload": true}
 			require.Equal(t, expected, keys)
+			if db == "mysql" {
+				copyPlan, err := build(t.Context(), limited, "default", []string{"Prod_stream_B"}, false)
+				require.NoError(t, err)
+				defer copyPlan.Close()
+				require.NoError(t, copyPlan.Execute(t.Context(), true))
+				delete(expected, utility.BaseBackupPath+"Prod_stream_B"+utility.SentinelSuffix)
+				delete(expected, utility.BaseBackupPath+"Prod_stream_B/payload")
+				require.Equal(t, expected, keys)
+			}
 		})
 	}
 }
