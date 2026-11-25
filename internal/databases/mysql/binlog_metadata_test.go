@@ -9,16 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	testDataBinlogServerUuid = "da187401-e4f3-11f1-9478-92bd74c99a74"
-	binlog1                  = "mysql-bin.000001"
-	binlog2                  = "mysql-bin.000002"
-	binlog3                  = "mysql-bin.000003"
-	binlog4                  = "mysql-bin.000004"
-	binlog5                  = "mysql-bin.000005"
-	binlog6                  = "mysql-bin.000006"
-)
-
 func TestApplyBinlogMetadata(t *testing.T) {
 	var anotherServerUuid = "00000000-0000-0000-0000-0000000000bb"
 	cases := []struct {
@@ -65,13 +55,18 @@ func TestApplyBinlogMetadata(t *testing.T) {
 			require.NoError(t, err)
 			nextGTID, err := readBinlogFilePreviousGTIDs(successor, mysql.MySQLFlavor)
 			require.NoError(t, err)
-			metadata := &BinlogMetadata{PreviousGTIDs: currentGTID, NextPreviousGTIDs: nextGTID}
+			metadata := &BinlogMetadata{
+				BinlogName:        tc.uploadedBinlogFile,
+				PreviousGTIDs:     currentGTID,
+				NextPreviousGTIDs: nextGTID,
+			}
 			sentinel := BinlogSentinelDto{GTIDArchived: tc.gtidArchivedInitial}
 
-			err = updateSentinelMetadata(&sentinel, metadata, mysql.MySQLFlavor, true)
+			err = updateSentinelMetadata(&sentinel, metadata, mysql.MySQLFlavor)
 
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedGtidArchived, sentinel.GTIDArchived)
+			require.Equal(t, tc.uploadedBinlogFile, sentinel.LastUploadedBinlog)
 		})
 	}
 }

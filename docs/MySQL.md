@@ -197,6 +197,12 @@ all executed transactions at the moment this particular binlog file created.
 This feature may be useful when you are uploading binlogs from different hosts (e.g. after master switchower)
 Note: Don't use `WALG_MYSQL_CHECK_GTIDS` when GTIDs are not used - it will slow down binlog upload.
 
+`WALG_MYSQL_BINLOG_GAP_TRACKING` enables archive gap tracking for MySQL when
+`WALG_MYSQL_CHECK_GTIDS` is enabled. It defaults to `false`; set it to `true`
+to enable gap tracking. With GTID checking enabled, a successful upload with gap
+tracking disabled removes previously recorded gap metadata from the sentinel.
+Gap tracking is not supported for MariaDB.
+
 ### ``binlog-fetch``
 
 Fetches binlogs from storage and saves them to `WALG_MYSQL_BINLOG_DST` folder.

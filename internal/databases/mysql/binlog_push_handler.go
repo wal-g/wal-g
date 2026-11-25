@@ -15,6 +15,7 @@ import (
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -31,7 +32,9 @@ type BinlogUploadContext struct {
 	RootFolder    storage.Folder
 	BinlogsFolder string
 	Flavor        string
+	GTIDPurged    mysql.GTIDSet
 	CheckGTIDs    bool
+	TrackGaps     bool
 	CacheFileName string
 	UntilBinlog   string
 }
@@ -59,6 +62,15 @@ func HandleBinlogPush(ctx context.Context, uploader internal.Uploader, untilBinl
 	flavor, err := getMySQLFlavor(conn)
 	tracelog.ErrorLogger.FatalOnError(err)
 
+	trackGaps, err := conf.GetBoolSettingDefault(conf.MysqlBinlogGapTracking, false)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	var gtidPurged mysql.GTIDSet
+	if trackGaps {
+		gtidPurged, err = getMySQLGTIDPurged(conn, flavor)
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+
 	usr, err := user.Current()
 	tracelog.ErrorLogger.FatalOnError(err)
 	cacheFileName := filepath.Join(usr.HomeDir, BinlogCacheFileName)
@@ -67,7 +79,9 @@ func HandleBinlogPush(ctx context.Context, uploader internal.Uploader, untilBinl
 		Uploader:      uploader,
 		BinlogsFolder: binlogsFolder,
 		Flavor:        flavor,
+		GTIDPurged:    gtidPurged,
 		CheckGTIDs:    checkGTIDs,
+		TrackGaps:     trackGaps,
 		CacheFileName: cacheFileName,
 		UntilBinlog:   untilBinlog,
 	}
@@ -159,6 +173,7 @@ func pushBinlogs(ctx context.Context, uploadCtx *BinlogUploadContext, binlogs []
 	// Non-empty results contain binlogs to upload plus one successor needed only for metadata.
 	filteredBinlogs := filterBinlogsForUpload(binlogs, cache.LastArchivedBinlog, uploadCtx.UntilBinlog, filter)
 
+	// Nothing to upload
 	if len(filteredBinlogs) == 0 {
 		return nil
 	}
@@ -166,6 +181,19 @@ func pushBinlogs(ctx context.Context, uploadCtx *BinlogUploadContext, binlogs []
 	nextFile, nextGTID, err := openBinlogFile(binlogsFolder, filteredBinlogs[0], flavor, uploadCtx.CheckGTIDs)
 	if err != nil {
 		return err
+	}
+
+	// We expect no gaps between the selected local binlog files, so check only before the first upload.
+	if uploadCtx.CheckGTIDs && uploadCtx.TrackGaps && flavor == mysql.MySQLFlavor {
+		changed, err := updateSentinelGaps(&binlogSentinelDto, nextGTID, uploadCtx.GTIDPurged, maxBinlogGapEntries)
+		tracelog.WarningLogger.PrintOnError(err)
+		if changed {
+			if err := UploadBinlogSentinel(ctx, rootFolder, &binlogSentinelDto); err != nil {
+				return err
+			}
+		}
+	} else {
+		binlogSentinelDto.GapTracking = nil
 	}
 
 	for i := 0; i < len(filteredBinlogs)-1; i++ {
@@ -180,13 +208,18 @@ func pushBinlogs(ctx context.Context, uploadCtx *BinlogUploadContext, binlogs []
 		}
 		utility.LoggedClose(currentFile, "failed to close binlog")
 
-		metadata := &BinlogMetadata{PreviousGTIDs: currentGTID, NextPreviousGTIDs: nextGTID}
-		err = updateSentinelMetadata(&binlogSentinelDto, metadata, flavor, uploadCtx.CheckGTIDs)
-		tracelog.WarningLogger.PrintOnError(err)
+		if uploadCtx.CheckGTIDs {
+			metadata := &BinlogMetadata{
+				BinlogName:        filteredBinlogs[i],
+				PreviousGTIDs:     currentGTID,
+				NextPreviousGTIDs: nextGTID,
+			}
+			err = updateSentinelMetadata(&binlogSentinelDto, metadata, flavor)
+			tracelog.WarningLogger.PrintOnError(err)
 
-		tracelog.DebugLogger.Printf("Uploading binlog sentinel: %s", &binlogSentinelDto)
-		if err := UploadBinlogSentinel(ctx, uploadCtx.RootFolder, &binlogSentinelDto); err != nil {
-			return err
+			if err := UploadBinlogSentinel(ctx, uploadCtx.RootFolder, &binlogSentinelDto); err != nil {
+				return err
+			}
 		}
 
 		cache.LastArchivedBinlog = filteredBinlogs[i]
@@ -212,13 +245,10 @@ func openBinlogFile(binlogsFolder, binlog, flavor string, checkGTIDs bool) (*os.
 	return file, previousGTIDs, nil
 }
 
-func updateSentinelMetadata(sentinel *BinlogSentinelDto, metadata *BinlogMetadata, flavor string, checkGTIDs bool) error {
-	if !checkGTIDs {
-		sentinel.GTIDArchived = ""
-		return nil
-	}
+func updateSentinelMetadata(sentinel *BinlogSentinelDto, metadata *BinlogMetadata, flavor string) error {
+	sentinel.LastUploadedBinlog = metadata.BinlogName
 
-	// Header read failures are logged by the caller; preserve the checkpoint.
+	// Header read failures are logged by the caller; preserve the checkpoint and published gaps.
 	if metadata.PreviousGTIDs == nil || metadata.NextPreviousGTIDs == nil {
 		return nil
 	}

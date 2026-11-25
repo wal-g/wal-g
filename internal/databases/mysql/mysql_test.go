@@ -247,3 +247,11 @@ func TestFetchMySQLVariable_ValueSurvivesLaterQueries(t *testing.T) {
 
 	assert.Equal(t, "11.4.10-MariaDB-deb12-log", version)
 }
+
+func TestGetMySQLGTIDPurgedMariaDB(t *testing.T) {
+	// A nil connection ensures this unsupported variable is never queried.
+	got, err := getMySQLGTIDPurged(nil, gomysql.MariaDBFlavor)
+
+	require.NoError(t, err)
+	require.Nil(t, got)
+}

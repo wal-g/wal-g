@@ -29,10 +29,28 @@ const BinlogSentinelPath = "binlog_sentinel_" + utility.VersionStr + ".json"
 const BinlogReadHeaderSize = 128 * 1024
 
 type BinlogSentinelDto struct {
-	GTIDArchived string `json:"GtidArchived"`
+	GTIDArchived       string            `json:"GtidArchived"`
+	LastUploadedBinlog string            `json:"LastUploadedBinlog,omitempty"`
+	GapTracking        *GapTrackingState `json:"GapTracking,omitempty"`
+}
+
+// UnknownGapLocation means the binlog before a gap is unknown.
+const UnknownGapLocation = ""
+
+type GapTrackingState struct {
+	GapWithoutLocation string `json:"GapWithoutLocation,omitempty"`
+	// Located gaps are ordered oldest first.
+	Gaps []BinlogGap `json:"Gaps,omitempty"`
+}
+
+type BinlogGap struct {
+	GTIDSet string `json:"GtidSet"`
+	// Remember last binlog before the gap, so we can stop replay binlogs here.
+	ReplayStopBinlog string `json:"ReplayStopBinlog"`
 }
 
 type BinlogMetadata struct {
+	BinlogName        string
 	PreviousGTIDs     mysql.GTIDSet
 	NextPreviousGTIDs mysql.GTIDSet
 }
@@ -70,6 +88,7 @@ func FetchBinlogSentinel(ctx context.Context, folder storage.Folder, sentinelDto
 }
 
 func UploadBinlogSentinel(ctx context.Context, folder storage.Folder, sentinelDto *BinlogSentinelDto) error {
+	tracelog.DebugLogger.Printf("Uploading binlog sentinel: %s", sentinelDto)
 	sentinelName := BinlogSentinelPath
 	dtoBody, err := json.Marshal(sentinelDto)
 	if err != nil {
