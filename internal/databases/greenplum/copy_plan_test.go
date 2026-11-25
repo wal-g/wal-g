@@ -80,7 +80,7 @@ func TestGreenplumWithHistoryStopsAtLatestClusterRestorePoint(t *testing.T) {
 	})
 	putWal(t, from, -1, 1, 1, 2, 3, 4, 5)
 
-	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, true)
+	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, true, 2)
 	require.NoError(t, err)
 	entries := planEntries(plan)
 	require.Contains(t, entries, walObject(-1, 1, 5))
@@ -99,7 +99,7 @@ func TestGreenplumPlainCopyIncludesRestorePointWal(t *testing.T) {
 	putGreenplumRestorePointFixture(t, from, backupName, []int{-1}, nil)
 	putWal(t, from, -1, 1, 1, 2, 3, 4, 5)
 
-	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false)
+	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false, 2)
 	require.NoError(t, err)
 	entries := planEntries(plan)
 	require.Contains(t, entries, walObject(-1, 1, 3))
@@ -144,7 +144,7 @@ func TestGreenplumCopyFiltersHistoryPerSegment(t *testing.T) {
 				greenplum.BackupSentinelDto{RestorePoint: &backupName, FinishTime: now, Segments: segments})
 			putRestorePoint(t, from, backupName, now, 3, timelines, map[int]string{-1: lsnIn(4), 0: lsnIn(4)})
 
-			plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, withHistory)
+			plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, withHistory, 2)
 			require.NoError(t, err)
 			entries := planEntries(plan)
 			for _, contentID := range []int{-1, 0} {
@@ -205,7 +205,7 @@ func TestGreenplumPlainCopyReadsOnlyRequiredRestorePoints(t *testing.T) {
 				}
 			}}
 
-			plan, err := greenplum.BuildCopyPlan(t.Context(), tracked, to, tc.selected, false)
+			plan, err := greenplum.BuildCopyPlan(t.Context(), tracked, to, tc.selected, false, 2)
 			require.NoError(t, err)
 			entries := planEntries(plan)
 			for name, count := range reads {
@@ -233,7 +233,7 @@ func TestGreenplumPlainCopyRequiresRestorePointWal(t *testing.T) {
 	putGreenplumRestorePointFixture(t, from, backupName, []int{-1}, nil)
 	putWal(t, from, -1, 1, 1, 2, 3)
 
-	_, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false)
+	_, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false, 2)
 	require.ErrorContains(t, err, "is not published in the source storage yet")
 }
 
@@ -246,7 +246,7 @@ func TestGreenplumPlainCopyUsesEachSegmentsRestorePointTimeline(t *testing.T) {
 	putWal(t, from, 0, 1, 1, 2, 3, 4)
 	putWal(t, from, 0, 2, 4)
 
-	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false)
+	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false, 2)
 	require.NoError(t, err)
 	entries := planEntries(plan)
 	require.Contains(t, entries, walObject(-1, 1, 4))
@@ -264,7 +264,7 @@ func TestGreenplumCopyPlanUsesEachSegmentsRestorePointTimeline(t *testing.T) {
 	putWal(t, from, 0, 1, 1, 2, 3, 4)
 	putWal(t, from, 0, 2, 4, 5)
 
-	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, true)
+	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, true, 2)
 	require.NoError(t, err)
 	entries := planEntries(plan)
 	require.Contains(t, entries, walObject(-1, 1, 5))
@@ -285,7 +285,7 @@ func TestGreenplumPlainCopyRejectsUnresolvableRestorePointTimeline(t *testing.T)
 		putWal(t, from, 0, 1, 1, 2, 3, 4)
 		putWal(t, from, 0, 2, 4)
 
-		_, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false)
+		_, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false, 2)
 		require.ErrorContains(t, err, expected)
 	}
 }
@@ -299,7 +299,7 @@ func TestGreenplumCopyRestorePointAtWalSegmentBoundary(t *testing.T) {
 		map[int]string{-1: fmt.Sprintf("0/%X", postgres.WalSegmentSize*4)})
 	putWal(t, from, -1, 1, 1, 2, 3)
 
-	_, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false)
+	_, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false, 2)
 	require.NoError(t, err)
 }
 
@@ -312,7 +312,7 @@ func TestGreenplumCopyRequiresStopWalBeforeRestorePointTimelineSwitch(t *testing
 	putWal(t, from, 0, 1, 2)
 	putWal(t, from, 0, 2, 4)
 
-	_, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false)
+	_, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false, 2)
 	require.ErrorContains(t, err, "stop WAL \"000000010000000000000003\" of Greenplum segment 0")
 	require.NotContains(t, err.Error(), "not published")
 }
@@ -326,7 +326,7 @@ func TestGreenplumWithHistoryReachesSelectedRestorePointBeyondLatest(t *testing.
 		map[int]string{-1: lsnIn(3)})
 	putWal(t, from, -1, 1, 1, 2, 3, 4, 5)
 
-	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, true)
+	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, true, 2)
 	require.NoError(t, err)
 	entries := planEntries(plan)
 	require.Contains(t, entries, walObject(-1, 1, 4))
@@ -343,7 +343,7 @@ func TestGreenplumCopyInfersLegacyCoordinatorTimeline(t *testing.T) {
 	putRestorePoint(t, from, backupName, time.Time{}, 0, nil, map[int]string{-1: lsnIn(4)})
 	putWal(t, from, -1, 1, 1, 2, 3, 4)
 
-	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false)
+	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, false, 2)
 	require.NoError(t, err)
 	require.Contains(t, planEntries(plan), walObject(-1, 1, 4))
 }
@@ -358,7 +358,7 @@ func TestGreenplumWithHistorySkipsRestorePointPastCopiedWal(t *testing.T) {
 	putRestorePoint(t, from, "rp_latest", now.Add(2*time.Minute), 1, nil, map[int]string{-1: lsnIn(5)})
 	putWal(t, from, -1, 1, 1, 2, 3, 4, 5, 6)
 
-	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, true)
+	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backupName, true, 2)
 	require.NoError(t, err)
 	entries := planEntries(plan)
 	require.Contains(t, entries, walObject(-1, 1, 5))
@@ -374,7 +374,7 @@ func TestGreenplumCopyWaitsForRestorePointWal(t *testing.T) {
 	putGreenplumRestorePointFixture(t, from, backupName, []int{-1}, nil)
 	putWal(t, from, -1, 1, 1, 2, 3)
 
-	_, err := greenplum.BuildCopyPlanWaitingWithSleep(t.Context(), from, to, backupName, false, 0,
+	_, err := greenplum.BuildCopyPlanWaitingWithSleep(t.Context(), from, to, backupName, false, 2, 0,
 		func(context.Context, time.Duration) error {
 			t.Fatal("must not wait without a timeout")
 			return nil
@@ -382,7 +382,7 @@ func TestGreenplumCopyWaitsForRestorePointWal(t *testing.T) {
 	require.ErrorContains(t, err, "is not published in the source storage yet")
 
 	delays := make([]time.Duration, 0)
-	plan, err := greenplum.BuildCopyPlanWaitingWithSleep(t.Context(), from, to, backupName, false, time.Hour,
+	plan, err := greenplum.BuildCopyPlanWaitingWithSleep(t.Context(), from, to, backupName, false, 2, time.Hour,
 		func(_ context.Context, delay time.Duration) error {
 			delays = append(delays, delay)
 			if len(delays) == 2 {
@@ -402,7 +402,7 @@ func TestGreenplumCopyDoesNotWaitForMissingStopWal(t *testing.T) {
 	putGreenplumRestorePointFixture(t, from, backupName, []int{-1}, nil)
 	putWal(t, from, -1, 1, 1, 2, 4)
 
-	_, err := greenplum.BuildCopyPlanWaitingWithSleep(t.Context(), from, to, backupName, false, time.Hour,
+	_, err := greenplum.BuildCopyPlanWaitingWithSleep(t.Context(), from, to, backupName, false, 2, time.Hour,
 		func(context.Context, time.Duration) error {
 			t.Fatal("a missing stop WAL never arrives")
 			return nil
@@ -420,7 +420,7 @@ func TestGreenplumCopyAllPreservesThreeLevelIncrementalCommitOrder(t *testing.T)
 	}
 	putGreenplumCoordinatorChain(t, from, backups)
 
-	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, "", false)
+	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, "", false, 2)
 	require.NoError(t, err)
 	entries := planEntries(plan)
 	for i := 1; i < len(backups); i++ {
@@ -485,7 +485,7 @@ func TestGreenplumCopyIncludesReferencedSharedFiles(t *testing.T) {
 	putObjects(t, from, referenced)
 	putObjects(t, from, orphans)
 
-	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backups[1].topName, false)
+	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backups[1].topName, false, 2)
 	require.NoError(t, err)
 	entries := planEntries(plan)
 	for name := range referenced {
@@ -506,7 +506,7 @@ func TestGreenplumCopyIncludesReferencedSharedFiles(t *testing.T) {
 	}
 
 	counting := &countingFolder{Folder: to}
-	plan, err = greenplum.BuildCopyPlan(t.Context(), from, counting, backups[1].topName, false)
+	plan, err = greenplum.BuildCopyPlan(t.Context(), from, counting, backups[1].topName, false, 2)
 	require.NoError(t, err)
 	require.NoError(t, copyutil.ExecuteRaw(t.Context(), plan))
 	require.Zero(t, counting.puts.Load())
@@ -529,7 +529,7 @@ func TestGreenplumCopyFailsOnMissingSharedFile(t *testing.T) {
 		to := testtools.MakeDefaultInMemoryStorageFolder()
 		putGreenplumCoordinatorChain(t, from, []greenplumBackupFixture{backup})
 
-		_, err := greenplum.BuildCopyPlan(t.Context(), from, to, backup.topName, false)
+		_, err := greenplum.BuildCopyPlan(t.Context(), from, to, backup.topName, false, 2)
 		require.ErrorContains(t, err, "MISSING_")
 	}
 }
@@ -547,7 +547,7 @@ func TestGreenplumCopyWithoutSharedFilesMetadata(t *testing.T) {
 		path.Join(coordinatorBasePath, pax.StoragePath, "UNREFERENCED_pax"):  "pax",
 	})
 
-	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backup.topName, false)
+	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backup.topName, false, 2)
 	require.NoError(t, err)
 	for name := range planEntries(plan) {
 		require.NotContains(t, name, "UNREFERENCED")
@@ -576,7 +576,7 @@ func TestGreenplumCopySkipsClusterSharedSize(t *testing.T) {
 		putDTO(t, from, name, greenplum.SharedSizeDTO{SharedSize: 7})
 	}
 
-	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backup.topName, false)
+	plan, err := greenplum.BuildCopyPlan(t.Context(), from, to, backup.topName, false, 2)
 	require.NoError(t, err)
 	entries := planEntries(plan)
 	for _, name := range clusterShared {

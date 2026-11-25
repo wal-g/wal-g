@@ -21,6 +21,22 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+func TestAddSourceObjectsMatchesSingleCalls(t *testing.T) {
+	source := testtools.MakeDefaultInMemoryStorageFolder()
+	one := copyutil.NewScopedPlan(source, source)
+	batch := copyutil.NewScopedPlan(source, source)
+	from := []string{"backup/a", "backup/b"}
+	to := []string{"copy/a", "copy/b"}
+	for _, name := range from {
+		require.NoError(t, source.PutObject(t.Context(), name, bytes.NewBufferString(name)))
+	}
+	for i, name := range from {
+		require.NoError(t, one.AddSourceObject(t.Context(), name, to[i], copyutil.MetadataPhase, true))
+	}
+	require.NoError(t, batch.AddSourceObjects(t.Context(), from, to, copyutil.MetadataPhase, true, 2))
+	require.Equal(t, one.Entries(), batch.Entries())
+}
+
 func TestExecuteRawPreservesOpaqueBytes(t *testing.T) {
 	from := testtools.MakeDefaultInMemoryStorageFolder()
 	to := testtools.MakeDefaultInMemoryStorageFolder()

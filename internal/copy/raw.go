@@ -212,6 +212,70 @@ func (p *Plan) AddSourceObject(ctx context.Context, sourcePath, targetPath strin
 	return p.AddObject(sourcePath, targetPath, phase, mutable)
 }
 
+// AddSourceObjects adds corresponding source and target paths with the same publication settings.
+// It skips cached sources and waits for all lookups before changing the plan.
+func (p *Plan) AddSourceObjects(
+	ctx context.Context, sourcePaths, targetPaths []string, phase Phase, mutable bool, copyConcurrency int,
+) error {
+	if len(sourcePaths) != len(targetPaths) {
+		return fmt.Errorf("got %d source paths and %d target paths", len(sourcePaths), len(targetPaths))
+	}
+	if err := p.findSourceObjects(ctx, sourcePaths, copyConcurrency); err != nil {
+		return err
+	}
+	for i, sourcePath := range sourcePaths {
+		if err := p.AddObject(sourcePath, targetPaths[i], phase, mutable); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *Plan) findSourceObjects(ctx context.Context, sourcePaths []string, copyConcurrency int) error {
+	if copyConcurrency < 1 {
+		return fmt.Errorf("copy concurrency must be positive, got %d", copyConcurrency)
+	}
+	for _, sourcePath := range sourcePaths {
+		if err := validateSourcePath(path.Clean(sourcePath)); err != nil {
+			return err
+		}
+	}
+	// Workers can safely write to distinct slice elements. Concurrent writes to p.source
+	// would race, so we populate the map after group.Wait().
+	objects := make([]storage.Object, len(sourcePaths))
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(copyConcurrency)
+	for i, sourcePath := range sourcePaths {
+		if groupCtx.Err() != nil {
+			break
+		}
+		name := path.Clean(sourcePath)
+		if _, cached := p.source[name]; cached {
+			continue
+		}
+		group.Go(func() error {
+			object, err := p.From.StatObject(groupCtx, name)
+			if err != nil {
+				return fmt.Errorf("required source object %q: %w", name, err)
+			}
+			objects[i] = object
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	for i, object := range objects {
+		if object != nil {
+			p.source[path.Clean(sourcePaths[i])] = object
+		}
+	}
+	return nil
+}
+
 func validateSourcePath(name string) error {
 	if name == "." || name == ".." || strings.HasPrefix(name, "../") || path.IsAbs(name) {
 		return fmt.Errorf("invalid copy source path %q", name)
