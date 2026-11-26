@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -62,6 +63,8 @@ var (
 				postgres.SetDatabasePageSize(viper.GetUint64(conf.PgBlockSize))
 				orioledb.SetDatabasePageSize(viper.GetUint64(conf.PgBlockSize))
 			}
+			err := conf.ConfigureAndRunDefaultWebServer()
+			tracelog.ErrorLogger.FatalOnError(err)
 		},
 	}
 )

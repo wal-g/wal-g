@@ -2,6 +2,8 @@ package mongo
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 	mongodb "github.com/wal-g/wal-g/internal/databases/mongo"
 )
 
@@ -19,7 +21,10 @@ var copyCmd = &cobra.Command{
 	Run: func(command *cobra.Command, _ []string) {
 		mongodb.HandleCopy(command.Context(), copyFrom, copyTo, copyBackupName, copyWithHistory)
 	},
-	PersistentPreRun: func(*cobra.Command, []string) {},
+	PersistentPreRun: func(*cobra.Command, []string) {
+		err := conf.ConfigureAndRunDefaultWebServer()
+		tracelog.ErrorLogger.FatalOnError(err)
+	},
 }
 
 func init() {
