@@ -262,6 +262,7 @@ const (
 	ForceWalDetal          = "WALG_FORCE_WAL_DELTA"
 	ServerSideCopyFallback = "WALG_SERVER_SIDE_COPY_FALLBACK"
 	CopyConcurrency        = "WALG_COPY_CONCURRENCY"
+	CopyStatConcurrency    = "WALG_COPY_STAT_CONCURRENCY"
 	DisasterCopy           = "WALG_DISASTER_COPY"
 	DisasterCopySkipFiles  = "WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES"
 )
@@ -436,6 +437,7 @@ var (
 		StatsdExtraTagsSetting:        true,
 		ServerSideCopyFallback:        true,
 		CopyConcurrency:               true,
+		CopyStatConcurrency:           true,
 		DisasterCopy:                  true,
 		DisasterCopySkipFiles:         true,
 

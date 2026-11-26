@@ -533,7 +533,7 @@ func Execute(ctx context.Context, plan *Plan, options ExecuteOptions) error {
 
 func groupPendingEntries(ctx context.Context, plan *Plan, options ExecuteOptions) (map[publicationOrder][]Entry, error) {
 	entries := plan.Entries()
-	concurrency, err := options.copyConcurrency()
+	concurrency, err := options.copyStatConcurrency()
 	if err != nil {
 		return nil, err
 	}

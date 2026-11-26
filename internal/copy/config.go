@@ -13,6 +13,7 @@ import (
 type ExecuteOptions struct {
 	MaxRetries             *int
 	Concurrency            int
+	StatConcurrency        int
 	UseServerSideCopy      bool
 	ServerSideCopyFallback bool
 	OverwriteConflicts     bool
@@ -29,9 +30,14 @@ func OptionsFromConfigs(source, destination *viper.Viper) (ExecuteOptions, error
 	if err != nil {
 		return ExecuteOptions{}, err
 	}
+	statConcurrency, err := configuredCopyStatConcurrency(source, concurrency)
+	if err != nil {
+		return ExecuteOptions{}, err
+	}
 	return ExecuteOptions{
 		MaxRetries:             &retries,
 		Concurrency:            concurrency,
+		StatConcurrency:        statConcurrency,
 		UseServerSideCopy:      rawCopyConfigEligible(source) && rawCopyConfigEligible(destination),
 		ServerSideCopyFallback: source.GetBool(conf.ServerSideCopyFallback) || destination.GetBool(conf.ServerSideCopyFallback),
 		OverwriteConflicts:     disasterCopyEnabled(source, destination),
@@ -66,6 +72,18 @@ func configuredCopyConcurrency(source *viper.Viper) (int, error) {
 	return concurrency, nil
 }
 
+func configuredCopyStatConcurrency(source *viper.Viper, copyConcurrency int) (int, error) {
+	value := sourceOrMainSetting(source, conf.CopyStatConcurrency)
+	if value == "" {
+		return copyConcurrency, nil
+	}
+	concurrency, err := strconv.Atoi(value)
+	if err != nil || concurrency < conf.MinAllowedConcurrency {
+		return 0, fmt.Errorf("%s must be a positive integer, got %q", conf.CopyStatConcurrency, value)
+	}
+	return concurrency, nil
+}
+
 func (o ExecuteOptions) copyRetries() (int, error) {
 	if o.MaxRetries == nil {
 		return configuredCopyRetries(nil)
@@ -84,6 +102,16 @@ func (o ExecuteOptions) copyConcurrency() (int, error) {
 		return 0, fmt.Errorf("%s must be a positive integer, got %d", conf.CopyConcurrency, o.Concurrency)
 	}
 	return o.Concurrency, nil
+}
+
+func (o ExecuteOptions) copyStatConcurrency() (int, error) {
+	if o.StatConcurrency == 0 {
+		return o.copyConcurrency()
+	}
+	if o.StatConcurrency < conf.MinAllowedConcurrency {
+		return 0, fmt.Errorf("%s must be a positive integer, got %d", conf.CopyStatConcurrency, o.StatConcurrency)
+	}
+	return o.StatConcurrency, nil
 }
 
 func disasterCopyEnabled(source, destination *viper.Viper) bool {

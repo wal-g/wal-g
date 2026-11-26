@@ -47,7 +47,7 @@ func HandleCopyWithHistory(
 	options, err := copy.OptionsFromConfigs(fromConfig, toConfig)
 	tracelog.ErrorLogger.FatalOnError(err)
 	plan, err := buildCopyPlanWaiting(
-		ctx, from.RootFolder(), to.RootFolder(), backupName, withHistory, options.Concurrency, walWaitTimeout, sleepContext)
+		ctx, from.RootFolder(), to.RootFolder(), backupName, withHistory, options.StatConcurrency, walWaitTimeout, sleepContext)
 	tracelog.ErrorLogger.FatalOnError(err)
 	options.SkipErrorsFor, err = copy.DisasterCopyPattern(fromConfig, toConfig)
 	tracelog.ErrorLogger.FatalOnError(err)
