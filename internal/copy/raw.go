@@ -110,6 +110,15 @@ type Plan struct {
 	entries map[string]Entry
 }
 
+var errSourceReleased = errors.New("copy plan source inventory was released by Execute")
+
+func (p *Plan) checkSource() error {
+	if p.source == nil {
+		return errSourceReleased
+	}
+	return nil
+}
+
 // NewPlan inventories the source once so planners can validate the full
 // manifest before any destination object is written.
 func NewPlan(ctx context.Context, from, to storage.Folder) (*Plan, error) {
@@ -134,6 +143,9 @@ func NewScopedPlan(from, to storage.Folder) *Plan {
 // InventoryPrefix is for payloads whose complete key set is not recorded in
 // metadata. Never pass a storage root when planning one selected backup.
 func (p *Plan) InventoryPrefix(ctx context.Context, prefix string) error {
+	if err := p.checkSource(); err != nil {
+		return err
+	}
 	if !p.scoped {
 		return nil
 	}
@@ -160,6 +172,9 @@ func (p *Plan) InventoryPrefix(ctx context.Context, prefix string) error {
 
 // InventoryFolder reads only direct children, for backup/restore-point names.
 func (p *Plan) InventoryFolder(ctx context.Context, prefix string) error {
+	if err := p.checkSource(); err != nil {
+		return err
+	}
 	if err := validateSourcePath(path.Clean(prefix)); err != nil {
 		return err
 	}
@@ -177,6 +192,9 @@ func (p *Plan) InventoryFolder(ctx context.Context, prefix string) error {
 
 // FindObject looks up a known source key without listing its parent.
 func (p *Plan) FindObject(ctx context.Context, name string) (storage.Object, error) {
+	if err := p.checkSource(); err != nil {
+		return nil, err
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -254,6 +272,9 @@ func (p *Plan) findSourceObjects(ctx context.Context, sourcePaths []string, copy
 			continue
 		}
 		group.Go(func() error {
+			if err := p.checkSource(); err != nil {
+				return err
+			}
 			object, err := p.From.StatObject(groupCtx, name)
 			if err != nil {
 				return fmt.Errorf("required source object %q: %w", name, err)
@@ -291,6 +312,9 @@ func (p *Plan) SourceObjects() []storage.Object {
 // SourceObjectsAt avoids sorting unrelated payload/shared-file keys for each
 // segment's WAL validation. This only reads the already inventoried objects.
 func (p *Plan) SourceObjectsAt(prefix string) []storage.Object {
+	if err := p.checkSource(); err != nil {
+		panic(err)
+	}
 	if prefix != "" {
 		prefix = strings.TrimSuffix(prefix, "/") + "/"
 	}
@@ -307,6 +331,9 @@ func (p *Plan) SourceObjectsAt(prefix string) []storage.Object {
 
 // BackupNames returns completed backups found in the standard base-backup folder.
 func (p *Plan) BackupNames() []string {
+	if err := p.checkSource(); err != nil {
+		panic(err)
+	}
 	prefix := strings.TrimSuffix(utility.BaseBackupPath, "/") + "/"
 	names := make([]string, 0)
 	for name := range p.source {
@@ -325,6 +352,9 @@ func (p *Plan) BackupNames() []string {
 
 // ResolveBackupNames applies the shared empty/all and LATEST semantics.
 func (p *Plan) ResolveBackupNames(ctx context.Context, requested string) ([]string, error) {
+	if err := p.checkSource(); err != nil {
+		return nil, err
+	}
 	if requested == "" {
 		if p.scoped {
 			if err := p.InventoryFolder(ctx, utility.BaseBackupPath); err != nil {
@@ -347,6 +377,9 @@ func (p *Plan) ResolveBackupNames(ctx context.Context, requested string) ([]stri
 // AddObject adds one source object. Duplicate destination paths must describe
 // the same immutable content; their latest publication order wins.
 func (p *Plan) AddObject(sourcePath, targetPath string, phase Phase, mutable bool) error {
+	if err := p.checkSource(); err != nil {
+		return err
+	}
 	sourcePath = path.Clean(sourcePath)
 	targetPath = path.Clean(targetPath)
 	object, ok := p.source[sourcePath]
@@ -371,6 +404,9 @@ func (p *Plan) AddObject(sourcePath, targetPath string, phase Phase, mutable boo
 
 // AddMatching adds every object accepted by match, preserving its path.
 func (p *Plan) AddMatching(match func(string) bool, phase Phase) error {
+	if err := p.checkSource(); err != nil {
+		return err
+	}
 	for name := range p.source {
 		if match(name) {
 			if err := p.AddObject(name, name, phase, false); err != nil {
@@ -473,6 +509,8 @@ func Execute(ctx context.Context, plan *Plan, options ExecuteOptions) error {
 	if err != nil {
 		return err
 	}
+	plan.source = nil
+	plan.listed = nil
 	byOrder, err := groupPendingEntries(ctx, plan, options)
 	if err != nil {
 		return err
