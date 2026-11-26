@@ -8,6 +8,8 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -145,15 +147,19 @@ func (p *Plan) InventoryPrefix(ctx context.Context, prefix string) error {
 		return nil
 	}
 	tracelog.InfoLogger.Printf("Listing selected copy source prefix %q", prefix)
+	start := time.Now()
+	listed := 0
 	folder := p.From.GetSubFolder(prefix)
 	if err := storage.WalkObjects(ctx, folder, func(object storage.Object) error {
 		name := path.Join(prefix, object.GetName())
 		p.source[name] = storage.NewLocalObjectWithVersion(name, object.GetLastModified(), object.GetSize(),
 			object.GetVersionID(), object.GetAdditionalInfo())
+		listed++
 		return nil
 	}); err != nil {
 		return fmt.Errorf("list source prefix %q: %w", prefix, err)
 	}
+	tracelog.InfoLogger.Printf("Listed selected copy source prefix %q: %d objects in %s", prefix, listed, time.Since(start))
 	p.listed[prefix] = true
 	return nil
 }
@@ -216,33 +222,35 @@ func (p *Plan) AddSourceObject(ctx context.Context, sourcePath, targetPath strin
 // It skips cached sources and waits for all lookups before changing the plan.
 func (p *Plan) AddSourceObjects(
 	ctx context.Context, sourcePaths, targetPaths []string, phase Phase, mutable bool, copyConcurrency int,
-) error {
+) (sourceLookups int, err error) {
 	if len(sourcePaths) != len(targetPaths) {
-		return fmt.Errorf("got %d source paths and %d target paths", len(sourcePaths), len(targetPaths))
+		return 0, fmt.Errorf("got %d source paths and %d target paths", len(sourcePaths), len(targetPaths))
 	}
-	if err := p.findSourceObjects(ctx, sourcePaths, copyConcurrency); err != nil {
-		return err
+	sourceLookups, err = p.findSourceObjects(ctx, sourcePaths, copyConcurrency)
+	if err != nil {
+		return 0, err
 	}
 	for i, sourcePath := range sourcePaths {
 		if err := p.AddObject(sourcePath, targetPaths[i], phase, mutable); err != nil {
-			return err
+			return 0, err
 		}
 	}
-	return nil
+	return sourceLookups, nil
 }
 
-func (p *Plan) findSourceObjects(ctx context.Context, sourcePaths []string, copyConcurrency int) error {
+func (p *Plan) findSourceObjects(ctx context.Context, sourcePaths []string, copyConcurrency int) (int, error) {
 	if copyConcurrency < 1 {
-		return fmt.Errorf("copy concurrency must be positive, got %d", copyConcurrency)
+		return 0, fmt.Errorf("copy concurrency must be positive, got %d", copyConcurrency)
 	}
 	for _, sourcePath := range sourcePaths {
 		if err := validateSourcePath(path.Clean(sourcePath)); err != nil {
-			return err
+			return 0, err
 		}
 	}
 	// Workers can safely write to distinct slice elements. Concurrent writes to p.source
 	// would race, so we populate the map after group.Wait().
 	objects := make([]storage.Object, len(sourcePaths))
+	lookups := 0
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(copyConcurrency)
 	for i, sourcePath := range sourcePaths {
@@ -253,6 +261,7 @@ func (p *Plan) findSourceObjects(ctx context.Context, sourcePaths []string, copy
 		if _, cached := p.source[name]; cached {
 			continue
 		}
+		lookups++
 		group.Go(func() error {
 			object, err := p.From.StatObject(groupCtx, name)
 			if err != nil {
@@ -263,17 +272,17 @@ func (p *Plan) findSourceObjects(ctx context.Context, sourcePaths []string, copy
 		})
 	}
 	if err := group.Wait(); err != nil {
-		return err
+		return 0, err
 	}
 	if err := ctx.Err(); err != nil {
-		return err
+		return 0, err
 	}
 	for i, object := range objects {
 		if object != nil {
 			p.source[path.Clean(sourcePaths[i])] = object
 		}
 	}
-	return nil
+	return lookups, nil
 }
 
 func validateSourcePath(name string) error {
@@ -528,6 +537,10 @@ func groupPendingEntries(ctx context.Context, plan *Plan, options ExecuteOptions
 	if err != nil {
 		return nil, err
 	}
+	tracelog.InfoLogger.Printf("Checking destination objects of %d planned entries", len(entries))
+	start := time.Now()
+	checked := 0
+	var found atomic.Int64
 	existing := make([]storage.Object, len(entries))
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(concurrency)
@@ -538,6 +551,7 @@ func groupPendingEntries(ctx context.Context, plan *Plan, options ExecuteOptions
 		if groupCtx.Err() != nil {
 			break
 		}
+		checked++
 		group.Go(func() error {
 			object, err := plan.To.StatObject(groupCtx, entry.TargetPath)
 			var missing storage.ObjectNotFoundError
@@ -548,6 +562,7 @@ func groupPendingEntries(ctx context.Context, plan *Plan, options ExecuteOptions
 				return fmt.Errorf("stat destination object %q: %w", entry.TargetPath, err)
 			}
 			existing[i] = object
+			found.Add(1)
 			return nil
 		})
 	}
@@ -557,6 +572,7 @@ func groupPendingEntries(ctx context.Context, plan *Plan, options ExecuteOptions
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	tracelog.InfoLogger.Printf("Checked %d destination objects in %s: %d already exist", checked, time.Since(start), found.Load())
 	byOrder := map[publicationOrder][]Entry{}
 	for i, entry := range entries {
 		if object := existing[i]; object != nil {

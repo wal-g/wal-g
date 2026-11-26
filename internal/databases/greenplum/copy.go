@@ -363,6 +363,8 @@ func addGreenplumSegmentChain(
 	case 2:
 		return state.segmentDepths[key], nil
 	}
+	start := time.Now()
+	var parentElapsed time.Duration
 	basePath := FormatSegmentBackupPath(contentID)
 	backup, err := internal.GetBackupByName(ctx, name, basePath, plan.From)
 	if err != nil {
@@ -376,7 +378,9 @@ func addGreenplumSegmentChain(
 	state.segmentState[key] = 1
 	depth := 0
 	if sentinel.IncrementFrom != nil {
+		parentStart := time.Now()
 		parentDepth, err := addGreenplumSegmentChain(ctx, plan, contentID, *sentinel.IncrementFrom, state)
+		parentElapsed = time.Since(parentStart)
 		if err != nil {
 			return 0, err
 		}
@@ -398,6 +402,8 @@ func addGreenplumSegmentChain(
 	state.segmentDepths[key] = depth
 	state.segmentBackups[key] = pgBackup
 	state.segmentState[key] = 2
+	tracelog.InfoLogger.Printf("Planned Greenplum segment %d backup %q in %s, excluding its parent backups",
+		contentID, name, time.Since(start)-parentElapsed)
 	return depth, nil
 }
 
@@ -426,17 +432,23 @@ func addGreenplumSegmentSharedFiles(
 			}
 			return err
 		}
+		fetchStart := time.Now()
 		files, err := shared.fetch(ctx, baseBackupsFolder, backupTime)
 		if err != nil {
 			return fmt.Errorf("read %s files metadata: %w", shared.storagePath, err)
 		}
+		fetchElapsed := time.Since(fetchStart)
 		paths := make([]string, 0, len(files))
 		for storagePath := range files {
 			paths = append(paths, path.Join(basePath, shared.storagePath, storagePath))
 		}
-		if err := plan.AddSourceObjects(ctx, paths, paths, copy.PayloadPhase, false, copyConcurrency); err != nil {
+		lookupStart := time.Now()
+		lookups, err := plan.AddSourceObjects(ctx, paths, paths, copy.PayloadPhase, false, copyConcurrency)
+		if err != nil {
 			return err
 		}
+		tracelog.InfoLogger.Printf("Planned %d %s files referenced by %q: read metadata in %s, checked %d uncached files in %s",
+			len(files), shared.storagePath, path.Join(basePath, backup.Name), fetchElapsed, lookups, time.Since(lookupStart))
 	}
 	return nil
 }
