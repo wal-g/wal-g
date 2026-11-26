@@ -76,7 +76,11 @@ func TestTryFindHighestTimelineID(t *testing.T) {
 	}
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
-			actual := tryFindHighestTimelineID(tc.filenames)
+			builder := newWalFolderIndexBuilder()
+			for _, name := range tc.filenames {
+				builder.add(name)
+			}
+			actual := builder.build().highestTimeline
 			assert.Equal(t, tc.expected, actual)
 		})
 	}

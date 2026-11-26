@@ -95,6 +95,13 @@ Removing a sentinel also does not protect a restore that has already read it.
   prefix/directory scope and frequency. Bound traversal and memory use, stop
   early when possible, and avoid rescanning per WAL or per object. Pagination
   alone does not make a full scan of millions of keys inexpensive.
+- `wal-verify` lists the WAL folder once with `storage.WalkObjects` into a
+  per-timeline sorted segment index (`wal_folder_index.go`, about 8 B/segment).
+  The scanner keeps status/timeline runs, not one entry per segment. Do not
+  reintroduce retained object slices, filename lists, hash sets or per-segment
+  scan records. Compare against the reference scan in
+  `TestWalVerifyIntegrityMatchesReference` and watch
+  `BenchmarkWalVerifyLargeWalFolder` B/op.
 - Listings can still be appropriate, for example to verify that deletion left
   no unexpected objects. Keep such checks scoped to the affected backup prefix,
   outside the steady-state hot path where possible, and account for their cost.

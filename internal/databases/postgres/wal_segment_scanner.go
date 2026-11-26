@@ -1,6 +1,10 @@
 package postgres
 
-import "github.com/wal-g/wal-g/utility"
+import (
+	"slices"
+
+	"github.com/wal-g/wal-g/utility"
+)
 
 type ScannedSegmentStatus int
 
@@ -15,16 +19,6 @@ const (
 	Found
 )
 
-type ScannedSegmentDescription struct {
-	WalSegmentDescription
-	status ScannedSegmentStatus
-}
-
-func newScannedSegmentDescription(description WalSegmentDescription,
-	status ScannedSegmentStatus) ScannedSegmentDescription {
-	return ScannedSegmentDescription{description, status}
-}
-
 func (status ScannedSegmentStatus) String() string {
 	return [...]string{"", "MISSING_LOST", "MISSING_UPLOADING", "MISSING_DELAYED", "FOUND"}[status]
 }
@@ -34,9 +28,22 @@ func (status ScannedSegmentStatus) MarshalText() ([]byte, error) {
 	return utility.MarshalEnumToString(status)
 }
 
-// WalSegmentScanner is used to scan the WAL segments storage
+// ScannedSegmentRun is a continuous run of scanned segments
+// with the same timeline and status
+type ScannedSegmentRun struct {
+	Timeline uint32
+	Status   ScannedSegmentStatus
+	MinNo    WalSegmentNo
+	MaxNo    WalSegmentNo
+	Count    int
+}
+
+// WalSegmentScanner is used to scan the WAL segments storage.
+// It aggregates scanned segments into runs, so its memory usage depends
+// on the number of status/timeline changes, not on the number of segments.
 type WalSegmentScanner struct {
-	ScannedSegments  []ScannedSegmentDescription
+	// runs are stored in scan order, i.e. in descending segment number order
+	runs             []ScannedSegmentRun
 	walSegmentRunner *WalSegmentRunner
 }
 
@@ -52,7 +59,6 @@ type SegmentScanConfig struct {
 
 func NewWalSegmentScanner(walSegmentRunner *WalSegmentRunner) *WalSegmentScanner {
 	return &WalSegmentScanner{
-		ScannedSegments:  make([]ScannedSegmentDescription, 0),
 		walSegmentRunner: walSegmentRunner,
 	}
 }
@@ -95,14 +101,45 @@ func (sc *WalSegmentScanner) Scan(config SegmentScanConfig) error {
 // GetMissingSegmentsDescriptions returns a slice containing WalSegmentDescription of each missing segment
 func (sc *WalSegmentScanner) GetMissingSegmentsDescriptions() []WalSegmentDescription {
 	result := make([]WalSegmentDescription, 0)
-	for _, segment := range sc.ScannedSegments {
-		if segment.status != Found {
-			result = append(result, segment.WalSegmentDescription)
+	for _, run := range sc.runs {
+		if run.Status == Found {
+			continue
+		}
+		for no := run.MaxNo; ; no = no.previous() {
+			result = append(result, WalSegmentDescription{Timeline: run.Timeline, Number: no})
+			if no == run.MinNo {
+				break
+			}
 		}
 	}
 	return result
 }
 
+// Runs returns the scanned segment runs ordered by ascending segment number
+func (sc *WalSegmentScanner) Runs() []ScannedSegmentRun {
+	result := slices.Clone(sc.runs)
+	slices.Reverse(result)
+	return result
+}
+
+// AddScannedSegment records a scanned segment. The WalSegmentRunner always moves
+// to the previous segment number, so a segment extends the last run when its
+// timeline and status match; otherwise it starts a new run.
 func (sc *WalSegmentScanner) AddScannedSegment(description WalSegmentDescription, status ScannedSegmentStatus) {
-	sc.ScannedSegments = append(sc.ScannedSegments, newScannedSegmentDescription(description, status))
+	if n := len(sc.runs); n > 0 {
+		last := &sc.runs[n-1]
+		if last.Timeline == description.Timeline && last.Status == status &&
+			last.MinNo > description.Number && last.MinNo.previous() == description.Number {
+			last.MinNo = description.Number
+			last.Count++
+			return
+		}
+	}
+	sc.runs = append(sc.runs, ScannedSegmentRun{
+		Timeline: description.Timeline,
+		Status:   status,
+		MinNo:    description.Number,
+		MaxNo:    description.Number,
+		Count:    1,
+	})
 }

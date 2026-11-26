@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -28,22 +27,23 @@ func (details TimelineCheckDetails) NewPlainTextReader() (io.Reader, error) {
 // TimelineCheckRunner is used to verify that the current timeline
 // is the highest among the storage timelines
 type TimelineCheckRunner struct {
-	currentTimeline    uint32
-	walFolderFilenames []string
+	currentTimeline uint32
+	highestTimeline uint32
 }
 
 func (check TimelineCheckRunner) Name() string {
 	return "TimelineCheck"
 }
 
-func NewTimelineCheckRunner(walFolderFilenames []string,
+// NewTimelineCheckRunner builds the check from the highest timeline found in storage,
+// see walFolderIndex.highestTimeline
+func NewTimelineCheckRunner(highestTimeline uint32,
 	currentSegment WalSegmentDescription) (TimelineCheckRunner, error) {
-	return TimelineCheckRunner{currentTimeline: currentSegment.Timeline, walFolderFilenames: walFolderFilenames}, nil
+	return TimelineCheckRunner{currentTimeline: currentSegment.Timeline, highestTimeline: highestTimeline}, nil
 }
 
 func (check TimelineCheckRunner) Run() (WalVerifyCheckResult, error) {
-	highestTimeline := tryFindHighestTimelineID(check.walFolderFilenames)
-	return newTimelineCheckResult(check.currentTimeline, highestTimeline), nil
+	return newTimelineCheckResult(check.currentTimeline, check.highestTimeline), nil
 }
 
 func (check TimelineCheckRunner) Type() WalVerifyCheckType {
@@ -70,21 +70,6 @@ func newTimelineCheckResult(currentTimeline, highestTimeline uint32) WalVerifyCh
 		}
 	}
 	return result
-}
-
-func tryFindHighestTimelineID(filenames []string) (highestTimelineID uint32) {
-	for _, name := range filenames {
-		fileTimeline, ok := tryParseTimelineID(name)
-		if !ok {
-			tracelog.WarningLogger.Printf(
-				"Could not parse the timeline Id from %s. Skipping...",
-				name)
-			continue
-		}
-
-		highestTimelineID = max(highestTimelineID, fileTimeline)
-	}
-	return highestTimelineID
 }
 
 func tryParseTimelineID(fileName string) (timelineID uint32, success bool) {

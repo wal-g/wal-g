@@ -2,11 +2,9 @@ package postgres
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"fmt"
 	"io"
-	"slices"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
@@ -44,7 +42,7 @@ type IntegrityCheckRunner struct {
 	stopWalSegmentNo          WalSegmentNo
 	uploadingSegmentRangeSize int
 	delayedSegmentRangeSize   int
-	walFolderFilenames        []string
+	walFolderIndex            *walFolderIndex
 	timelineSwitchMap         map[WalSegmentNo]*TimelineHistoryRecord
 	noBackupsFound            bool
 }
@@ -52,7 +50,7 @@ type IntegrityCheckRunner struct {
 func NewIntegrityCheckRunner(
 	ctx context.Context,
 	rootFolder storage.Folder,
-	walFolderFilenames []string,
+	walFolderIndex *walFolderIndex,
 	currentWalSegment WalSegmentDescription,
 	backupSearchParams BackupSearchParams,
 ) (IntegrityCheckRunner, error) {
@@ -94,16 +92,15 @@ func NewIntegrityCheckRunner(
 		stopWalSegmentNo:          stopWalSegmentNo,
 		uploadingSegmentRangeSize: uploadingSegmentRangeSize,
 		delayedSegmentRangeSize:   viper.GetInt(conf.MaxDelayedSegmentsCount),
-		walFolderFilenames:        walFolderFilenames,
+		walFolderIndex:            walFolderIndex,
 		timelineSwitchMap:         timelineSwitchMap,
 		noBackupsFound:            noBackupsFound,
 	}, nil
 }
 
 func (check IntegrityCheckRunner) Run() (WalVerifyCheckResult, error) {
-	storageSegments := getSegmentsFromFiles(check.walFolderFilenames)
-	walSegmentRunner := NewWalSegmentRunner(check.startWalSegment,
-		storageSegments,
+	walSegmentRunner := newWalSegmentRunnerWithSet(check.startWalSegment,
+		check.walFolderIndex,
 		check.stopWalSegmentNo,
 		check.timelineSwitchMap)
 
@@ -113,7 +110,7 @@ func (check IntegrityCheckRunner) Run() (WalVerifyCheckResult, error) {
 		return WalVerifyCheckResult{}, err
 	}
 
-	integrityScanSegmentSequences := collapseSegmentsByStatusAndTimeline(segmentScanner.ScannedSegments)
+	integrityScanSegmentSequences := collapseSegmentsByStatusAndTimeline(segmentScanner.Runs())
 
 	return check.newWalIntegrityCheckResult(integrityScanSegmentSequences), nil
 }
@@ -163,17 +160,6 @@ type IntegrityScanSegmentSequence struct {
 	Status        ScannedSegmentStatus `json:"status"`
 }
 
-func newIntegrityScanSegmentSequence(sequence *WalSegmentsSequence,
-	status ScannedSegmentStatus) *IntegrityScanSegmentSequence {
-	return &IntegrityScanSegmentSequence{
-		TimelineID:    sequence.TimelineID,
-		StartSegment:  sequence.MinSegmentNo.GetFilename(sequence.TimelineID),
-		EndSegment:    sequence.MaxSegmentNo.GetFilename(sequence.TimelineID),
-		Status:        status,
-		SegmentsCount: len(sequence.WalSegmentNumbers),
-	}
-}
-
 // runWalIntegrityScan invokes the following storage scan series
 // (on each iteration scanner continues from the position where it stopped)
 // 1. At first, it runs scan until it finds some segment in WAL storage
@@ -210,36 +196,22 @@ func runWalIntegrityScan(scanner *WalSegmentScanner,
 	})
 }
 
-// collapseSegmentsByStatusAndTimeline collapses scanned segments
-// with the same timeline and Status into segment sequences to minify the output
-func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescription) []*IntegrityScanSegmentSequence {
-	if len(scannedSegments) == 0 {
+// collapseSegmentsByStatusAndTimeline converts the scanned segment runs
+// (continuous segments with the same timeline and Status) into the output rows
+func collapseSegmentsByStatusAndTimeline(runs []ScannedSegmentRun) []*IntegrityScanSegmentSequence {
+	if len(runs) == 0 {
 		return nil
 	}
-
-	// make sure that ScannedSegments are ordered
-	slices.SortFunc(scannedSegments, func(a, b ScannedSegmentDescription) int {
-		return cmp.Compare(a.Number, b.Number)
-	})
-
-	segmentSequences := make([]*IntegrityScanSegmentSequence, 0)
-	currentSequence := NewSegmentsSequence(scannedSegments[0].Timeline, scannedSegments[0].Number)
-	currentStatus := scannedSegments[0].status
-
-	for i := 1; i < len(scannedSegments); i++ {
-		segment := scannedSegments[i]
-
-		// switch to the new sequence on segment Status change or timeline id change
-		if segment.status != currentStatus || currentSequence.TimelineID != segment.Timeline {
-			segmentSequences = append(segmentSequences, newIntegrityScanSegmentSequence(currentSequence, currentStatus))
-			currentSequence = NewSegmentsSequence(segment.Timeline, segment.Number)
-			currentStatus = segment.status
-		} else {
-			currentSequence.AddWalSegmentNo(segment.Number)
-		}
+	segmentSequences := make([]*IntegrityScanSegmentSequence, 0, len(runs))
+	for _, run := range runs {
+		segmentSequences = append(segmentSequences, &IntegrityScanSegmentSequence{
+			TimelineID:    run.Timeline,
+			StartSegment:  run.MinNo.GetFilename(run.Timeline),
+			EndSegment:    run.MaxNo.GetFilename(run.Timeline),
+			Status:        run.Status,
+			SegmentsCount: run.Count,
+		})
 	}
-
-	segmentSequences = append(segmentSequences, newIntegrityScanSegmentSequence(currentSequence, currentStatus))
 	return segmentSequences
 }
 

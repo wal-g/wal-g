@@ -115,7 +115,7 @@ func BuildWalVerifyCheckRunner(
 	ctx context.Context,
 	checkType WalVerifyCheckType,
 	rootFolder storage.Folder,
-	walFolderFilenames []string,
+	walFolderIndex *walFolderIndex,
 	currentWalSegment WalSegmentDescription,
 	backupSearchParams BackupSearchParams,
 ) (WalVerifyCheckRunner, error) {
@@ -123,9 +123,9 @@ func BuildWalVerifyCheckRunner(
 	var err error
 	switch checkType {
 	case WalVerifyTimelineCheck:
-		checkRunner, err = NewTimelineCheckRunner(walFolderFilenames, currentWalSegment)
+		checkRunner, err = NewTimelineCheckRunner(walFolderIndex.highestTimeline, currentWalSegment)
 	case WalVerifyIntegrityCheck:
-		checkRunner, err = NewIntegrityCheckRunner(ctx, rootFolder, walFolderFilenames, currentWalSegment, backupSearchParams)
+		checkRunner, err = NewIntegrityCheckRunner(ctx, rootFolder, walFolderIndex, currentWalSegment, backupSearchParams)
 	default:
 		return nil, NewUnknownWalVerifyCheckError(checkType)
 	}
@@ -148,13 +148,13 @@ func HandleWalVerify(
 ) {
 	checkResults := make(map[WalVerifyCheckType]WalVerifyCheckResult, len(checkTypes))
 
-	// pre-fetch WAL folder filenames to reduce storage load
-	walFolderFilenames, err := getFolderFilenames(ctx, rootFolder.GetSubFolder(utility.WalPath))
+	// list the WAL folder once for all checks; keep only a compact segment index
+	walFolderIndex, err := buildWalFolderIndex(ctx, rootFolder.GetSubFolder(utility.WalPath))
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch WAL folder filenames: %v", err)
 
 	for _, checkType := range checkTypes {
 		tracelog.InfoLogger.Printf("Building check runner: %s\n", checkType)
-		runner, err := BuildWalVerifyCheckRunner(ctx, checkType, rootFolder, walFolderFilenames, currentWalSegment, backupSearchParams)
+		runner, err := BuildWalVerifyCheckRunner(ctx, checkType, rootFolder, walFolderIndex, currentWalSegment, backupSearchParams)
 		tracelog.ErrorLogger.FatalfOnError(
 			fmt.Sprintf("Failed to build check runner %s:", checkType), err)
 

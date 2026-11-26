@@ -52,10 +52,22 @@ func (desc WalSegmentDescription) GetFileName() string {
 	return desc.Number.GetFilename(desc.Timeline)
 }
 
+// walSegmentSet answers whether a WAL segment exists in storage
+type walSegmentSet interface {
+	Contains(segment WalSegmentDescription) bool
+}
+
+type walSegmentMap map[WalSegmentDescription]bool
+
+func (m walSegmentMap) Contains(segment WalSegmentDescription) bool {
+	_, exists := m[segment]
+	return exists
+}
+
 // WalSegmentRunner is used for sequential iteration over WAL segments in the storage
 type WalSegmentRunner struct {
 	currentWalSegment WalSegmentDescription
-	walFolderSegments map[WalSegmentDescription]bool
+	walFolderSegments walSegmentSet
 	stopSegmentNo     WalSegmentNo
 	timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord
 }
@@ -63,6 +75,15 @@ type WalSegmentRunner struct {
 func NewWalSegmentRunner(
 	startWalSegment WalSegmentDescription,
 	segments map[WalSegmentDescription]bool,
+	stopSegmentNo WalSegmentNo,
+	timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
+) *WalSegmentRunner {
+	return newWalSegmentRunnerWithSet(startWalSegment, walSegmentMap(segments), stopSegmentNo, timelineSwitchMap)
+}
+
+func newWalSegmentRunnerWithSet(
+	startWalSegment WalSegmentDescription,
+	segments walSegmentSet,
 	stopSegmentNo WalSegmentNo,
 	timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
 ) *WalSegmentRunner {
@@ -84,7 +105,7 @@ func (r *WalSegmentRunner) Next() (WalSegmentDescription, error) {
 		return WalSegmentDescription{}, newReachedStopSegmentError()
 	}
 	nextSegment := r.getNextSegment()
-	if _, fileExists := r.walFolderSegments[nextSegment]; !fileExists {
+	if !r.walFolderSegments.Contains(nextSegment) {
 		return WalSegmentDescription{}, newWalSegmentNotFoundError(nextSegment.GetFileName())
 	}
 	r.currentWalSegment = nextSegment
@@ -107,7 +128,7 @@ func (r *WalSegmentRunner) getNextSegment() WalSegmentDescription {
 		// Sometimes there are records in .history that are not actually present in cluster history
 		// for example after restoring cluster
 		// We will skip such records
-		if _, fileExists := r.walFolderSegments[nextSegment]; fileExists {
+		if r.walFolderSegments.Contains(nextSegment) {
 			tracelog.WarningLogger.Printf("timeline switch at LSN %s is not from our history. Skipping it\n", record.lsn.String())
 			return nextSegment
 		}
