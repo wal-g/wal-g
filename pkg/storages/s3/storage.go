@@ -20,6 +20,7 @@ type Storage struct {
 type Config struct {
 	IsolateEndpointSource      bool     `json:"-"`
 	Secrets                    *Secrets `json:"-"`
+	MaxIdleConnsPerHost        int      `json:"-"`
 	Region                     string
 	Endpoint                   string
 	EndpointSource             string

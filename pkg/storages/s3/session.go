@@ -188,6 +188,8 @@ func applyYCSessionToken(awsCfg *aws.Config, cfg *Config) ([]func(*s3.Options), 
 func buildHTTPClient(cfg *Config, tlsServerName string) (aws.HTTPClient, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.ResponseHeaderTimeout = cfg.RequestTimeout
+	transport.MaxIdleConnsPerHost = cfg.MaxIdleConnsPerHost
+	transport.MaxIdleConns = max(transport.MaxIdleConns, cfg.MaxIdleConnsPerHost)
 
 	if tlsServerName != "" {
 		if transport.TLSClientConfig == nil {
