@@ -2,6 +2,8 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
@@ -42,6 +44,8 @@ var (
 		PersistentPreRun: func(*cobra.Command, []string) {
 			// do not check for any configured settings because wal-g copy uses the different
 			// settings init process
+			err := conf.ConfigureAndRunDefaultWebServer()
+			tracelog.ErrorLogger.FatalOnError(err)
 		},
 	}
 )

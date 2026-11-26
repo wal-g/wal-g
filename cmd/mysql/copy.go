@@ -2,6 +2,8 @@ package mysql
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 	db "github.com/wal-g/wal-g/internal/databases/mysql"
 )
 
@@ -19,7 +21,10 @@ var uniformCopyCmd = &cobra.Command{
 	Run: func(command *cobra.Command, _ []string) {
 		db.HandleCopy(command.Context(), uniformCopyFrom, uniformCopyTo, uniformCopyBackupName, uniformCopyWithHistory)
 	},
-	PersistentPreRun: func(*cobra.Command, []string) {},
+	PersistentPreRun: func(*cobra.Command, []string) {
+		err := conf.ConfigureAndRunDefaultWebServer()
+		tracelog.ErrorLogger.FatalOnError(err)
+	},
 }
 
 func init() {
