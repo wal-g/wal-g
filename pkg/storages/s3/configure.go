@@ -54,6 +54,7 @@ const (
 	disable100ContinueSetting      = "S3_DISABLE_100_CONTINUE"
 	enableVersioningSetting        = "S3_ENABLE_VERSIONING"
 	deleteBatchSizeSetting         = "S3_DELETE_BATCH_SIZE"
+	maxIdleConnsPerHostSetting     = "S3_MAX_IDLE_CONNS_PER_HOST"
 )
 
 var SettingList = []string{
@@ -97,6 +98,7 @@ var SettingList = []string{
 	disable100ContinueSetting,
 	enableVersioningSetting,
 	deleteBatchSizeSetting,
+	maxIdleConnsPerHostSetting,
 }
 
 const (
@@ -115,6 +117,7 @@ const (
 	defaultDisabledRetentionPeriod = -1
 	defaultDisable100Continue      = false
 	defaultDeleteBatchSize         = 1000
+	defaultMaxIdleConnsPerHost     = 256
 )
 
 func ConfigureStorage(
@@ -221,6 +224,14 @@ func configureStorage(
 		return nil, err
 	}
 
+	maxIdleConnsPerHost, err := setting.IntOptional(settings, maxIdleConnsPerHostSetting, defaultMaxIdleConnsPerHost)
+	if err != nil {
+		return nil, err
+	}
+	if maxIdleConnsPerHost <= 0 {
+		return nil, fmt.Errorf("%s must be positive", maxIdleConnsPerHostSetting)
+	}
+
 	config := &Config{
 		Secrets: &Secrets{
 			SecretKey: strings.TrimSpace(setting.FirstDefined(settings, secretAccessKeySetting, secretKeySetting)),
@@ -268,6 +279,7 @@ func configureStorage(
 		Disable100Continue:      disable100Continue,
 		EnableVersioning:        settings[enableVersioningSetting],
 		DeleteBatchSize:         deleteBatchSize,
+		MaxIdleConnsPerHost:     maxIdleConnsPerHost,
 	}
 
 	st, err := NewStorage(ctx, config, rootWraps...)

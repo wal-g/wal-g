@@ -107,6 +107,10 @@ Limits additional attempts for each S3 request. Default is 15 (at most 16 total 
 
 Sets the timeout for waiting for response headers from S3 in seconds. Default is 0 (no timeout). Go starts this timer only after the entire request, including its body, has been written. It bounds waiting for response headers, not a stalled upload, response-body read, or the whole WAL-G operation across retries.
 
+* `WALG_S3_MAX_IDLE_CONNS_PER_HOST`
+
+Limits the number of idle keep-alive connections that WAL-G keeps for reuse for each S3 host (for each node address with `S3_ENDPOINT_SOURCE`). Default is 256; the value must be a positive integer. WAL-G does not open connections in advance: when more connections become idle than the limit allows, the extra connections are closed, and later requests open new TCP and TLS connections. Idle connections are closed after 90 seconds. Each storage, including each failover storage, has its own connection pool, and its total idle connection limit is raised to at least this value.
+
 * `S3_MIN_THROTTLING_RETRY_DELAY`
 
 Overrides the default minimum time between retries when throttled in milliseconds. Default is 500ms.
