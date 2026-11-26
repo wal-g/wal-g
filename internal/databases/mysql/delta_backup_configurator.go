@@ -122,7 +122,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 	}
 
 	// MariaDB has no server_uuid, so an empty UUID on both sides is not a change.
-	if serverUUID != "" && (prevBackupSentinelDto.ServerUUID == "" || prevBackupSentinelDto.ServerUUID != serverUUID) {
+	if serverUUID != "" && prevBackupSentinelDto.ServerUUID != serverUUID {
 		tracelog.InfoLogger.Printf("Server UUID has changed since last backup (%s vs %s). "+
 			"Fallback to full backup.", prevBackupSentinelDto.ServerUUID, serverUUID)
 		return PrevBackupInfo{}, 0, nil
