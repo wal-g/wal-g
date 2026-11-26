@@ -98,6 +98,11 @@ Removing a sentinel also does not protect a restore that has already read it.
 - Listings can still be appropriate, for example to verify that deletion left
   no unexpected objects. Keep such checks scoped to the affected backup prefix,
   outside the steady-state hot path where possible, and account for their cost.
+- Access probes must not use `ListFolder`: on S3 it paginates the whole prefix
+  (or all versions). Use `storage.CheckReadAccess`; S3 sends one ListObjectsV2
+  with `MaxKeys=1` and no delimiter. Wrappers such as `LimitedFolder` must
+  forward it. See `pkg/storages/s3/read_check_test.go`. The multistorage alive
+  checker's `readCheck` still uses `ListFolder`.
 - PostgreSQL/Greenplum copy plans must not enumerate storage roots or shared
   AO/PAX namespaces to select one backup. Resolve shared keys from manifests,
   and stat only planned destination keys before publishing anything. See

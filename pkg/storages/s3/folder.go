@@ -277,6 +277,23 @@ func (folder *Folder) ListFolder(ctx context.Context) (objects []storage.Object,
 	return objects, subFolders, nil
 }
 
+// CheckReadAccess verifies list access with a single ListObjectsV2 request limited to one key. It deliberately uses
+// no delimiter, no pagination and no versioning lookup so that its cost does not depend on the number of objects
+// stored under the prefix.
+func (folder *Folder) CheckReadAccess(ctx context.Context) error {
+	_, err := folder.s3API.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket:  folder.bucket,
+		Prefix:  aws.String(folder.path),
+		MaxKeys: aws.Int32(1),
+	})
+	// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
+	// which don't yet exist.
+	if err != nil && !isAwsNotExist(err) {
+		return errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
+	}
+	return nil
+}
+
 func (folder *Folder) ListFolderSegment(
 	ctx context.Context,
 	startAfterKey *string,
