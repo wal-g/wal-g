@@ -120,7 +120,8 @@ func TestInitConfigDoesNotValidateDefaults(t *testing.T) {
 
 func TestCheckAllowedSettingsAcceptsCopyConcurrency(t *testing.T) {
 	configFile := filepath.Join(t.TempDir(), "config.json")
-	assert.NoError(t, os.WriteFile(configFile, []byte(`{"WALG_COPY_CONCURRENCY": "4", "WALG_NOT_A_SETTING": "1"}`), 0o600))
+	assert.NoError(t, os.WriteFile(configFile,
+		[]byte(`{"WALG_COPY_CONCURRENCY": "4", "WALG_COPY_STAT_CONCURRENCY": "40", "WALG_NOT_A_SETTING": "1"}`), 0o600))
 
 	logFile, err := os.CreateTemp(t.TempDir(), "warnings-*.log")
 	assert.NoError(t, err)
@@ -144,6 +145,7 @@ func TestCheckAllowedSettingsAcceptsCopyConcurrency(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, string(logOutput), "WALG_NOT_A_SETTING is unknown")
 	assert.NotContains(t, string(logOutput), config.CopyConcurrency+" is unknown")
+	assert.NotContains(t, string(logOutput), config.CopyStatConcurrency+" is unknown")
 }
 
 func resetToDefaults() {
