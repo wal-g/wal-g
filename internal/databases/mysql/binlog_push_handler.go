@@ -65,11 +65,8 @@ func HandleBinlogPush(ctx context.Context, uploader internal.Uploader, untilBinl
 	trackGaps, err := conf.GetBoolSettingDefault(conf.MysqlBinlogGapTracking, false)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	var gtidPurged mysql.GTIDSet
-	if trackGaps {
-		gtidPurged, err = getMySQLGTIDPurged(conn, flavor)
-		tracelog.ErrorLogger.FatalOnError(err)
-	}
+	gtidPurged, err := getMySQLGTIDPurged(conn, flavor)
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	usr, err := user.Current()
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -409,11 +406,4 @@ func putCache(cache LogsCache, cacheFileName string) {
 			tracelog.ErrorLogger.Printf("Failed to write MySQL binlog cache file: %v\n", err)
 		}
 	}
-}
-
-func lastOrDefault(data []string, defaultValue string) string {
-	if len(data) > 0 {
-		return data[len(data)-1]
-	}
-	return defaultValue
 }

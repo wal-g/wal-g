@@ -17,7 +17,6 @@ const maxBinlogGapEntries = 10
 //
 // Returns true when something changed in the sentinel.
 func updateSentinelGaps(sentinel *BinlogSentinelDto, previousGTIDs, gtidPurged mysql.GTIDSet, maxGapArraySize int) (bool, error) {
-
 	replayStopBinlog := sentinel.LastUploadedBinlog
 	changed := false
 	// On the first check we do not know where existing gaps occurred.
