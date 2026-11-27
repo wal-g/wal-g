@@ -126,6 +126,7 @@ const (
 	FailoverStorageCacheEMAAlphaDeadMin  = "WALG_FAILOVER_STORAGES_CACHE_EMA_ALPHA_DEAD_MIN"
 	FailoverStoragesCheckSize            = "WALG_FAILOVER_STORAGES_CHECK_SIZE"
 	PgDaemonWALUploadTimeout             = "WALG_DAEMON_WAL_UPLOAD_TIMEOUT"
+	WalPushTimeoutSetting                = "WALG_WAL_PUSH_TIMEOUT"
 	PgTargetStorage                      = "WALG_TARGET_STORAGE"
 	DisablePartialRestore                = "WALG_DISABLE_PARTIAL_RESTORE"
 
@@ -573,6 +574,7 @@ var (
 		FailoverStorageCacheEMAAlphaDeadMin:  true,
 		FailoverStoragesCheckSize:            true,
 		PgDaemonWALUploadTimeout:             true,
+		WalPushTimeoutSetting:                true,
 		DisablePartialRestore:                true,
 		ForceWalDetal:                        true,
 		PgAppName:                            true,

@@ -1,13 +1,19 @@
 package pg
 
 import (
+	"context"
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const WalPushShortDescription = "Uploads a WAL file to storage"
+
+var timeout time.Duration
 
 // walPushCmd represents the walPush command
 var walPushCmd = &cobra.Command{
@@ -15,18 +21,37 @@ var walPushCmd = &cobra.Command{
 	Short: WalPushShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		storage, err := internal.ConfigureMultiStorage(cmd.Context(), true)
+		ctx := cmd.Context()
+
+		pushTimeout, err := getWalPushTimeout(cmd)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		if pushTimeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, pushTimeout)
+			defer cancel()
+		}
+
+		storage, err := internal.ConfigureMultiStorage(ctx, true)
 		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
 
-		walUploader, err := postgres.PrepareMultiStorageWalUploader(cmd.Context(), storage.RootFolder(), targetStorage)
+		walUploader, err := postgres.PrepareMultiStorageWalUploader(ctx, storage.RootFolder(), targetStorage)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = postgres.HandleWALPush(cmd.Context(), walUploader, args[0])
+		err = postgres.HandleWALPush(ctx, walUploader, args[0])
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
+}
+
+func getWalPushTimeout(cmd *cobra.Command) (time.Duration, error) {
+	if cmd.Flags().Changed("timeout") || timeout > 0 {
+		return timeout, nil
+	}
+	return config.GetDurationSettingDefault(config.WalPushTimeoutSetting, 0)
 }
 
 func init() {
 	Cmd.AddCommand(walPushCmd)
 	walPushCmd.Flags().StringVar(&targetStorage, "target-storage", "", targetStorageDescription)
+	walPushCmd.Flags().DurationVar(&timeout, "timeout", 0, "Overall operation timeout (e.g. 1s, 2m)")
 }
