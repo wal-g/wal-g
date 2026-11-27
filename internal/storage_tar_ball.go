@@ -62,7 +62,7 @@ func (tarBall *StorageTarBall) CloseTar() error {
 	if err != nil {
 		return errors.Wrap(err, "CloseTar: failed to close underlying writer")
 	}
-	tracelog.InfoLogger.Printf("Finished writing part %d of backup %s.\n", tarBall.partNumber, tarBall.backupName)
+	tracelog.InfoLogger.Printf("Finished writing part %d with name %s of backup %s.\n", tarBall.partNumber, tarBall.name, tarBall.backupName)
 	return nil
 }
 
@@ -87,7 +87,7 @@ func (tarBall *StorageTarBall) startUpload(ctx context.Context, name string, cry
 
 	path := GetBackupTarPath(tarBall.backupName, name)
 
-	tracelog.InfoLogger.Printf("Starting part %d of backup %s ...\n", tarBall.partNumber, tarBall.backupName)
+	tracelog.InfoLogger.Printf("Starting part %d with name %s of backup %s ...\n", tarBall.partNumber, name, tarBall.backupName)
 
 	go func() {
 		err := uploader.Upload(ctx, path, pipeReader)
