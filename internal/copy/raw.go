@@ -221,12 +221,12 @@ func (p *Plan) AddSourceObject(ctx context.Context, sourcePath, targetPath strin
 // AddSourceObjects adds corresponding source and target paths with the same publication settings.
 // It skips cached sources and waits for all lookups before changing the plan.
 func (p *Plan) AddSourceObjects(
-	ctx context.Context, sourcePaths, targetPaths []string, phase Phase, mutable bool, copyConcurrency int,
+	ctx context.Context, sourcePaths, targetPaths []string, phase Phase, mutable bool, statConcurrency int,
 ) (sourceLookups int, err error) {
 	if len(sourcePaths) != len(targetPaths) {
 		return 0, fmt.Errorf("got %d source paths and %d target paths", len(sourcePaths), len(targetPaths))
 	}
-	sourceLookups, err = p.findSourceObjects(ctx, sourcePaths, copyConcurrency)
+	sourceLookups, err = p.findSourceObjects(ctx, sourcePaths, statConcurrency)
 	if err != nil {
 		return 0, err
 	}
@@ -238,9 +238,9 @@ func (p *Plan) AddSourceObjects(
 	return sourceLookups, nil
 }
 
-func (p *Plan) findSourceObjects(ctx context.Context, sourcePaths []string, copyConcurrency int) (int, error) {
-	if copyConcurrency < 1 {
-		return 0, fmt.Errorf("copy concurrency must be positive, got %d", copyConcurrency)
+func (p *Plan) findSourceObjects(ctx context.Context, sourcePaths []string, statConcurrency int) (int, error) {
+	if statConcurrency < 1 {
+		return 0, fmt.Errorf("stat concurrency must be positive, got %d", statConcurrency)
 	}
 	for _, sourcePath := range sourcePaths {
 		if err := validateSourcePath(path.Clean(sourcePath)); err != nil {
@@ -252,7 +252,7 @@ func (p *Plan) findSourceObjects(ctx context.Context, sourcePaths []string, copy
 	objects := make([]storage.Object, len(sourcePaths))
 	lookups := 0
 	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(copyConcurrency)
+	group.SetLimit(statConcurrency)
 	for i, sourcePath := range sourcePaths {
 		if groupCtx.Err() != nil {
 			break
