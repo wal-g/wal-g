@@ -26,7 +26,7 @@ const (
 
 	encryptTargetFlag        = "encrypt-source"
 	encryptTargetShorthand   = "e"
-	encryptTargetDescription = "Encypt file in target storage"
+	encryptTargetDescription = "Encrypt file in target storage"
 )
 
 var (

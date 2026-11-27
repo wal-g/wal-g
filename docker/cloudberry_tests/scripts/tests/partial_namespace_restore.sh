@@ -78,11 +78,11 @@ if ! echo $output1 | grep -q "$EXPECTED_ERROR_MSG"; then
   echo $output1
   exit 1
 elif ! echo $output2 | grep -q "$EXPECTED_ERROR_MSG"; then
-  echo "Error: skip namespace must be emtpy after partial fetch"
+  echo "Error: skip namespace must be empty after partial fetch"
   echo $output2
   exit 1
 elif ! echo $output3 | grep -q "$EXPECTED_ERROR_MSG"; then
-  echo "Error: skip namespace must be emtpy after partial fetch"
+  echo "Error: skip namespace must be empty after partial fetch"
   echo $output3
   exit 1
 fi

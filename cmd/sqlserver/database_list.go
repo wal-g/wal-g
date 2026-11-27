@@ -5,7 +5,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/sqlserver"
 )
 
-const databaseListShortDescription = "List datbases in the backup"
+const databaseListShortDescription = "List databases in the backup"
 
 var databaseListCmd = &cobra.Command{
 	Use:   "database-list",
