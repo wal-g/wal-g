@@ -41,6 +41,9 @@ func (folder *Folder) WalkObjects(ctx context.Context, visit func(storage.Object
 					continue
 				}
 				info, err := entry.Info()
+				if os.IsNotExist(err) {
+					continue
+				}
 				if err != nil {
 					return err
 				}

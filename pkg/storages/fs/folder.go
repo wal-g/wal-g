@@ -57,6 +57,9 @@ func (folder *Folder) ListFolder(_ context.Context) (objects []storage.Object, s
 		}
 
 		info, err := fileInfo.Info()
+		if os.IsNotExist(err) {
+			continue
+		}
 		if err != nil {
 			return nil, nil, err
 		}
