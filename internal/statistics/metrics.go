@@ -98,6 +98,27 @@ func PushMetrics() {
 	}
 }
 
+// fatalfOnError is replaceable in tests because the real logger exits the process.
+var fatalfOnError = func(format string, err error) {
+	tracelog.ErrorLogger.FatalfOnError(format, err)
+}
+
+// FatalOnError pushes metrics and exits if err is not nil.
+// A fatal exit skips the command's PersistentPostRun metrics hook, so failures
+// (e.g. walg_uploader_uploaded_files_failed_total) would never reach StatsD otherwise.
+func FatalOnError(err error) {
+	FatalfOnError(tracelog.GetErrorFormatter(), err)
+}
+
+// FatalfOnError is like FatalOnError but with a custom message format.
+func FatalfOnError(format string, err error) {
+	if err == nil {
+		return
+	}
+	PushMetrics()
+	fatalfOnError(format, err)
+}
+
 func WriteStatusCodeMetric(code int) {
 	WalgMetrics.S3Codes.WithLabelValues(strconv.Itoa(code)).Inc()
 }
