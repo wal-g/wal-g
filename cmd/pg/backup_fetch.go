@@ -39,6 +39,10 @@ var backupFetchCmd = &cobra.Command{
 	Short: backupFetchShortDescription, // TODO : improve description
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
+		if consoleEnabled(cmd) {
+			startConsoleServer(cmd.Context())
+		}
+
 		internal.ConfigureLimiters()
 
 		if fetchTargetUserData == "" {
