@@ -220,3 +220,40 @@ func TestParseBinlogPosFromMariaDBBackupInfo(t *testing.T) {
 	assert.Equal(t, int64(1298), info.BinlogPos.FilePosition)
 	assert.Equal(t, "0-1-6", info.BinlogPos.LastGTID)
 }
+
+func TestWithApplyLogOnly(t *testing.T) {
+	var tests = []struct {
+		name          string
+		isLast        bool
+		serverVersion string
+		exp           bool
+	}{
+		{"mysql, more backups follow", false, "8.0.35-27", true},
+		{"mysql, last backup", true, "8.0.35-27", false},
+		{"mariadb, more backups follow", false, "11.4.10-MariaDB-deb12-log", false},
+		{"mariadb, last backup", true, "11.4.10-MariaDB-deb12-log", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", "xtrabackup --prepare")
+			got := withApplyLogOnly(t.Context(), cmd, tt.isLast, tt.serverVersion)
+			assert.Equal(t, tt.exp, strings.Contains(got.Args[len(got.Args)-1], XtrabackupApplyLogOnly))
+		})
+	}
+}
+
+func TestIsMariaDBBackup(t *testing.T) {
+	var tests = []struct {
+		exp           bool
+		serverVersion string
+	}{
+		{true, "11.4.10-MariaDB-deb12-log"},
+		{true, "10.6.18-MariaDB"},
+		{false, "8.0.35-27"},
+		{false, "8.0.36"},
+		{false, ""},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.exp, isMariaDBBackup(tt.serverVersion), tt.serverVersion)
+	}
+}

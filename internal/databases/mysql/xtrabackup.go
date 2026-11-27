@@ -115,6 +115,25 @@ func isXtrabackup(cmd *exec.Cmd) bool {
 	})
 }
 
+// isMariaDBBackup reports whether a backup with this ServerVersion was taken from MariaDB.
+// mariabackup has no --apply-log-only option and rejects it as unknown; a backup it has
+// prepared still accepts further --incremental-dir prepares.
+func isMariaDBBackup(serverVersion string) bool {
+	return strings.Contains(serverVersion, "MariaDB")
+}
+
+// withApplyLogOnly returns prepareCmd with --apply-log-only added when more backups will be
+// applied on top of this one (that is, it is not the last in the chain). A backup taken from
+// MariaDB never gets the flag, because mariabackup rejects it.
+func withApplyLogOnly(ctx context.Context, prepareCmd *exec.Cmd, isLast bool, serverVersion string) *exec.Cmd {
+	if isLast || isMariaDBBackup(serverVersion) {
+		return prepareCmd
+	}
+	prepareCmd = cloneCommand(ctx, prepareCmd)
+	injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
+	return prepareCmd
+}
+
 //nolint:unparam
 func prepareTemporaryDirectory(tmpDirRoot string) (string, error) {
 	tmpDirPattern := "wal-g"
@@ -252,10 +271,7 @@ func xtrabackupFetchClassic(ctx context.Context, backup internal.Backup, restore
 		prepareCmd = cloneCommand(ctx, prepareCmd)
 		injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+tempDeltaDir)
 	}
-	if !isLast {
-		prepareCmd = cloneCommand(ctx, prepareCmd)
-		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
-	}
+	prepareCmd = withApplyLogOnly(ctx, prepareCmd, isLast, sentinel.ServerVersion)
 
 	stdin, err := restoreCmd.StdinPipe()
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
@@ -328,10 +344,7 @@ func xtrabackupFetchInhouse(ctx context.Context, backup internal.Backup, prepare
 		prepareCmd = cloneCommand(ctx, prepareCmd)
 		injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+tempDeltaDir)
 	}
-	if !isLast {
-		prepareCmd = cloneCommand(ctx, prepareCmd)
-		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
-	}
+	prepareCmd = withApplyLogOnly(ctx, prepareCmd, isLast, sentinel.ServerVersion)
 
 	fetcher, err := internal.GetBackupStreamFetcher(ctx, backup)
 	if err != nil {
