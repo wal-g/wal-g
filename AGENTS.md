@@ -172,6 +172,17 @@ Removing a sentinel also does not protect a restore that has already read it.
   a `mongod` restart cannot continue from the cached file list. See
   `internal/databases/mongo/binary/backup_cursor.go` and `backup.go`.
 
+## MongoDB oplog replay
+
+- `DBApplier` (`internal/databases/mongo/oplog/applier.go`) replays through the
+  user-level `applyOps` command, usually on a temporary standalone `mongod`.
+  `client.ApplyOps` drops `ts`, so mongod sees entries with a zero `ts`; `ui` is
+  removed unless `PreserveUUID` is set; fields that `db.Oplog` does not decode,
+  such as `versionContext`, are lost.
+- Without authorization `applyOps` does not reject unregistered internal oplog
+  commands; it applies them. Decide for each new server oplog command whether to
+  skip, apply or fail; see `applier_mongo90_test.go` for MongoDB 9.0.
+
 ## Validation and handoff
 
 - MongoDB binary and Redis AOF/TS backups share `WALG_BACKUP_FILE_PART_SIZE` and

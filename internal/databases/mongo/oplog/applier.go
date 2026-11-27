@@ -23,6 +23,13 @@ const (
 	IndexNotFoundError     int32 = 27
 )
 
+// Oplog commands introduced in MongoDB 9.0 that need special handling during replay.
+const (
+	dropIdentCmd               = "dropIdent"
+	timeseriesConversionCmd    = "upgradeDowngradeViewlessTimeseries"
+	initReplicatedFastCountCmd = "initReplicatedFastCount"
+)
+
 type TypeAssertionError struct {
 	etype string
 	key   string
@@ -250,6 +257,13 @@ func shouldSkip(oplog *db.Oplog, catchUp bool) error {
 			*/
 			return fmt.Errorf("%s operation is not supported in applyOps mode", oplog.Object[0].Key)
 		}
+		if oplog.Object[0].Key == dropIdentCmd {
+			// dropIdent is the replicated second phase of a drop on storage with schema epochs (not the
+			// default attached storage). It names a storage ident of the source node: the logical drop
+			// comes in the preceding drop/dropIndexes entry, and mongod reaps its own drop-pending idents.
+			// applyOps would also give it a zero timestamp.
+			return fmt.Errorf("%s operation only removes storage of a dropped collection or index", dropIdentCmd)
+		}
 	}
 
 	if !catchUp && !isOpAllowedInconfigDB(oplog) {
@@ -344,7 +358,17 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 		return nil
 	}
 
-	if !ap.preserveUUID {
+	cmdName := ""
+	if op.Operation == "c" && len(op.Object) > 0 {
+		cmdName = op.Object[0].Key
+	}
+	if err := checkMongo90Command(cmdName, op); err != nil {
+		return NewOpHandleError(*op, err)
+	}
+
+	// mongod requires the collection UUID to convert a timeseries collection. A restored binary backup
+	// keeps the source UUIDs, and mongod checks that the UUID matches the collection.
+	if !ap.preserveUUID && cmdName != timeseriesConversionCmd {
 		_, err = filterUUIDs(op)
 		if err != nil {
 			return fmt.Errorf("can not filter UUIDs from op '%+v', error: %+v", op, err)
@@ -380,9 +404,30 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 		// we ignore some errors (for example 'duplicate key error')
 		// TODO: check after TOOLS-2041
 		if !ap.shouldIgnore(op.Operation, err) {
+			if cmdName == timeseriesConversionCmd {
+				err = fmt.Errorf("can not replay timeseries collection conversion made by "+
+					"setFeatureCompatibilityVersion between 8.x and 9.0: %w", err)
+			}
 			return NewOpHandleError(*op, err)
 		}
 		tracelog.WarningLogger.Printf("apply error is skipped: %+v\nop:\n%+v", err, *op)
+	}
+	return nil
+}
+
+// checkMongo90Command rejects MongoDB 9.0 oplog commands that can not be replayed correctly.
+func checkMongo90Command(cmdName string, op *db.Oplog) error {
+	switch cmdName {
+	case timeseriesConversionCmd:
+		if op.UI == nil {
+			return fmt.Errorf("%s entry has no collection UUID", timeseriesConversionCmd)
+		}
+	case initReplicatedFastCountCmd:
+		// The entry is logged only with container writes enabled (featureFlagContainerWrites, off by default).
+		// The following container writes keep collection counts and sizes, applyOps does not accept them,
+		// and skipping them would leave stale counts.
+		return fmt.Errorf("%s is not supported: replicated fast count containers can not be replayed",
+			initReplicatedFastCountCmd)
 	}
 	return nil
 }
