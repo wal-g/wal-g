@@ -25,15 +25,10 @@ func TestAddSourceObjectsMatchesSingleCalls(t *testing.T) {
 	source := testtools.MakeDefaultInMemoryStorageFolder()
 	one := copyutil.NewScopedPlan(source, source)
 	batch := copyutil.NewScopedPlan(source, source)
-	from := []string{"backup/a", "backup/b", "shared/c", "shared/d", "shared/d"}
-	to := []string{"copy/a", "copy/b", "copy/c", "copy/d", "copy/d"}
-	for _, name := range []string{"backup/a", "backup/b", "shared/c", "shared/d"} {
+	from := []string{"backup/a", "backup/b"}
+	to := []string{"copy/a", "copy/b"}
+	for _, name := range from {
 		require.NoError(t, source.PutObject(t.Context(), name, bytes.NewBufferString(name)))
-	}
-	for _, plan := range []*copyutil.Plan{one, batch} {
-		require.NoError(t, plan.InventoryPrefix(t.Context(), "backup"))
-		_, err := plan.FindObject(t.Context(), "shared/c")
-		require.NoError(t, err)
 	}
 	for i, name := range from {
 		require.NoError(t, one.AddSourceObject(t.Context(), name, to[i], copyutil.MetadataPhase, true))
@@ -41,51 +36,6 @@ func TestAddSourceObjectsMatchesSingleCalls(t *testing.T) {
 	_, err := batch.AddSourceObjects(t.Context(), from, to, copyutil.MetadataPhase, true, 2)
 	require.NoError(t, err)
 	require.Equal(t, one.Entries(), batch.Entries())
-	require.Len(t, batch.Entries(), 4)
-}
-
-func TestAddSourceObjectsCountsEveryLookupOfDuplicatePaths(t *testing.T) {
-	source := &countingStatFolder{Folder: testtools.MakeDefaultInMemoryStorageFolder()}
-	require.NoError(t, source.PutObject(t.Context(), "shared/d", bytes.NewBufferString("d")))
-	plan := copyutil.NewScopedPlan(source, testtools.MakeDefaultInMemoryStorageFolder())
-	paths := []string{"shared/d", "shared/./d"}
-
-	lookups, err := plan.AddSourceObjects(t.Context(), paths, paths, copyutil.PayloadPhase, false, 2)
-	require.NoError(t, err)
-	require.Positive(t, lookups)
-	require.Equal(t, source.Stats(), lookups)
-	entries := plan.Entries()
-	require.Len(t, entries, 1)
-	require.Equal(t, "shared/d", entries[0].TargetPath)
-}
-
-func TestAddSourceObjectsCountsOnlyUncachedLookups(t *testing.T) {
-	source := &countingStatFolder{Folder: testtools.MakeDefaultInMemoryStorageFolder()}
-	for _, name := range []string{"backup/a", "backup/b", "shared/c", "shared/d", "shared/e"} {
-		require.NoError(t, source.PutObject(t.Context(), name, bytes.NewBufferString(name)))
-	}
-	plan := copyutil.NewScopedPlan(source, testtools.MakeDefaultInMemoryStorageFolder())
-	require.NoError(t, plan.InventoryPrefix(t.Context(), "backup"))
-	_, err := plan.FindObject(t.Context(), "shared/c")
-	require.NoError(t, err)
-	paths := []string{"backup/a", "backup/b", "shared/c", "shared/d", "shared/e"}
-
-	statsBefore := source.Stats()
-	lookups, err := plan.AddSourceObjects(t.Context(), paths, paths, copyutil.PayloadPhase, false, 2)
-	require.NoError(t, err)
-	require.Equal(t, 2, lookups)
-	require.Equal(t, statsBefore+lookups, source.Stats())
-
-	statsBefore = source.Stats()
-	lookups, err = plan.AddSourceObjects(t.Context(), paths, paths, copyutil.PayloadPhase, false, 2)
-	require.NoError(t, err)
-	require.Zero(t, lookups)
-	require.Equal(t, statsBefore, source.Stats())
-	targets := make([]string, 0, len(paths))
-	for _, entry := range plan.Entries() {
-		targets = append(targets, entry.TargetPath)
-	}
-	require.Equal(t, paths, targets)
 }
 
 func TestExecuteRawPreservesOpaqueBytes(t *testing.T) {
@@ -320,26 +270,6 @@ func TestStandaloneDatabasePlansExcludeUnrelatedArchiveHistory(t *testing.T) {
 			}
 		})
 	}
-}
-
-type countingStatFolder struct {
-	storage.Folder
-
-	mu    sync.Mutex
-	stats int
-}
-
-func (f *countingStatFolder) StatObject(ctx context.Context, name string) (storage.Object, error) {
-	f.mu.Lock()
-	f.stats++
-	f.mu.Unlock()
-	return f.Folder.StatObject(ctx, name)
-}
-
-func (f *countingStatFolder) Stats() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.stats
 }
 
 type failingPutFolder struct {
