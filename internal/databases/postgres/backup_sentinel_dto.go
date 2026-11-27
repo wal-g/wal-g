@@ -83,6 +83,7 @@ type ExtendedMetadataDto struct {
 	FinishLsn        LSN       `json:"finish_lsn"`
 	IsPermanent      bool      `json:"is_permanent"`
 	SystemIdentifier *uint64   `json:"system_identifier"`
+	IncrementFrom    *string   `json:"delta_from,omitempty"`
 
 	UncompressedSize int64 `json:"uncompressed_size"`
 	CompressedSize   int64 `json:"compressed_size"`
@@ -108,6 +109,7 @@ func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Tim
 	meta.FinishLsn = *sentinelDto.BackupFinishLSN
 	meta.PgVersion = sentinelDto.PgVersion
 	meta.SystemIdentifier = sentinelDto.SystemIdentifier
+	meta.IncrementFrom = sentinelDto.IncrementFrom
 	meta.UserData = sentinelDto.UserData
 	meta.UncompressedSize = sentinelDto.UncompressedSize
 	meta.CompressedSize = sentinelDto.CompressedSize
@@ -196,6 +198,7 @@ type BackupSentinelDtoV2 struct {
 	IsPermanent    bool      `json:"IsPermanent"`
 }
 
+//nolint:gocritic // hugeParam
 func NewBackupSentinelDtoV2(sentinel BackupSentinelDto, meta ExtendedMetadataDto) BackupSentinelDtoV2 {
 	return BackupSentinelDtoV2{
 		BackupSentinelDto: sentinel,
