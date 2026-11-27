@@ -140,7 +140,8 @@ Planning lists only the selected backup payload prefixes and their segment WAL
 directories, not the entire storage. Shared AO/PAX objects are looked up by keys
 from the selected manifests. Destination checks use bounded concurrent HEAD/stat
 requests for planned objects, without listing the destination.
-`WALG_COPY_STAT_CONCURRENCY` limits these requests; it defaults to `WALG_COPY_CONCURRENCY`.
+`WALG_COPY_STAT_CONCURRENCY` (default 4) limits these requests and the shared
+AO/PAX lookups.
 WAL directories can still be large: this does not yet remove WAL/history
 enumeration or bound the in-memory plan independently of the selected data.
 

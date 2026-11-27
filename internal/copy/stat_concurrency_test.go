@@ -25,10 +25,7 @@ func TestCopyStatConcurrencyConfigPrecedence(t *testing.T) {
 		wantConcurrency, wantStatConcurrency   int
 		invalid                                bool
 	}{
-		{name: "default follows default copy concurrency", wantConcurrency: 8, wantStatConcurrency: 8},
-		{name: "follows main copy concurrency", copyMain: "4", wantConcurrency: 4, wantStatConcurrency: 4},
-		{name: "follows environment copy concurrency", copyEnvironment: "6", wantConcurrency: 6, wantStatConcurrency: 6},
-		{name: "follows source copy concurrency", copyMain: "4", copySource: "2", wantConcurrency: 2, wantStatConcurrency: 2},
+		{name: "default", wantConcurrency: 8, wantStatConcurrency: 4},
 		{name: "main", copyMain: "4", main: "40", wantConcurrency: 4, wantStatConcurrency: 40},
 		{name: "environment", environment: "60", wantConcurrency: 8, wantStatConcurrency: 60},
 		{name: "source wins", main: "40", source: "20", wantConcurrency: 8, wantStatConcurrency: 20},
@@ -36,6 +33,8 @@ func TestCopyStatConcurrencyConfigPrecedence(t *testing.T) {
 		{name: "destination ignored", main: "40", destination: "90", wantConcurrency: 8, wantStatConcurrency: 40},
 		{name: "lower than copy concurrency", copySource: "4", source: "1", wantConcurrency: 4, wantStatConcurrency: 1},
 		{name: "invalid environment", environment: "bad", invalid: true},
+		{name: "blank environment", environment: " ", invalid: true},
+		{name: "blank source", main: "1", source: " ", invalid: true},
 		{name: "zero", source: "0", invalid: true},
 		{name: "negative", source: "-1", invalid: true},
 		{name: "invalid", source: "bad", invalid: true},
@@ -110,7 +109,7 @@ func TestExecuteLimitsDestinationStatsSeparately(t *testing.T) {
 	}{
 		{"more stats than transfers", copyutil.ExecuteOptions{Concurrency: 2, StatConcurrency: 5}, 5, 2},
 		{"fewer stats than transfers", copyutil.ExecuteOptions{Concurrency: 4, StatConcurrency: 1}, 1, 4},
-		{"unset follows transfers", copyutil.ExecuteOptions{Concurrency: 3}, 3, 3},
+		{"unset uses default", copyutil.ExecuteOptions{Concurrency: 3}, 4, 3},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			viper.Reset()

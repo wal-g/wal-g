@@ -304,6 +304,7 @@ var (
 		LogLevelSetting:              "NORMAL",
 		ServerSideCopyFallback:       "true",
 		CopyConcurrency:              "8",
+		CopyStatConcurrency:          "4",
 		DisasterCopy:                 "false",
 	}
 

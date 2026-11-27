@@ -26,11 +26,11 @@ func OptionsFromConfigs(source, destination *viper.Viper) (ExecuteOptions, error
 	if err != nil {
 		return ExecuteOptions{}, err
 	}
-	concurrency, err := configuredCopyConcurrency(source)
+	concurrency, err := configuredConcurrency(source, conf.CopyConcurrency)
 	if err != nil {
 		return ExecuteOptions{}, err
 	}
-	statConcurrency, err := configuredCopyStatConcurrency(source, concurrency)
+	statConcurrency, err := configuredConcurrency(source, conf.CopyStatConcurrency)
 	if err != nil {
 		return ExecuteOptions{}, err
 	}
@@ -63,23 +63,11 @@ func configuredCopyRetries(source *viper.Viper) (int, error) {
 	return retries, nil
 }
 
-func configuredCopyConcurrency(source *viper.Viper) (int, error) {
-	value := sourceOrMainSetting(source, conf.CopyConcurrency)
+func configuredConcurrency(source *viper.Viper, setting string) (int, error) {
+	value := sourceOrMainSetting(source, setting)
 	concurrency, err := strconv.Atoi(value)
 	if err != nil || concurrency < conf.MinAllowedConcurrency {
-		return 0, fmt.Errorf("%s must be a positive integer, got %q", conf.CopyConcurrency, value)
-	}
-	return concurrency, nil
-}
-
-func configuredCopyStatConcurrency(source *viper.Viper, copyConcurrency int) (int, error) {
-	value := sourceOrMainSetting(source, conf.CopyStatConcurrency)
-	if value == "" {
-		return copyConcurrency, nil
-	}
-	concurrency, err := strconv.Atoi(value)
-	if err != nil || concurrency < conf.MinAllowedConcurrency {
-		return 0, fmt.Errorf("%s must be a positive integer, got %q", conf.CopyStatConcurrency, value)
+		return 0, fmt.Errorf("%s must be a positive integer, got %q", setting, value)
 	}
 	return concurrency, nil
 }
@@ -95,23 +83,21 @@ func (o ExecuteOptions) copyRetries() (int, error) {
 }
 
 func (o ExecuteOptions) copyConcurrency() (int, error) {
-	if o.Concurrency == 0 {
-		return configuredCopyConcurrency(nil)
-	}
-	if o.Concurrency < conf.MinAllowedConcurrency {
-		return 0, fmt.Errorf("%s must be a positive integer, got %d", conf.CopyConcurrency, o.Concurrency)
-	}
-	return o.Concurrency, nil
+	return optionConcurrency(o.Concurrency, conf.CopyConcurrency)
 }
 
 func (o ExecuteOptions) copyStatConcurrency() (int, error) {
-	if o.StatConcurrency == 0 {
-		return o.copyConcurrency()
+	return optionConcurrency(o.StatConcurrency, conf.CopyStatConcurrency)
+}
+
+func optionConcurrency(concurrency int, setting string) (int, error) {
+	if concurrency == 0 {
+		return configuredConcurrency(nil, setting)
 	}
-	if o.StatConcurrency < conf.MinAllowedConcurrency {
-		return 0, fmt.Errorf("%s must be a positive integer, got %d", conf.CopyStatConcurrency, o.StatConcurrency)
+	if concurrency < conf.MinAllowedConcurrency {
+		return 0, fmt.Errorf("%s must be a positive integer, got %d", setting, concurrency)
 	}
-	return o.StatConcurrency, nil
+	return concurrency, nil
 }
 
 func disasterCopyEnabled(source, destination *viper.Viper) bool {
