@@ -70,6 +70,7 @@ type Bundle struct {
 	IncrementFromFiles internal.BackupFileList
 	IncrementFromName  string
 	DeltaMap           PagedFileDeltaMap
+	UseWalSummary      bool
 	TablespaceSpec     TablespaceSpec
 	DataCatalogSize    atomic.Int64
 
@@ -273,7 +274,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 		// For details see
 		//nolint:lll    // https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 
-		if (wasInBase || bundle.forceIncremental) && (time.Equal(baseFile.MTime)) {
+		if !bundle.UseWalSummary && (wasInBase || bundle.forceIncremental) && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup
 			tracelog.DebugLogger.Println("Skipped due to unchanged modification time: " + path)
 			bundle.TarBallComposer.SkipFile(fileInfoHeader, info)
@@ -296,10 +297,28 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 
 // isPagedFile checks basic expectations for paged file
 func (bundle *Bundle) isIncremented(path string, wasInBase bool, info fs.FileInfo) bool {
+	if bundle.UseWalSummary && isPagedFile(info, path) && bundle.walSummaryRequiresFullCopy(path) {
+		return false
+	}
 	incrementBaseLsn := bundle.getIncrementBaseLsn()
 	isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(info, path)
 	isIncremented = isIncremented || (bundle.IncrementFromChkpNum != nil && wasInBase && orioledb.IsOrioledbDataFile(info, path))
 	return isIncremented
+}
+
+func (bundle *Bundle) walSummaryRequiresFullCopy(path string) bool {
+	node, err := GetRelFileNodeFrom(path)
+	if err != nil {
+		return true
+	}
+	bitmap, exists := bundle.DeltaMap[*node]
+	if exists && bitmap == nil {
+		return true
+	}
+	// PostgreSQL uses relNumber=0 to mark creation of a whole database.
+	node.RelNode = 0
+	_, exists = bundle.DeltaMap[*node]
+	return exists
 }
 
 // TODO : unit tests
