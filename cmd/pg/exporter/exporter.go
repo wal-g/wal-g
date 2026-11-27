@@ -31,6 +31,7 @@ type WalgExporter struct {
 
 	// Metrics of backups
 	backupCount            *prometheus.GaugeVec
+	orphanedBackups        prometheus.Gauge
 	backupInfo             *prometheus.GaugeVec
 	backupStartTimestamp   *prometheus.GaugeVec
 	backupFinishTimestamp  *prometheus.GaugeVec
@@ -124,28 +125,38 @@ func (b *BackupInfo) IsFullBackup() bool {
 	return !strings.Contains(b.BackupName, "_D_")
 }
 
-// GetDeltaOriginName extracts the parent backup name for delta backups
-func (b *BackupInfo) GetDeltaOriginName(backups []BackupInfo) string {
-	if b.IsFullBackup() {
-		return "" // Full backups don't have a base backup
-	}
-
-	// Find the "_D_" pattern in the backup name
-	deltaIndex := strings.Index(b.BackupName, "_D_")
-	if deltaIndex == -1 || len(b.BackupName) <= deltaIndex+3 {
-		return ""
-	}
-
-	// Extract the part after "_D_" which contains the base backup identifier
-	expectedParent := "base_" + b.BackupName[deltaIndex+3:] // +3 to skip "_D_"
+// parentIndices finds the parent of each delta backup (-1 if it is not found or not unique)
+func parentIndices(backups []BackupInfo) []int {
+	parents := make([]int, len(backups))
 	for i := range backups {
-		candidate := &backups[i]
-		if b.BackupName != candidate.BackupName && strings.HasPrefix(candidate.BackupName, expectedParent) {
-			return candidate.BackupName
+		parents[i] = -1
+		_, parentWalFile, isDelta := strings.Cut(backups[i].BackupName, "_D_")
+		if !isDelta {
+			continue
+		}
+
+		for j := range backups {
+			candidate := &backups[j]
+			if candidate.WalFileName != parentWalFile || candidate.FinishLSN > backups[i].StartLSN {
+				continue
+			}
+			if parents[i] != -1 {
+				parents[i] = -1 // Several backups match, the parent cannot be determined
+				break
+			}
+			parents[i] = j
 		}
 	}
 
-	return ""
+	return parents
+}
+
+// isRestorable checks that the chain of parents of a backup reaches a full backup
+func isRestorable(backups []BackupInfo, parents []int, i int) bool {
+	for parents[i] >= 0 {
+		i = parents[i]
+	}
+	return backups[i].IsFullBackup()
 }
 
 // NewWalgExporter creates a new WAL-G exporter
@@ -190,10 +201,16 @@ func NewWalgExporter(
 			Help: "Number of backups by type",
 		}, []string{"backup_type"}),
 
+		orphanedBackups: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "walg_orphaned_backups",
+			Help: "Number of delta backups whose chain of parents does not reach a full backup",
+		}),
+
 		backupInfo: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "walg_backup_info",
 			Help: "Information about stored backups. Value is always 1.",
-		}, []string{"backup_name", "backup_type", "wal_file", "pg_version", "start_lsn", "finish_lsn", "is_permanent", "delta_origin"}),
+		}, []string{"backup_name", "backup_type", "wal_file", "pg_version", "start_lsn", "finish_lsn", "is_permanent",
+			"delta_origin", "hostname"}),
 
 		backupStartTimestamp: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "walg_backup_start_timestamp",
@@ -249,6 +266,7 @@ func (e *WalgExporter) Describe(ch chan<- *prometheus.Desc) {
 	e.walVerifyCheck.Describe(ch)
 	e.walIntegrity.Describe(ch)
 	e.backupCount.Describe(ch)
+	e.orphanedBackups.Describe(ch)
 	e.backupInfo.Describe(ch)
 	e.backupStartTimestamp.Describe(ch)
 	e.backupFinishTimestamp.Describe(ch)
@@ -268,6 +286,7 @@ func (e *WalgExporter) Collect(ch chan<- prometheus.Metric) {
 	e.walVerifyCheck.Collect(ch)
 	e.walIntegrity.Collect(ch)
 	e.backupCount.Collect(ch)
+	e.orphanedBackups.Collect(ch)
 	e.backupInfo.Collect(ch)
 	e.backupStartTimestamp.Collect(ch)
 	e.backupFinishTimestamp.Collect(ch)
@@ -326,11 +345,14 @@ func (e *WalgExporter) scrapeBackupMetrics() {
 		return
 	}
 
+	// Find the parent of each delta backup
+	parents := parentIndices(backups)
+
 	// Update backup metrics
-	e.updateBackupMetrics(backups)
+	e.updateBackupMetrics(backups, parents)
 
 	// Calculate PITR window
-	e.updatePitrWindow(backups)
+	e.updatePitrWindow(backups, parents)
 
 	e.logger.Info("Metrics for backups scrape completed", "duration", time.Since(start))
 }
@@ -398,7 +420,7 @@ func (e *WalgExporter) getWalVerify() (*WalVerifyResponse, error) {
 }
 
 // updateBackupMetrics updates backup-related metrics with detailed labels
-func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
+func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo, parents []int) {
 	// Reset metrics
 	e.backupCount.Reset()
 	e.backupInfo.Reset()
@@ -407,7 +429,7 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 	e.backupUncompressedSize.Reset()
 	e.backupCompressedSize.Reset()
 
-	fullCount, deltaCount := 0, 0
+	fullCount, deltaCount, orphanedCount := 0, 0, 0
 
 	// Create detailed metrics for each backup
 	for i := range backups {
@@ -418,11 +440,17 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 		} else {
 			deltaCount++
 		}
+		if !isRestorable(backups, parents, i) {
+			orphanedCount++
+		}
 
 		isPermanent := strconv.FormatBool(backup.IsPermanent)
 
-		// Get parent backup name for delta backups (empty for full backups)
-		deltaOriginBackupName := backup.GetDeltaOriginName(backups)
+		// Get parent backup name for delta backups (empty for full backups and when the parent cannot be determined)
+		deltaOriginBackupName := ""
+		if parents[i] >= 0 {
+			deltaOriginBackupName = backups[parents[i]].BackupName
+		}
 
 		// Labels for detailed backup information
 		labels := []string{
@@ -434,6 +462,7 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 			LSN(backup.FinishLSN).String(), // finish_lsn
 			isPermanent,                    // is_permanent
 			deltaOriginBackupName,          // delta_origin
+			backup.Hostname,                // hostname
 		}
 		e.backupInfo.WithLabelValues(labels...).Set(1)
 
@@ -449,6 +478,7 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 	// Set backup counts by type
 	e.backupCount.WithLabelValues("full").Set(float64(fullCount))
 	e.backupCount.WithLabelValues("delta").Set(float64(deltaCount))
+	e.orphanedBackups.Set(float64(orphanedCount))
 }
 
 func mapStatus(status string) float64 {
@@ -502,23 +532,23 @@ func (e *WalgExporter) updateWalMetrics(verifyData *WalVerifyResponse) {
 }
 
 // updatePitrWindow calculates and updates the PITR window size
-func (e *WalgExporter) updatePitrWindow(backups []BackupInfo) {
+func (e *WalgExporter) updatePitrWindow(backups []BackupInfo, parents []int) {
 	if len(backups) == 0 {
 		e.pitrWindow.Set(0)
 		return
 	}
 
-	// Find earliest non-permanent backup (matches wal-verify behavior)
+	// Find earliest non-permanent backup that can be restored
 	var earliestEligibleBackup *BackupInfo
 
 	for i := range backups {
-		// Skip permanent backups
-		if backups[i].IsPermanent {
+		// Skip permanent backups and backups whose chain of parents does not reach a full backup
+		if backups[i].IsPermanent || !isRestorable(backups, parents, i) {
 			continue
 		}
 
 		// Update if this is the first eligible backup or older than the current find
-		if earliestEligibleBackup == nil || backups[i].Time.Before(earliestEligibleBackup.Time) {
+		if earliestEligibleBackup == nil || pitrStart(&backups[i]).Before(pitrStart(earliestEligibleBackup)) {
 			earliestEligibleBackup = &backups[i]
 		}
 	}
@@ -530,12 +560,19 @@ func (e *WalgExporter) updatePitrWindow(backups []BackupInfo) {
 	}
 
 	// Calculate window, ensuring we don't report negative time
-	window := time.Since(earliestEligibleBackup.Time).Seconds()
+	window := time.Since(pitrStart(earliestEligibleBackup)).Seconds()
 	if window < 0 {
 		window = 0
 	}
 
 	e.pitrWindow.Set(window)
+}
+
+func pitrStart(backup *BackupInfo) time.Time {
+	if backup.FinishTime.IsZero() {
+		return backup.Time
+	}
+	return backup.FinishTime
 }
 
 // checkStorageAliveness checks if the storage backend is accessible
