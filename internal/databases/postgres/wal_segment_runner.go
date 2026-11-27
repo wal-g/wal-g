@@ -57,14 +57,14 @@ type WalSegmentRunner struct {
 	currentWalSegment WalSegmentDescription
 	walFolderSegments map[WalSegmentDescription]bool
 	stopSegmentNo     WalSegmentNo
-	timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord
+	timelineSwitchMap map[WalSegmentNo][]*TimelineHistoryRecord
 }
 
 func NewWalSegmentRunner(
 	startWalSegment WalSegmentDescription,
 	segments map[WalSegmentDescription]bool,
 	stopSegmentNo WalSegmentNo,
-	timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
+	timelineSwitchMap map[WalSegmentNo][]*TimelineHistoryRecord,
 ) *WalSegmentRunner {
 	return &WalSegmentRunner{
 		currentWalSegment: startWalSegment,
@@ -102,7 +102,8 @@ func (r *WalSegmentRunner) getNextSegment() WalSegmentDescription {
 	nextTimeline := r.currentWalSegment.Timeline
 	nextSegmentNo := r.currentWalSegment.Number.previous()
 	nextSegment := WalSegmentDescription{Timeline: nextTimeline, Number: nextSegmentNo}
-	if record, ok := r.timelineSwitchMap[r.currentWalSegment.Number]; ok {
+	if records, ok := r.timelineSwitchMap[r.currentWalSegment.Number]; ok && len(records) > 0 {
+		record := pickSwitchRecord(records, r.currentWalSegment.Timeline)
 		tracelog.DebugLogger.Printf("found timeline switch at LSN %s\n", record.lsn.String())
 		// Sometimes there are records in .history that are not actually present in cluster history
 		// for example after restoring cluster
@@ -115,6 +116,20 @@ func (r *WalSegmentRunner) getNextSegment() WalSegmentDescription {
 		nextSegment.Timeline = record.timeline
 	}
 	return nextSegment
+}
+
+// pickSwitchRecord chooses the record to follow when walking backwards through a segment
+// that contains one or more timeline switches. Records are in .history order (ascending timeline).
+// All timelines newer than the oldest record started inside this segment, so the previous segment
+// belongs to the oldest record that is older than the current timeline (e.g. 7 -> 6 -> 5 gives 5).
+// If there is no such record, the first one is used.
+func pickSwitchRecord(records []*TimelineHistoryRecord, currentTimeline uint32) *TimelineHistoryRecord {
+	for _, record := range records {
+		if record.timeline < currentTimeline {
+			return record
+		}
+	}
+	return records[0]
 }
 
 // getFolderFilenames returns a set of filenames in provided storage folder
