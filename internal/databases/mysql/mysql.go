@@ -101,6 +101,18 @@ func getMySQLGTIDExecuted(conn *client.Conn, flavor string) (gomysql.GTIDSet, er
 	return gomysql.ParseGTIDSet(flavor, gtidStr)
 }
 
+func getMySQLGTIDPurged(conn *client.Conn, flavor string) (gomysql.GTIDSet, error) {
+	if flavor == gomysql.MariaDBFlavor {
+		// MariaDB has no gtid_purged variable.
+		return nil, nil
+	}
+	gtidStr, err := fetchMySQLVariable(conn, "global.gtid_purged")
+	if err != nil {
+		return nil, err
+	}
+	return gomysql.ParseMysqlGTIDSet(gtidStr)
+}
+
 func getServerUUID(conn *client.Conn, flavor string) (string, error) {
 	query := ""
 	switch flavor {

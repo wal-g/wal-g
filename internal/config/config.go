@@ -163,6 +163,7 @@ const (
 	MysqlBinlogDstSetting             = "WALG_MYSQL_BINLOG_DST"
 	MysqlBackupPrepareCmd             = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 	MysqlCheckGTIDs                   = "WALG_MYSQL_CHECK_GTIDS"
+	MysqlBinlogGapTracking            = "WALG_MYSQL_BINLOG_GAP_TRACKING"
 	MysqlBinlogServerHost             = "WALG_MYSQL_BINLOG_SERVER_HOST"
 	MysqlBinlogServerPort             = "WALG_MYSQL_BINLOG_SERVER_PORT"
 	MysqlBinlogServerUser             = "WALG_MYSQL_BINLOG_SERVER_USER"
@@ -617,6 +618,7 @@ var (
 		MysqlBackupPrepareCmd:             true,
 		MysqlTakeBinlogsFromMaster:        true,
 		MysqlCheckGTIDs:                   true,
+		MysqlBinlogGapTracking:            true,
 		StreamSplitterPartitions:          true,
 		StreamSplitterBlockSize:           true,
 		StreamSplitterMaxFileSize:         true,

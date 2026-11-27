@@ -2,6 +2,8 @@
 
 # common wal-g settings
 export WALG_MYSQL_DATASOURCE_NAME=sbtest:@/sbtest
+export WALG_MYSQL_CHECK_GTIDS=True
+export WALG_MYSQL_BINLOG_GAP_TRACKING=True
 export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup \
     --stream=xbstream \
     --user=sbtest \
