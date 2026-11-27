@@ -48,6 +48,7 @@ func SetupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 
 	ctx.Step(`we stop mongo on ([^\s]*)$`, tctx.StopMongodb)
 	ctx.Step(`we fill oplog on ([^\s]*)$`, tctx.FillOplog)
+	ctx.Step(`we schedule an oplog write on ([^\s]*) during replay$`, tctx.ScheduleOplogWriteDuringReplay)
 	ctx.Step(`we run oplog-replay on ([^\s]*)$`, tctx.RunOplogReplay)
 
 	SetupMongodbLogicalSteps(ctx, tctx)
@@ -393,7 +394,7 @@ func (tctx *TestContext) replayOplogImpl(backupId int, timestampId, container st
 	}
 
 	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v %v", from, until, withPartial)
-	return walg.OplogReplay(from.String(), until.String(), partial, false, "")
+	return walg.OplogReplay(from.String(), until.String(), partial, false, false, "")
 }
 
 func (tctx *TestContext) addPartiallyData(host string) error {
@@ -580,8 +581,16 @@ func (tctx *TestContext) StopMongodb(host string) error {
 
 func (tctx *TestContext) RunOplogReplay(host string) error {
 	walg := WalgUtilFromTestContext(tctx, host)
-	if err := walg.OplogReplay("LATEST_ON_REPLICA", "LATEST", false, true, "/config/mongod-minimal.conf"); err != nil {
-		return err
+	replayErr := walg.OplogReplay(
+		"LATEST_ON_REPLICA", "LATEST", false, true, true, "/config/mongod-minimal.conf")
+	if tctx.AuxData.FollowLatestWriteDone != nil {
+		if err := <-tctx.AuxData.FollowLatestWriteDone; err != nil {
+			return err
+		}
+		tctx.AuxData.FollowLatestWriteDone = nil
+	}
+	if replayErr != nil {
+		return replayErr
 	}
 
 	mc, err := MongoCtlFromTestContext(tctx, host)
@@ -594,6 +603,38 @@ func (tctx *TestContext) RunOplogReplay(host string) error {
 	}
 
 	return mc.StartMongod()
+}
+
+func (tctx *TestContext) ScheduleOplogWriteDuringReplay(host string) error {
+	if tctx.AuxData.FollowLatestWriteDone != nil {
+		return fmt.Errorf("an oplog write during replay is already scheduled")
+	}
+	done := make(chan error, 1)
+	tctx.AuxData.FollowLatestWriteDone = done
+	go func() {
+		timer := time.NewTimer(2 * time.Second)
+		defer timer.Stop()
+		select {
+		case <-tctx.Context.Done():
+			done <- tctx.Context.Err()
+			return
+		case <-timer.C:
+		}
+
+		mc, err := MongoCtlFromTestContext(tctx, host)
+		if err == nil {
+			err = mc.AddDataToCollection("follow_latest", "oplog_coll", "follow", 100, 1000)
+		}
+		var lastMajTS helpers.OpTimestamp
+		if err == nil {
+			lastMajTS, err = mc.LastMajTS()
+		}
+		if err == nil {
+			err = tctx.waitForOplogArchive(lastMajTS)
+		}
+		done <- err
+	}()
+	return nil
 }
 
 func (tctx *TestContext) addHostToReplicaSet(replica, master string) error {

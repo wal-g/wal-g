@@ -12,8 +12,10 @@ import (
 )
 
 type ReplayProgress struct {
-	mu         sync.RWMutex
-	checkpoint ReplayCheckpoint
+	mu                  sync.RWMutex
+	checkpoint          ReplayCheckpoint
+	processedTS         models.Timestamp
+	pendingTransactions bool
 }
 
 type ReplayCheckpoint struct {
@@ -21,8 +23,17 @@ type ReplayCheckpoint struct {
 	Generation uint64
 }
 
+type ReplayStatus struct {
+	ProcessedTS         models.Timestamp
+	Checkpoint          ReplayCheckpoint
+	PendingTransactions bool
+}
+
 func NewReplayProgress(since models.Timestamp) *ReplayProgress {
-	return &ReplayProgress{checkpoint: ReplayCheckpoint{OpTime: models.OpTime{TS: since}}}
+	return &ReplayProgress{
+		checkpoint:  ReplayCheckpoint{OpTime: models.OpTime{TS: since}},
+		processedTS: since,
+	}
 }
 
 func (p *ReplayProgress) Snapshot() ReplayCheckpoint {
@@ -36,7 +47,32 @@ func (p *ReplayProgress) Initialize(ts models.Timestamp) {
 	defer p.mu.Unlock()
 	if p.checkpoint.Generation == 0 {
 		p.checkpoint.OpTime = models.OpTime{TS: ts}
+		p.processedTS = ts
 	}
+}
+
+func (p *ReplayProgress) BeginAttempt() {
+	p.mu.Lock()
+	p.processedTS = p.checkpoint.OpTime.TS
+	p.pendingTransactions = false
+	p.mu.Unlock()
+}
+
+func (p *ReplayProgress) Status() ReplayStatus {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return ReplayStatus{
+		ProcessedTS:         p.processedTS,
+		Checkpoint:          p.checkpoint,
+		PendingTransactions: p.pendingTransactions,
+	}
+}
+
+func (p *ReplayProgress) MarkProcessed(ts models.Timestamp, pendingTransactions bool) {
+	p.mu.Lock()
+	p.processedTS = ts
+	p.pendingTransactions = pendingTransactions
+	p.mu.Unlock()
 }
 
 func (p *ReplayProgress) MarkDurable(opTime models.OpTime) {
@@ -204,6 +240,7 @@ func (a *CheckpointingApplier) applyOperations(
 		return fmt.Errorf("can not handle op: %w", err)
 	}
 	a.lastAppliedTS = ops[len(ops)-1].TS
+	a.progress.MarkProcessed(a.lastAppliedTS, a.applier.HasPendingTransactions())
 	a.dirty = true
 	if !a.checkpointDue || a.applier.HasPendingTransactions() {
 		return nil

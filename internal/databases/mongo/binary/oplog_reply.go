@@ -33,18 +33,7 @@ func runOplogReplay(
 	replayArgs ReplyOplogConfig,
 	attempt oplogReplayAttempt,
 ) (err error) {
-	// set up mongodb client and oplog applier
-	var mongoClientArgs []client.Option
-	if replayArgs.OplogAlwaysUpsert != nil {
-		mongoClientArgs = append(mongoClientArgs, client.OplogAlwaysUpsert(*replayArgs.OplogAlwaysUpsert))
-	}
-
-	if replayArgs.OplogApplicationMode != nil {
-		mongoClientArgs = append(mongoClientArgs,
-			client.OplogApplicationMode(client.OplogAppMode(*replayArgs.OplogApplicationMode)))
-	}
-
-	mongoClient, err := client.NewMongoClient(ctx, mongodbURL, mongoClientArgs...)
+	mongoClient, err := newOplogReplayMongoClient(ctx, mongodbURL, replayArgs)
 	if err != nil {
 		return err
 	}
@@ -56,19 +45,12 @@ func runOplogReplay(
 		}
 	}()
 
-	since := attempt.checkpoint.OpTime.TS
-	var emptyTS models.Timestamp
-	if since == emptyTS {
-		if replayArgs.WithCatchUpReconfig {
-			since, err = mongoClient.CatchUpStartTS(ctx)
-		} else {
-			since, err = mongoClient.LastOplogTS(ctx)
-		}
-		if err != nil {
-			return err
-		}
+	since, err := resolveOplogReplayStart(ctx, mongoClient, replayArgs, attempt.checkpoint)
+	if err != nil {
+		return err
 	}
 	attempt.progress.Initialize(since)
+	attempt.progress.BeginAttempt()
 
 	if err = mongoClient.EnsureIsMaster(ctx); err != nil {
 		return err
@@ -98,22 +80,91 @@ func runOplogReplay(
 		return err
 	}
 
+	if err = runOplogReplayPipeline(
+		ctx, replayArgs, attempt, downloader, oplogApplier, since); err != nil {
+		return err
+	}
+	return nil
+}
+
+func newOplogReplayMongoClient(
+	ctx context.Context,
+	mongodbURL string,
+	replayArgs ReplyOplogConfig,
+) (*client.MongoClient, error) {
+	var options []client.Option
+	if replayArgs.OplogAlwaysUpsert != nil {
+		options = append(options, client.OplogAlwaysUpsert(*replayArgs.OplogAlwaysUpsert))
+	}
+	if replayArgs.OplogApplicationMode != nil {
+		options = append(options,
+			client.OplogApplicationMode(client.OplogAppMode(*replayArgs.OplogApplicationMode)))
+	}
+	return client.NewMongoClient(ctx, mongodbURL, options...)
+}
+
+func resolveOplogReplayStart(
+	ctx context.Context,
+	db client.MongoDriver,
+	replayArgs ReplyOplogConfig,
+	checkpoint stages.ReplayCheckpoint,
+) (models.Timestamp, error) {
+	if checkpoint.OpTime.TS != (models.Timestamp{}) {
+		return checkpoint.OpTime.TS, nil
+	}
+	if replayArgs.WithCatchUpReconfig {
+		return db.CatchUpStartTS(ctx)
+	}
+	return db.LastOplogTS(ctx)
+}
+
+func runOplogReplayPipeline(
+	ctx context.Context,
+	replayArgs ReplyOplogConfig,
+	attempt oplogReplayAttempt,
+	downloader archive.Downloader,
+	applier stages.Applier,
+	since models.Timestamp,
+) error {
+	if replayArgs.FollowLatest != nil {
+		fetcher := stages.NewFollowingStorageFetcher(downloader, replayArgs.FollowLatest.PollInterval)
+		controller := newCatchUpController(*replayArgs.FollowLatest, attempt.progress, fetcher)
+		return HandleFollowingOplogReplay(ctx, since, attempt.resumeAfter, fetcher, applier, controller)
+	}
+
 	path, err := resolveOplogReplaySequence(ctx, downloader, since, replayArgs.Until)
 	if err != nil {
 		return err
 	}
-
-	// setup storage fetcher
-	oplogFetcher := stages.NewStorageFetcher(downloader, path)
+	fetcher := stages.NewStorageFetcher(downloader, path)
 	if attempt.resumeAfter {
-		oplogFetcher.WithResumeAfter()
+		fetcher.WithResumeAfter()
 	}
+	return HandleOplogReplay(ctx, since, replayArgs.Until, fetcher, applier)
+}
 
-	// run worker cycle
-	if err = HandleOplogReplay(ctx, since, replayArgs.Until, oplogFetcher, oplogApplier); err != nil {
+func HandleFollowingOplogReplay(
+	ctx context.Context,
+	since models.Timestamp,
+	resumeAfter bool,
+	fetcher *stages.FollowingStorageFetcher,
+	applier stages.Applier,
+	controller *catchUpController,
+) error {
+	errGroup, ctx := errgroup.WithContext(ctx)
+	oplogC, fetchErrC, err := fetcher.FetchFrom(ctx, since, resumeAfter)
+	if err != nil {
 		return err
 	}
-	return nil
+	applyErrC, err := applier.Apply(ctx, oplogC)
+	if err != nil {
+		return err
+	}
+
+	errGroup.Go(func() error { return <-fetchErrC })
+	errGroup.Go(func() error { return <-applyErrC })
+	errGroup.Go(func() error { return controller.Run(ctx) })
+	return errGroup.Wait()
 }
 
 func resolveOplogReplaySequence(

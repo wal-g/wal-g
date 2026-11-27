@@ -74,6 +74,7 @@ type AuxData struct {
 	CreatedBackupNames         []string
 	IncompleteBackupObjectKeys []string
 	OplogPushEnabled           bool
+	FollowLatestWriteDone      chan error
 }
 
 type DBVersion struct {
