@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -198,25 +199,44 @@ func buildHTTPClient(cfg *Config, tlsServerName string) (aws.HTTPClient, error) 
 		transport.TLSClientConfig.ServerName = tlsServerName
 	}
 
-	if cfg.CACertFile != "" {
-		certs, err := os.ReadFile(cfg.CACertFile)
-		if err != nil {
-			return nil, fmt.Errorf("read S3 CA cert file: %w", err)
-		}
+	if cfg.CACertFile == "" {
+		return &http.Client{Transport: NewRoundTripperWithLogging(transport)}, nil
+	}
+
+	certs, err := os.ReadFile(cfg.CACertFile)
+	if err != nil {
+		return nil, fmt.Errorf("read S3 CA cert file: %w", err)
+	}
+	if !x509.NewCertPool().AppendCertsFromPEM(certs) {
+		return nil, fmt.Errorf("no PEM certs found in %q", cfg.CACertFile)
+	}
+	if transport.TLSClientConfig == nil {
+		transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
+	withRootCAs := &rootCAsOnFirstRequest{transport: transport, customCerts: certs}
+	return &http.Client{Transport: NewRoundTripperWithLogging(withRootCAs)}, nil
+}
+
+// rootCAsOnFirstRequest sets the root CAs of its transport, the system pool plus the custom
+// certificates, just before the first request. Loading the system pool takes milliseconds,
+// which commands that never reach the storage should not pay, such as wal-fetch of a
+// prefetched segment.
+type rootCAsOnFirstRequest struct {
+	transport   *http.Transport
+	customCerts []byte
+	once        sync.Once
+}
+
+func (r *rootCAsOnFirstRequest) RoundTrip(req *http.Request) (*http.Response, error) {
+	r.once.Do(func() {
 		pool, err := x509.SystemCertPool()
 		if err != nil || pool == nil {
 			pool = x509.NewCertPool()
 		}
-		if !pool.AppendCertsFromPEM(certs) {
-			return nil, fmt.Errorf("no PEM certs found in %q", cfg.CACertFile)
-		}
-		if transport.TLSClientConfig == nil {
-			transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
-		}
-		transport.TLSClientConfig.RootCAs = pool
-	}
-
-	return &http.Client{Transport: NewRoundTripperWithLogging(transport)}, nil
+		pool.AppendCertsFromPEM(r.customCerts)
+		r.transport.TLSClientConfig.RootCAs = pool
+	})
+	return r.transport.RoundTrip(req)
 }
 
 func configureCredentials(ctx context.Context, awsCfg *aws.Config, cfg *Config) error {

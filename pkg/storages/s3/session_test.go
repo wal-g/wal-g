@@ -3,10 +3,13 @@ package s3
 import (
 	"crypto/md5"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -60,6 +63,37 @@ func TestLoadAWSConfigWithRequestTimeout(t *testing.T) {
 	require.True(t, ok)
 
 	require.Equal(t, 5*time.Second, transport.ResponseHeaderTimeout)
+}
+
+func TestCACertFileRootCAsAreSetOnFirstRequest(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	defer server.Close()
+	caCertFile := filepath.Join(t.TempDir(), "ca.pem")
+	serverCert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+	require.NoError(t, os.WriteFile(caCertFile, serverCert, 0o600))
+
+	httpClient, err := buildHTTPClient(&Config{CACertFile: caCertFile}, "")
+	require.NoError(t, err)
+	client, ok := httpClient.(*http.Client)
+	require.True(t, ok)
+	logging, ok := client.Transport.(*loggingTransport)
+	require.True(t, ok)
+	withRootCAs, ok := logging.underlying.(*rootCAsOnFirstRequest)
+	require.True(t, ok)
+	require.Nil(t, withRootCAs.transport.TLSClientConfig.RootCAs)
+
+	response, err := client.Get(server.URL)
+	require.NoError(t, err, "the server certificate must verify against the CA cert file")
+	require.NoError(t, response.Body.Close())
+	require.NotNil(t, withRootCAs.transport.TLSClientConfig.RootCAs)
+}
+
+func TestCACertFileWithoutCertificatesFailsBeforeFirstRequest(t *testing.T) {
+	caCertFile := filepath.Join(t.TempDir(), "ca.pem")
+	require.NoError(t, os.WriteFile(caCertFile, []byte("not a certificate"), 0o600))
+
+	_, err := buildHTTPClient(&Config{CACertFile: caCertFile}, "")
+	require.ErrorContains(t, err, "no PEM certs found")
 }
 
 func assertSessionTransport(t *testing.T, httpClient any, serverName string) {
