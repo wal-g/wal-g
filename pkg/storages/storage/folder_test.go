@@ -18,6 +18,30 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+type allVersionsRecorder struct {
+	storage.Folder
+	calls []bool
+}
+
+func (f *allVersionsRecorder) SetShowAllVersions(show bool) {
+	f.calls = append(f.calls, show)
+}
+
+func TestSetShowAllVersions(t *testing.T) {
+	folder := memory.NewFolder("in_memory/", memory.NewKVS())
+
+	t.Run("supported folder forwards both values", func(t *testing.T) {
+		recorder := &allVersionsRecorder{Folder: folder}
+		assert.True(t, storage.SetShowAllVersions(recorder, true))
+		assert.True(t, storage.SetShowAllVersions(recorder, false))
+		assert.Equal(t, []bool{true, false}, recorder.calls)
+	})
+
+	t.Run("unsupported folder returns false", func(t *testing.T) {
+		assert.False(t, storage.SetShowAllVersions(folder, true))
+	})
+}
+
 func TestListFolderRecursively(t *testing.T) {
 	var folder = memory.NewFolder("in_memory/", memory.NewKVS())
 	paths := []string{

@@ -259,7 +259,6 @@ func WithAllVersions(folder Folder) Folder {
 	return folder
 }
 
-// TODO: unittests
 // SetShowAllVersions sets whether to show all versions including deleted objects.
 // If the folder doesn't support this feature, it's a no-op.
 func SetShowAllVersions(folder Folder, show bool) bool {
