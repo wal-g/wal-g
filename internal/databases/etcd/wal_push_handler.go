@@ -45,16 +45,19 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 	fromWal := 0
 	if len(walFiles) > 0 && cache.LastArchivedWal != "" {
 		lastSeq, _ := parseWALName(walFiles[len(walFiles)-1])
-		cachedSeq, _ := parseWALName(cache.LastArchivedWal)
+		cachedSeq, cacheErr := parseWALName(cache.LastArchivedWal)
 
 		//write ensurance that reading leader member of cluster
-		if lastSeq < cachedSeq {
+		if cacheErr != nil {
+			tracelog.WarningLogger.Printf("cached wal name %q is not a wal file, clearing cache", cache.LastArchivedWal)
+			cache = LogsCache{}
+		} else if lastSeq < cachedSeq {
 			tracelog.WarningLogger.Printf("wal was reset (%s => %s), clearing cache",
 				cache.LastArchivedWal, walFiles[0])
 			cache = LogsCache{}
 		} else {
-			//cacheSeq is last wal that was already archived, start archiving from the next
-			fromWal = int(cachedSeq) + 1
+			// cache holds the last wal already archived; start from the first local file after it
+			fromWal = firstWalAfter(walFiles, cache.LastArchivedWal)
 			tracelog.WarningLogger.Printf("Start to archive from wal: %s\n",
 				cache.LastArchivedWal)
 		}
@@ -77,6 +80,12 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 	// Write Wal Cache (even when no data uploaded, it will create file on first run)
 	putCache(cache)
 	return nil
+}
+
+// firstWalAfter returns the index of the first WAL file in walFiles that sorts after cachedWal.
+// walFiles is sorted and WAL names are fixed-width hex, so string order is sequence order.
+func firstWalAfter(walFiles []string, cachedWal string) int {
+	return sort.Search(len(walFiles), func(i int) bool { return walFiles[i] > cachedWal })
 }
 
 func archiveWal(ctx context.Context, uploader internal.Uploader, dataDir string, wal string) error {
