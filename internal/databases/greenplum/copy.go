@@ -68,14 +68,14 @@ func buildCopyPlanWaiting(
 	from, to storage.Folder,
 	backupName string,
 	withHistory bool,
-	copyConcurrency int,
+	statConcurrency int,
 	timeout time.Duration,
 	sleep func(context.Context, time.Duration) error,
 ) (*copy.Plan, error) {
 	deadline := time.Now().Add(timeout)
 	delay := copyWaitInitialDelay
 	for {
-		plan, err := BuildCopyPlan(ctx, from, to, backupName, withHistory, copyConcurrency)
+		plan, err := BuildCopyPlan(ctx, from, to, backupName, withHistory, statConcurrency)
 		var notPublished notPublishedError
 		if !errors.As(err, &notPublished) {
 			return plan, err
@@ -108,7 +108,7 @@ func sleepContext(ctx context.Context, delay time.Duration) error {
 }
 
 type greenplumCopyState struct {
-	copyConcurrency int
+	statConcurrency int
 
 	backupState    map[string]uint8
 	backupDepths   map[string]int
@@ -131,10 +131,10 @@ func (index walFolderIndex) has(walName string) bool {
 }
 
 func newGreenplumCopyState(
-	ctx context.Context, plan *copy.Plan, withHistory bool, copyConcurrency int,
+	ctx context.Context, plan *copy.Plan, withHistory bool, statConcurrency int,
 ) (*greenplumCopyState, error) {
 	state := &greenplumCopyState{
-		copyConcurrency: copyConcurrency,
+		statConcurrency: statConcurrency,
 
 		backupState:    make(map[string]uint8),
 		backupDepths:   make(map[string]int),
@@ -227,7 +227,7 @@ func BuildCopyPlan(
 	from, to storage.Folder,
 	backupName string,
 	withHistory bool,
-	copyConcurrency int,
+	statConcurrency int,
 ) (*copy.Plan, error) {
 	plan := copy.NewScopedPlan(from, to)
 	names, err := plan.ResolveBackupNames(ctx, backupName)
@@ -235,7 +235,7 @@ func BuildCopyPlan(
 		return nil, err
 	}
 
-	state, err := newGreenplumCopyState(ctx, plan, withHistory, copyConcurrency)
+	state, err := newGreenplumCopyState(ctx, plan, withHistory, statConcurrency)
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +392,7 @@ func addGreenplumSegmentChain(
 	if err := plan.AddBackupAt(basePath, name, name); err != nil {
 		return 0, err
 	}
-	if err := addGreenplumSegmentSharedFiles(ctx, plan, basePath, backup, state.copyConcurrency); err != nil {
+	if err := addGreenplumSegmentSharedFiles(ctx, plan, basePath, backup, state.statConcurrency); err != nil {
 		return 0, fmt.Errorf("plan shared files for Greenplum segment %d backup %q: %w", contentID, name, err)
 	}
 	targetSentinel := path.Join(basePath, internal.SentinelNameFromBackup(name))
@@ -412,7 +412,7 @@ func addGreenplumSegmentSharedFiles(
 	plan *copy.Plan,
 	basePath string,
 	backup internal.Backup,
-	copyConcurrency int,
+	statConcurrency int,
 ) error {
 	baseBackupsFolder := plan.From.GetSubFolder(basePath)
 	backupTime := internal.BackupTime{BackupName: backup.Name, StorageName: backup.GetStorageName()}
@@ -443,7 +443,7 @@ func addGreenplumSegmentSharedFiles(
 			paths = append(paths, path.Join(basePath, shared.storagePath, storagePath))
 		}
 		lookupStart := time.Now()
-		lookups, err := plan.AddSourceObjects(ctx, paths, paths, copy.PayloadPhase, false, copyConcurrency)
+		lookups, err := plan.AddSourceObjects(ctx, paths, paths, copy.PayloadPhase, false, statConcurrency)
 		if err != nil {
 			return err
 		}
