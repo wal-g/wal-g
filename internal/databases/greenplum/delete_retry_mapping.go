@@ -3,11 +3,14 @@ package greenplum
 import (
 	"bytes"
 	"context"
+	jsonv1 "encoding/json"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -40,25 +43,64 @@ func pendingRecoveryMappings(ctx context.Context, root storage.Folder) ([]string
 func readClusterDeletionMetadata(ctx context.Context, root storage.Folder, name string,
 	sentinel *BackupSentinelDto) (internal.DeletionMetadata, error) {
 	doc, err := internal.ReadDeletionMetadata(ctx, root.GetSubFolder(utility.BaseBackupPath),
-		name+utility.SentinelSuffix, sentinel)
+		name+utility.SentinelSuffix, sentinel, "increment_from", "increment_full_name")
 	var missing storage.ObjectNotFoundError
-	if err != nil || !errors.As(doc.Problem, &missing) {
-		return doc, err
+	if err == nil && errors.As(doc.Problem, &missing) {
+		retry, readErr := internal.ReadDeletionMetadata(ctx, root.GetSubFolder(recoveryMappingPath),
+			name+".json", sentinel, "increment_from", "increment_full_name")
+		if readErr != nil || errors.As(retry.Problem, &missing) {
+			return doc, readErr
+		}
+		doc = retry
+		if doc.CanRewrite {
+			var version int
+			var recordedName string
+			if json.Unmarshal(doc.Fields["recovery_version"], &version) != nil || version != 1 ||
+				json.Unmarshal(doc.Fields["recovery_backup_name"], &recordedName) != nil || recordedName != name {
+				doc.Problem = errors.Join(doc.Problem, fmt.Errorf("invalid recovery mapping for %s", name))
+				doc.CanRewrite = false
+			}
+		}
 	}
-	retry, err := internal.ReadDeletionMetadata(ctx, root.GetSubFolder(recoveryMappingPath), name+".json", sentinel)
-	if errors.As(retry.Problem, &missing) {
-		return doc, err
+	if doc.CanRewrite {
+		if mappingErr := validateClusterMapping(doc, name, sentinel); mappingErr != nil {
+			doc.Problem = errors.Join(doc.Problem, mappingErr)
+			doc.CanRewrite = false
+		}
 	}
-	if err != nil || retry.Problem != nil {
-		return retry, errors.Join(err, retry.Problem)
+	return doc, err
+}
+
+func validateClusterMapping(doc internal.DeletionMetadata, name string, sentinel *BackupSentinelDto) error {
+	for key := range doc.Fields {
+		if key != "segments" && strings.EqualFold(key, "segments") {
+			if _, exists := doc.Fields["segments"]; exists {
+				return fmt.Errorf("ambiguous segments in %s", name)
+			}
+			doc.Fields["segments"] = doc.Fields[key]
+			delete(doc.Fields, key)
+		}
 	}
-	var version int
-	var recordedName string
-	if json.Unmarshal(retry.Fields["recovery_version"], &version) != nil || version != 1 ||
-		json.Unmarshal(retry.Fields["recovery_backup_name"], &recordedName) != nil || recordedName != name {
-		return retry, fmt.Errorf("invalid recovery mapping for %s", name)
+	if doc.Problem == nil {
+		return nil
 	}
-	return retry, nil
+	fields := maps.Clone(doc.Fields)
+	for key := range fields {
+		switch strings.ToLower(key) {
+		case "increment_from", "increment_full_name", "increment_count":
+			delete(fields, key)
+		}
+	}
+	data, err := json.Marshal(fields)
+	if err != nil {
+		return err
+	}
+	var cluster BackupSentinelDto
+	if err := json.Unmarshal(data, &cluster, jsonv1.DefaultOptionsV1(), jsontext.AllowDuplicateNames(false)); err != nil {
+		return err
+	}
+	*sentinel = cluster
+	return nil
 }
 
 func (g *greenplumDeletionPlanner) prepareRetryMappings(ctx context.Context) error {
@@ -69,8 +111,15 @@ func (g *greenplumDeletionPlanner) prepareRetryMappings(ctx context.Context) err
 		if err != nil {
 			return err
 		}
-		if doc.Problem != nil {
+		previous := g.plan.Backups[name].Metadata.(BackupSentinelDto).Segments
+		if !doc.CanRewrite {
+			if len(previous) > 0 || len(sentinel.Segments) > 0 || doc.Fields["segments"] != nil {
+				return fmt.Errorf("cannot save resolved segment mapping for %s: %w", name, doc.Problem)
+			}
 			continue
+		}
+		if !slices.Equal(previous, sentinel.Segments) {
+			return fmt.Errorf("segment mapping changed during deletion planning for %s", name)
 		}
 		data, err := retryMappingDocument(doc, name, g.mappings[name])
 		if err != nil {
@@ -233,7 +282,8 @@ func (g *greenplumDeletionPlanner) finalizeRetryMappings(ctx context.Context) er
 			return 0
 		}
 		if depths[name] == 0 {
-			depths[name] = 1 + depth(g.plan.Backups[name].Parent)
+			b := g.plan.Backups[name]
+			depths[name] = 1 + max(depth(b.Parent), depth(b.Base))
 		}
 		return depths[name]
 	}

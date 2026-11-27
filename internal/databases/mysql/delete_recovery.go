@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -13,7 +12,8 @@ import (
 
 func loadDeletionBackup(ctx context.Context, root storage.Folder, name string) (internal.DeletionBackup, error) {
 	var s StreamSentinelDto
-	doc, err := internal.ReadDeletionMetadata(ctx, root.GetSubFolder(utility.BaseBackupPath), name+utility.SentinelSuffix, &s)
+	doc, err := internal.ReadDeletionMetadata(ctx, root.GetSubFolder(utility.BaseBackupPath),
+		name+utility.SentinelSuffix, &s, "DeltaFrom", "DeltaFullName")
 	if err != nil {
 		return internal.DeletionBackup{}, err
 	}
@@ -26,17 +26,18 @@ func loadDeletionBackup(ctx context.Context, root storage.Folder, name string) (
 	}
 	b.Problem = errors.Join(b.Problem, incErr)
 	b.DependenciesKnown = doc.Problem == nil && incErr == nil
-	if b.DependenciesKnown && s.IncrementFrom != nil {
-		b.Parent, b.Base = *s.IncrementFrom, *s.IncrementFullName
+	if s.IsIncremental && s.Tool != WalgXtrabackupTool {
+		b.DependenciesKnown = false
+		b.Problem = errors.Join(b.Problem, fmt.Errorf("incremental fields on command-stream backup %s", name))
 	}
+	b.SetDependencyNames(s.IncrementFrom, s.IncrementFullName, doc)
 	return b, nil
 }
 
 // DeleteUnusedLogs is not supported for MySQL
 func PlanRecoveryDeletion(ctx context.Context, root storage.Folder, destination string,
 	names []string, _ bool) (*internal.DeletionPlan, error) {
-	isBackupName := func(name string) bool { return strings.HasPrefix(name, "stream_") }
-	p, err := internal.NewDeletionPlan(ctx, root, destination, names, true, isBackupName, loadDeletionBackup)
+	p, err := internal.NewDeletionPlan(ctx, root, destination, names, true, nil, loadDeletionBackup)
 	if err != nil {
 		return p, err
 	}

@@ -67,6 +67,11 @@ type FolderExt interface {
 	ListFolderSegment(ctx context.Context, startAfter *string, endBefore *string) (objects []Object, subFolders []Folder, err error)
 }
 
+func HasCaseSensitiveKeys(folder Folder) bool {
+	f, ok := folder.(interface{ HasCaseSensitiveKeys() bool })
+	return ok && f.HasCaseSensitiveKeys()
+}
+
 type CrossFolderCopier interface {
 	CanCopyFrom(source Folder) bool
 	CopyObjectFrom(ctx context.Context, source Folder, sourcePath, destinationPath string, size int64) error

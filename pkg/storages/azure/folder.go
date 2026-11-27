@@ -40,6 +40,8 @@ func NewFolder(
 	}
 }
 
+func (*Folder) HasCaseSensitiveKeys() bool { return true }
+
 func (folder *Folder) GetPath() string {
 	return folder.path
 }

@@ -208,6 +208,8 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 	return subFolder
 }
 
+func (*Folder) HasCaseSensitiveKeys() bool { return true }
+
 func (folder *Folder) GetPath() string {
 	return folder.path
 }

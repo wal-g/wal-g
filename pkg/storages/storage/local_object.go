@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"io/fs"
 	"time"
 )
 
@@ -16,6 +17,16 @@ type LocalObject struct {
 
 func NewLocalObject(name string, lastModified time.Time, size int64) *LocalObject {
 	return &LocalObject{name: name, lastModified: lastModified, size: size}
+}
+
+const SymlinkInfo = "SYMLINK"
+
+func NewLocalObjectFromInfo(info fs.FileInfo) *LocalObject {
+	object := NewLocalObject(info.Name(), info.ModTime(), info.Size())
+	if info.Mode()&fs.ModeSymlink != 0 {
+		object.additionalInfo = SymlinkInfo
+	}
+	return object
 }
 
 func NewLocalObjectWithVersion(name string, lastModified time.Time, size int64, version string, additionalInfo string) *LocalObject {

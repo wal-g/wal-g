@@ -39,6 +39,8 @@ func (folder *Folder) StatObject(_ context.Context, objectRelativePath string) (
 	return storage.NewLocalObject(objectRelativePath, object.Timestamp, int64(object.Size)), nil
 }
 
+func (*Folder) HasCaseSensitiveKeys() bool { return true }
+
 func (folder *Folder) GetPath() string {
 	return folder.path
 }

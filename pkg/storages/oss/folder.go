@@ -49,6 +49,8 @@ func NewFolder(ossAPI *oss.Client, bucket string, path string, config *Config) *
 	}
 }
 
+func (*Folder) HasCaseSensitiveKeys() bool { return true }
+
 func (f *Folder) GetPath() string {
 	if !strings.HasSuffix(f.path, "/") {
 		f.path += "/"

@@ -3,7 +3,6 @@ package redis
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -14,9 +13,7 @@ import (
 
 func PlanRecoveryDeletion(ctx context.Context, root storage.Folder, destination string,
 	names []string, logs bool) (*internal.DeletionPlan, error) {
-	plan, err := internal.NewDeletionPlan(ctx, root, destination, names, false, func(name string) bool {
-		return strings.HasPrefix(name, "stream_") || strings.HasPrefix(name, "ts_")
-	}, func(ctx context.Context, root storage.Folder, name string) (internal.DeletionBackup, error) {
+	load := func(ctx context.Context, root storage.Folder, name string) (internal.DeletionBackup, error) {
 		var sentinel archive.Backup
 		doc, err := internal.ReadDeletionMetadata(ctx, root.GetSubFolder(utility.BaseBackupPath), name+utility.SentinelSuffix, &sentinel)
 		b := internal.DeletionBackup{DependenciesKnown: true, Problem: doc.Problem}
@@ -25,7 +22,8 @@ func PlanRecoveryDeletion(ctx context.Context, root storage.Folder, destination 
 			b.Problem = fmt.Errorf("conflicting backup name %s", sentinel.BackupName)
 		}
 		return b, err
-	})
+	}
+	plan, err := internal.NewDeletionPlan(ctx, root, destination, names, false, nil, load)
 	if err != nil {
 		return plan, err
 	}

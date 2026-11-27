@@ -25,7 +25,7 @@ type DeletionBackupMetadata struct {
 func LoadDeletionBackup(ctx context.Context, root storage.Folder, name string) (internal.DeletionBackup, error) {
 	base := root.GetSubFolder(utility.BaseBackupPath)
 	var data DeletionBackupMetadata
-	s, err := internal.ReadDeletionMetadata(ctx, base, name+utility.SentinelSuffix, &data.Sentinel)
+	s, err := internal.ReadDeletionMetadata(ctx, base, name+utility.SentinelSuffix, &data.Sentinel, "DeltaFrom", "DeltaFullName")
 	if err != nil {
 		return internal.DeletionBackup{}, err
 	}
@@ -48,9 +48,7 @@ func LoadDeletionBackup(ctx context.Context, root storage.Folder, name string) (
 		data.Sentinel.IncrementCount, data.Sentinel.IncrementFromLSN != nil, true)
 	b.DependenciesKnown = s.Problem == nil && incErr == nil && data.Sentinel.BackupStartLSN != nil
 	b.Problem = errors.Join(b.Problem, incErr)
-	if b.DependenciesKnown && data.Sentinel.IncrementFrom != nil {
-		b.Parent, b.Base = *data.Sentinel.IncrementFrom, *data.Sentinel.IncrementFullName
-	}
+	b.SetDependencyNames(data.Sentinel.IncrementFrom, data.Sentinel.IncrementFullName, s)
 	if !b.ProtectionKnown {
 		b.Problem = errors.Join(b.Problem, fmt.Errorf("unknown protection metadata for %s", name))
 	}
@@ -124,10 +122,13 @@ func validateDeletionMetadataAgreement(name string, data *DeletionBackupMetadata
 
 func PlanRecoveryDeletion(ctx context.Context, root storage.Folder, destination string,
 	names []string, logs bool) (*internal.DeletionPlan, error) {
-	isBackupName := func(name string) bool { return strings.HasPrefix(name, "base_") }
+	isBackupName := func(name string) bool { return logs && strings.HasPrefix(name, "base_") }
 	p, err := internal.NewDeletionPlan(ctx, root, destination, names, true, isBackupName, LoadDeletionBackup)
 	if err != nil {
 		return p, err
+	}
+	if err := CheckRecoveryDeltaNames(ctx, p); err != nil {
+		return nil, err
 	}
 	if err := p.PrepareTargets(ctx, nil); err != nil {
 		return p, err
@@ -140,13 +141,20 @@ func PlanRecoveryDeletion(ctx context.Context, root storage.Folder, destination 
 	return p, internal.PlanDeletionJournals(ctx, p, utility.WalPath)
 }
 
+var recoveryDeltaName = regexp.MustCompile(fmt.Sprintf("^base_%[1]s_D_(%[1]s)(?:_%[2]s)?$", PatternTimelineAndLogSegNo, PatternLSN))
+
+func CheckRecoveryDeltaNames(ctx context.Context, p *internal.DeletionPlan) error {
+	return p.CheckDeltaParents(ctx, utility.StripWalFileName, recoveryDeltaName)
+}
+
 var recoveryWALKey = regexp.MustCompile(`^([0-9A-F]{24})(_delta|_part)?(\.(lz4|lzma|lzo|br|zst|nop|gzip|gz|json))?$`)
 var recoveryBulkWALKey = regexp.MustCompile(`^([0-9A-F]{23})\.json$`)
 
 func PlanRecoveryWALs(ctx context.Context, p *internal.DeletionPlan) error {
 	retention := deletionWALRetention{knownTimelines: map[uint32]bool{}, segmentSize: WalSegmentSize}
-	for _, b := range p.Retained() {
-		if err := retention.retainBackup(p, b); err != nil {
+	retained := p.Retained()
+	for i := range retained {
+		if err := retention.retainBackup(p, &retained[i]); err != nil {
 			p.Defer(err.Error())
 			return nil
 		}
@@ -174,10 +182,13 @@ type deletionWALRetention struct {
 	segmentSize    uint64
 }
 
-func (r *deletionWALRetention) retainBackup(p *internal.DeletionPlan, b internal.DeletionBackup) error {
+func (r *deletionWALRetention) retainBackup(p *internal.DeletionPlan, b *internal.DeletionBackup) error {
 	data, ok := b.Metadata.(DeletionBackupMetadata)
 	if !ok || !data.LogsKnown {
 		return fmt.Errorf("WALs retained: unknown recovery/protection metadata for %s", b.Name)
+	}
+	if err := p.CheckRetainedAncestry(*b); err != nil {
+		return fmt.Errorf("WALs retained: %w", err)
 	}
 	size, err := deletionWALSegmentSize(data.Sentinel)
 	if err != nil {
@@ -218,7 +229,7 @@ func (r *deletionWALRetention) retainAncestors(p *internal.DeletionPlan, parent 
 			return fmt.Errorf("WALs retained: unknown incremental ancestor %s", parent)
 		}
 		ancestorData, ok := ancestor.Metadata.(DeletionBackupMetadata)
-		if !ok || !ancestorData.LogsKnown {
+		if !ok || !ancestor.DependenciesKnown || !ancestorData.LogsKnown {
 			return fmt.Errorf("WALs retained: unknown ancestor boundary %s", parent)
 		}
 		start := uint64(ancestorData.Meta.StartLsn-1) / r.segmentSize

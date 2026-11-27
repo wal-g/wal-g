@@ -60,7 +60,7 @@ func (folder *Folder) ListFolder(_ context.Context) (objects []storage.Object, s
 		if err != nil {
 			return nil, nil, err
 		}
-		objects = append(objects, storage.NewLocalObject(fileInfo.Name(), info.ModTime(), info.Size()))
+		objects = append(objects, storage.NewLocalObjectFromInfo(info))
 	}
 	return
 }

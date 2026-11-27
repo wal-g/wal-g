@@ -24,6 +24,8 @@ func NewFolder(connection *swift.Connection, container swift.Container, path str
 	return &Folder{connection, container, path}
 }
 
+func (*Folder) HasCaseSensitiveKeys() bool { return true }
+
 func (folder *Folder) GetPath() string {
 	return folder.path
 }

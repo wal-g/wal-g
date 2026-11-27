@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -48,6 +49,7 @@ func TestRecoveryDeletesDamagedOwnedFilesAcrossDatabases(t *testing.T) {
 					recoveryPut(t, base, key, "")
 				}
 				recoveryPut(t, base, "B10/keep", "unreadable")
+				recoveryPut(t, base, "B10"+utility.SentinelSuffix, "{")
 				recoveryPut(t, base, "other/keep", "unreadable")
 				p, err := build(t.Context(), root, "default", []string{"B1"}, false)
 				require.NoError(t, err)
@@ -68,6 +70,7 @@ func TestRecoveryDeletesDamagedOwnedFilesAcrossDatabases(t *testing.T) {
 				recoveryExists(t, base, "B1/zero", false)
 				recoveryExists(t, base, "journal_B1", false)
 				recoveryExists(t, base, "B10/keep", true)
+				recoveryExists(t, base, "B10"+utility.SentinelSuffix, true)
 				recoveryExists(t, base, "other/keep", true)
 				err = p.Execute(t.Context(), true)
 				if db != "greenplum" {
@@ -87,6 +90,97 @@ func putPGRecovery(t *testing.T, root storage.Folder, number int, permanent bool
 	recoveryPut(t, base, name+utility.SentinelSuffix, fmt.Sprintf(`{"LSN":%d,"FinishLSN":%d,"PgVersion":150000,"StartWalFileName":%q,"EndWalFileName":%q}`, start, end, wal, wal))
 	recoveryPut(t, base, name+"/metadata.json", fmt.Sprintf(`{"start_lsn":%d,"finish_lsn":%d,"is_permanent":%t}`, start, end, permanent))
 	return name
+}
+
+type recoveryReadFailure struct {
+	storage.Folder
+	key string
+	err error
+}
+
+func (f recoveryReadFailure) GetSubFolder(name string) storage.Folder {
+	f.Folder = f.Folder.GetSubFolder(name)
+	return f
+}
+
+func (f recoveryReadFailure) ReadObject(ctx context.Context, key string) (io.ReadCloser, error) {
+	if key == f.key {
+		return nil, f.err
+	}
+	return f.Folder.ReadObject(ctx, key)
+}
+
+func TestRecoveryRetainsUnreadableNeighbor(t *testing.T) {
+	for _, object := range []string{"sentinel", "metadata", "journal"} {
+		t.Run(object, func(t *testing.T) {
+			root := fs.NewFolder(t.TempDir(), "")
+			target := putPGRecovery(t, root, 1, false)
+			neighbor := putPGRecovery(t, root, 2, false)
+			base := root.GetSubFolder(utility.BaseBackupPath)
+			journal := internal.NewEmptyJournalInfo(neighbor, time.Unix(1, 0), time.Unix(2, 0), utility.WalPath)
+			require.NoError(t, journal.Upload(t.Context(), root))
+			recoveryPut(t, base, neighbor+"/payload", "keep")
+			key := map[string]string{"sentinel": neighbor + utility.SentinelSuffix, "metadata": neighbor + "/metadata.json",
+				"journal": internal.JournalPrefix + neighbor}[object]
+			fault := recoveryReadFailure{root, key, errors.New("unreadable object")}
+			p, err := postgres.PlanRecoveryDeletion(t.Context(), fault, "default", []string{target}, false)
+			require.NoError(t, err)
+			defer p.Close()
+			require.Equal(t, []string{target}, p.TargetNames())
+			require.Contains(t, strings.Join(p.Warnings, " "), neighbor)
+			require.NoError(t, p.Execute(t.Context(), false))
+			recoveryExists(t, base, target+utility.SentinelSuffix, true)
+			require.NoError(t, p.Execute(t.Context(), true))
+			recoveryExists(t, base, target+utility.SentinelSuffix, false)
+			recoveryExists(t, base, target+"/metadata.json", false)
+			for _, key := range []string{neighbor + utility.SentinelSuffix, neighbor + "/payload", neighbor + "/metadata.json", internal.JournalPrefix + neighbor} {
+				recoveryExists(t, base, key, true)
+			}
+			survivor, err := internal.NewJournalInfo(t.Context(), neighbor, root, utility.WalPath)
+			require.NoError(t, err)
+			require.True(t, journal.PriorBackupEnd.Equal(survivor.PriorBackupEnd))
+		})
+	}
+}
+
+func TestRecoveryUnreadableAncestryDefersWALCleanup(t *testing.T) {
+	root := fs.NewFolder(t.TempDir(), "")
+	target := putPGRecovery(t, root, 1, false)
+	neighbor := putPGRecovery(t, root, 2, false)
+	wal := root.GetSubFolder(utility.WalPath)
+	key := postgres.WalSegmentNo(1).GetFilename(1)
+	recoveryPut(t, wal, key, "keep")
+	fault := recoveryReadFailure{root, neighbor + utility.SentinelSuffix, context.DeadlineExceeded}
+	_, err := postgres.PlanRecoveryDeletion(t.Context(), fault, "default", []string{target}, true)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+
+	fault.err = errors.New("unreadable sentinel")
+	p, err := postgres.PlanRecoveryDeletion(t.Context(), fault, "default", []string{target}, true)
+	require.NoError(t, err)
+	defer p.Close()
+	require.ErrorContains(t, p.Execute(t.Context(), true), "WALs retained")
+	base := root.GetSubFolder(utility.BaseBackupPath)
+	recoveryExists(t, base, target+utility.SentinelSuffix, false)
+	recoveryExists(t, base, neighbor+utility.SentinelSuffix, true)
+	recoveryExists(t, wal, key, true)
+}
+
+func TestRecoveryIncompleteReferenceToCascadedBackup(t *testing.T) {
+	for _, field := range []string{"DeltaFrom", "DeltaFullName"} {
+		t.Run(field, func(t *testing.T) {
+			root := fs.NewFolder(t.TempDir(), "")
+			base := root.GetSubFolder(utility.BaseBackupPath)
+			full := putReviewV2(t, root, 1, false, false, "")
+			delta := putReviewV2(t, root, 2, false, false, full)
+			recoveryPut(t, base, "base_damaged"+utility.SentinelSuffix, fmt.Sprintf(`{%q:%q}`, field, delta))
+			_, err := postgres.PlanRecoveryDeletion(t.Context(), root, "default", []string{full}, false)
+			require.ErrorContains(t, err, "base_damaged")
+			require.ErrorContains(t, err, delta)
+			for _, name := range []string{full, delta, "base_damaged"} {
+				recoveryExists(t, base, name+utility.SentinelSuffix, true)
+			}
+		})
+	}
 }
 
 func TestRecoveryPostgresRetainedBoundaryAndPermanentIntervals(t *testing.T) {
@@ -145,7 +239,7 @@ func TestRecoveryDependenciesAndProtectionPreflight(t *testing.T) {
 			base := root.GetSubFolder(utility.BaseBackupPath)
 			recoveryPut(t, base, "stream_B1/payload", "payload")
 			recoveryPut(t, base, "stream_B1"+utility.SentinelSuffix, "broken")
-			s := `{"IsPermanent":false,"IsIncremental":true,"DeltaFrom":"stream_B1","DeltaFullName":"stream_B1","DeltaCount":1,"DeltaLSN":1}`
+			s := `{"Tool":"WALG_XTRABACKUP_TOOL","IsPermanent":false,"IsIncremental":true,"DeltaFrom":"stream_B1","DeltaFullName":"stream_B1","DeltaCount":1,"DeltaLSN":1}`
 			if scenario == "permanent" {
 				s = strings.Replace(s, `"IsPermanent":false`, `"IsPermanent":true`, 1)
 			}
@@ -158,15 +252,17 @@ func TestRecoveryDependenciesAndProtectionPreflight(t *testing.T) {
 			recoveryPut(t, base, "stream_B2"+utility.SentinelSuffix, s)
 			recoveryPut(t, base, "journal_stream_B2", "broken")
 			p, err := mysql.PlanRecoveryDeletion(t.Context(), root, "default", []string{"stream_B1"}, false)
-			if p != nil {
-				defer p.Close()
-			}
-			if scenario != "cascade" && scenario != "permanent" {
-				require.Error(t, err)
-				recoveryExists(t, base, "stream_B1/payload", true)
+			require.NoError(t, err)
+			defer p.Close()
+			if scenario == "unknown" || scenario == "cycle" {
+				require.Equal(t, []string{"stream_B1"}, p.TargetNames())
+				require.Contains(t, strings.Join(p.Warnings, " "), "stream_B2")
+				require.NoError(t, p.Execute(t.Context(), true))
+				recoveryExists(t, base, "stream_B1/payload", false)
+				recoveryExists(t, base, "stream_B2"+utility.SentinelSuffix, true)
+				recoveryExists(t, base, "journal_stream_B2", true)
 				return
 			}
-			require.NoError(t, err)
 			require.Equal(t, []string{"stream_B1", "stream_B2"}, p.TargetNames())
 			require.NoError(t, p.Execute(t.Context(), true))
 			recoveryExists(t, base, "journal_stream_B2", false)
@@ -217,7 +313,7 @@ func TestRecoveryJournalDoesNotReadDamagedTarget(t *testing.T) {
 	base := root.GetSubFolder(utility.BaseBackupPath)
 	for i := 1; i <= 3; i++ {
 		name := fmt.Sprintf("stream_B%d", i)
-		recoveryPut(t, base, name+utility.SentinelSuffix, `{"IsPermanent":false,"IsIncremental":false}`)
+		recoveryPut(t, base, name+utility.SentinelSuffix, `{"Tool":"WALG_XTRABACKUP_TOOL","IsPermanent":false,"IsIncremental":false}`)
 		j := internal.NewEmptyJournalInfo(name, time.Unix(int64(i-1), 0), time.Unix(int64(i), 0), mysql.BinlogPath)
 		require.NoError(t, j.Upload(t.Context(), root))
 	}
