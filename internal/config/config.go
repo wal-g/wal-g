@@ -126,6 +126,8 @@ const (
 	FailoverStorageCacheEMAAlphaDeadMin  = "WALG_FAILOVER_STORAGES_CACHE_EMA_ALPHA_DEAD_MIN"
 	FailoverStoragesCheckSize            = "WALG_FAILOVER_STORAGES_CHECK_SIZE"
 	PgDaemonWALUploadTimeout             = "WALG_DAEMON_WAL_UPLOAD_TIMEOUT"
+	PgArchiveSkipList                    = "WALG_PG_ARCHIVE_SKIP_LIST"
+	PgArchiveSkipListTTL                 = "WALG_PG_ARCHIVE_SKIP_LIST_TTL"
 	PgTargetStorage                      = "WALG_TARGET_STORAGE"
 	DisablePartialRestore                = "WALG_DISABLE_PARTIAL_RESTORE"
 
@@ -351,6 +353,7 @@ var (
 		PgAliveCheckInterval:      "1m",
 		FailoverStoragesCheckSize: "1mb",
 		PgDaemonWALUploadTimeout:  "60s",
+		PgArchiveSkipListTTL:      "60s",
 		ForceWalDetal:             "false",
 		PgAppName:                 "wal-g",
 	}
@@ -358,6 +361,7 @@ var (
 	GPDefaultSettings = map[string]string{
 		DisasterCopySkipFiles:        `^segments_005/seg-?[0-9]+/wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$`,
 		GPLogsDirectory:              "/var/log",
+		PgArchiveSkipListTTL:         "60s",
 		PgWalSize:                    "64",
 		PgWalPageSize:                "32768",
 		PgBlockSize:                  "32768",
@@ -573,6 +577,8 @@ var (
 		FailoverStorageCacheEMAAlphaDeadMin:  true,
 		FailoverStoragesCheckSize:            true,
 		PgDaemonWALUploadTimeout:             true,
+		PgArchiveSkipList:                    true,
+		PgArchiveSkipListTTL:                 true,
 		DisablePartialRestore:                true,
 		ForceWalDetal:                        true,
 		PgAppName:                            true,

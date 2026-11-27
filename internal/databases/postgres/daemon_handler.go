@@ -19,6 +19,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/daemon"
 	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/statistics"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -62,7 +63,7 @@ func (h *CheckMessageHandler) Handle(_ context.Context, _ []byte) error {
 
 type ArchiveMessageHandler struct {
 	fd       net.Conn
-	uploader *WalUploader
+	storage  storage.Storage
 	archiver *daemonArchiver
 }
 
@@ -84,8 +85,8 @@ func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) 
 	defer cancel()
 	if h.archiver != nil {
 		err = h.archiver.Push(ctx, fullPath)
-	} else {
-		err = HandleWALPush(ctx, h.uploader, fullPath)
+	} else if !SkipListedWAL(fullPath) {
+		err = h.pushBatch(ctx, fullPath)
 	}
 	if err != nil {
 		return fmt.Errorf("file archiving failed: %w", err)
@@ -95,6 +96,14 @@ func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) 
 		return newSocketWriteFailedError(err)
 	}
 	return nil
+}
+
+func (h *ArchiveMessageHandler) pushBatch(ctx context.Context, walFilePath string) error {
+	walUploader, err := PrepareMultiStorageWalUploader(ctx, h.storage.RootFolder(), "")
+	if err != nil {
+		return err
+	}
+	return HandleWALPush(ctx, walUploader, walFilePath)
 }
 
 type WalFetchMessageHandler struct {
@@ -148,11 +157,7 @@ func NewMessageHandler(
 	case daemon.CheckType:
 		return &CheckMessageHandler{c}, nil
 	case daemon.WalPushType:
-		walUploader, err := PrepareMultiStorageWalUploader(ctx, storage.RootFolder(), "")
-		if err != nil {
-			return nil, err
-		}
-		return &ArchiveMessageHandler{fd: c, uploader: walUploader}, nil
+		return &ArchiveMessageHandler{fd: c, storage: storage}, nil
 	case daemon.WalFetchType:
 		folderReader, err := internal.PrepareMultiStorageFolderReader(ctx, storage.RootFolder(), "")
 		if err != nil {
@@ -287,13 +292,16 @@ func processConnection(ctx context.Context, c net.Conn, multiSt *multistorage.St
 			failAndLogError(c, fmt.Errorf("read message from %s, err: %v", c.RemoteAddr(), err))
 			return
 		}
+		if messageType == daemon.WalPushType {
+			defer statistics.PushMetrics() // After the reply, which must not wait for DNS.
+		}
 		err = handleMessage(ctx, messageType, messageBody, c, multiSt, archiver)
 		if err != nil {
 			failAndLogError(c, err)
 			return
 		}
 		if messageType == daemon.WalPushType {
-			tracelog.DebugLogger.Printf("successfully archived: %s\n", string(messageBody))
+			tracelog.DebugLogger.Printf("wal-push acknowledged: %s\n", string(messageBody))
 			return
 		}
 		if messageType == daemon.WalFetchType {
