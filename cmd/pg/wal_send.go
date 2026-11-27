@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	walSendShortDescription = "Serve WAL from the storage to connecting standbys " +
+	walSendShortDescription = "Serve archived WAL and the latest backup to clients " +
 		"via the postgres Streaming Replication Protocol"
 
 	walSendAddressFlag      = "address"

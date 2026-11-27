@@ -286,6 +286,12 @@ func (s *walSendServer) handleConnection(ctx context.Context, conn net.Conn) {
 			conn.RemoteAddr(), time.Since(start).Round(time.Millisecond))
 	}()
 
+	// Advertise the archive's PostgreSQL version even on the first connection,
+	// before the asynchronous warmup has finished. Callers share the identity cache.
+	if _, err := s.identifySystem(ctx); err != nil {
+		tracelog.WarningLogger.Printf("wal-send: initialize client identity: %v", err)
+		return
+	}
 	client := newWalSendClient(s, conn)
 	client.Serve(ctx)
 }
@@ -423,6 +429,8 @@ func (c *walSendClient) handleQuery(ctx context.Context, query string) {
 			&pgproto3.ReadyForQuery{TxStatus: 'I'})
 	case "START_REPLICATION":
 		c.handleStartReplication(ctx, fields)
+	case "BASE_BACKUP":
+		c.handleBaseBackup(ctx, query)
 	default:
 		_ = c.writeQueryError("0A000",
 			fmt.Sprintf("wal-send does not support the %q command", fields[0]))
