@@ -564,6 +564,7 @@ func getBinlogSinceTS(ctx context.Context, folder storage.Folder, backupName str
 			}
 		}
 	}
+	sentinelTS := startTS
 	// case when binlog was uploaded before backup
 	binlogs, _, err := folder.GetSubFolder(BinlogPath).ListFolder(ctx)
 	if err != nil {
@@ -577,7 +578,56 @@ func getBinlogSinceTS(ctx context.Context, folder storage.Folder, backupName str
 			}
 		}
 	}
-	return startTS, nil
+	return skipCoveredBinlogs(binlogs, startTS, sentinelTS, streamSentinel.BinLogFileName), nil
+}
+
+// skipCoveredBinlogs moves startTS past binlogs the backup already contains.
+// BinLogStart only advances when binlog-push runs around backup time, so
+// startTS can point at files well before the backup boundary, and those
+// would be replayed in full. A file counts as covered when it belongs to the
+// boundary file's sequence, is numbered before it, and was uploaded before the
+// backup sentinel: after a failover another server may upload files with the
+// same names, but only after the backup finished. Only the leading run of
+// covered files is skipped, so nothing uploaded in between is lost.
+func skipCoveredBinlogs(binlogs []storage.Object, startTS, sentinelTS time.Time, boundaryFile string) time.Time {
+	prefix, boundary, ok := parseRecoveryBinlog(boundaryFile)
+	if !ok || sentinelTS.Equal(utility.MaxTime) {
+		return startTS
+	}
+	binlogs = slices.Clone(binlogs)
+	slices.SortFunc(binlogs, func(a, b storage.Object) int {
+		return a.GetLastModified().Compare(b.GetLastModified())
+	})
+	skipped := 0
+	for _, binlog := range binlogs {
+		modified := binlog.GetLastModified()
+		if modified.Before(startTS) {
+			continue
+		}
+		if modified.Before(sentinelTS) && binlogBefore(binlog.GetName(), prefix, boundary) {
+			skipped++
+			continue
+		}
+		if skipped > 0 {
+			// files uploaded at the same instant as this one are kept too
+			tracelog.InfoLogger.Printf("Skipping binlogs uploaded before %s: covered by the backup (boundary %s)",
+				binlog.GetName(), boundaryFile)
+			return modified
+		}
+		break
+	}
+	return startTS
+}
+
+// binlogBefore reports whether storage object name is a binlog of the given
+// sequence numbered before boundary.
+func binlogBefore(name, prefix string, boundary uint64) bool {
+	m := recoveryBinlogObject.FindStringSubmatch(name)
+	if m == nil {
+		return false
+	}
+	p, n, ok := parseRecoveryBinlog(m[1])
+	return ok && p == prefix && n < boundary
 }
 
 // getLogsCoveringInterval lists the operation logs that cover the interval
