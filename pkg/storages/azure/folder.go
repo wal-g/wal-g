@@ -119,6 +119,24 @@ func (folder *Folder) ListFolder(ctx context.Context) ([]storage.Object, []stora
 	return objects, subFolders, nil
 }
 
+func (folder *Folder) ListObjectsWithPrefix(ctx context.Context, prefix string) ([]storage.Object, error) {
+	base := storage.AddDelimiterToPath(folder.path)
+	fullPrefix := base + prefix
+	pager := folder.containerClient.NewListBlobsFlatPager(&container.ListBlobsFlatOptions{Prefix: &fullPrefix})
+	var objects []storage.Object
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("list Azure objects with prefix %q: %w", fullPrefix, err)
+		}
+		for _, blob := range page.Segment.BlobItems {
+			name := strings.TrimPrefix(*blob.Name, base)
+			objects = append(objects, storage.NewLocalObject(name, *blob.Properties.LastModified, *blob.Properties.ContentLength))
+		}
+	}
+	return objects, nil
+}
+
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return NewFolder(
 		storage.AddDelimiterToPath(storage.JoinPath(folder.path, subFolderRelativePath)),
