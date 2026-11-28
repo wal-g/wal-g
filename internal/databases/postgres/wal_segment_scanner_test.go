@@ -61,21 +61,54 @@ func TestWalSegmentScanner_ScanAllRange(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	assert.Len(t, walSegmentScanner.ScannedSegments, int(startSegmentNo-stopSegmentNo))
+	scannedSegments := expandScannedRuns(walSegmentScanner.Runs())
+	assert.Len(t, scannedSegments, int(startSegmentNo-stopSegmentNo))
 
-	for _, segment := range walSegmentScanner.ScannedSegments {
+	for _, segment := range scannedSegments {
 		// check that all scanned segments are in range [stopSegmentNo, startSegmentNo)
 		assert.True(t, segment.Number >= stopSegmentNo && segment.Number <= startSegmentNo)
 		// check that timeline is correct for each segment
 		assert.Equal(t, timelineId, segment.Timeline)
 	}
 
-	// check that all segments in walSegmentScanner.ScannedSegments are unique
+	// check that all scanned segments are unique
 	scannedSegmentNumbersSet := make(map[postgres.WalSegmentNo]bool)
-	for _, segment := range walSegmentScanner.ScannedSegments {
+	for _, segment := range scannedSegments {
 		scannedSegmentNumbersSet[segment.Number] = true
 	}
-	assert.Len(t, scannedSegmentNumbersSet, len(walSegmentScanner.ScannedSegments))
+	assert.Len(t, scannedSegmentNumbersSet, len(scannedSegments))
+}
+
+// TestWalSegmentScanner_RunsAreAggregated checks that the scanner keeps one run
+// per status change instead of one entry per segment
+func TestWalSegmentScanner_RunsAreAggregated(t *testing.T) {
+	stopSegmentNo := postgres.WalSegmentNo(5000)
+	startSegmentNo := postgres.WalSegmentNo(15000)
+	lost := map[postgres.WalSegmentNo]bool{6000: true, 6001: true, 9000: true}
+	walSegmentScanner := createWalSegmentScanner(1, stopSegmentNo, startSegmentNo, lost)
+	err := walSegmentScanner.Scan(postgres.SegmentScanConfig{
+		UnlimitedScan:        true,
+		MissingSegmentStatus: postgres.Lost,
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, []postgres.ScannedSegmentRun{
+		{Timeline: 1, Status: postgres.Found, MinNo: 5000, MaxNo: 5999, Count: 1000},
+		{Timeline: 1, Status: postgres.Lost, MinNo: 6000, MaxNo: 6001, Count: 2},
+		{Timeline: 1, Status: postgres.Found, MinNo: 6002, MaxNo: 8999, Count: 2998},
+		{Timeline: 1, Status: postgres.Lost, MinNo: 9000, MaxNo: 9000, Count: 1},
+		{Timeline: 1, Status: postgres.Found, MinNo: 9001, MaxNo: 14999, Count: 5999},
+	}, walSegmentScanner.Runs())
+}
+
+func expandScannedRuns(runs []postgres.ScannedSegmentRun) []postgres.WalSegmentDescription {
+	result := make([]postgres.WalSegmentDescription, 0)
+	for _, run := range runs {
+		for no := run.MinNo; no <= run.MaxNo; no++ {
+			result = append(result, postgres.WalSegmentDescription{Timeline: run.Timeline, Number: no})
+		}
+	}
+	return result
 }
 
 // testWalSegmentScannerMissingSegments invokes Scan() method and returns found missing segment numbers
