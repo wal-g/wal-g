@@ -65,6 +65,11 @@ func (lf *LimitedFolder) WithAllVersions() storage.Folder {
 	return NewLimitedFolder(storage.WithAllVersions(lf.Folder), lf.limiter)
 }
 
+// CheckReadAccess delegates to the underlying folder so that its bounded probe is not hidden by the wrapper.
+func (lf *LimitedFolder) CheckReadAccess(ctx context.Context) error {
+	return storage.CheckReadAccess(ctx, lf.Folder)
+}
+
 func (lf *LimitedFolder) WalkObjects(ctx context.Context, visit func(storage.Object) error) error {
 	return storage.WalkObjects(ctx, lf.Folder, visit)
 }

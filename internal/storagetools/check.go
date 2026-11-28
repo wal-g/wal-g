@@ -13,7 +13,7 @@ import (
 )
 
 func HandleCheckRead(ctx context.Context, folder storage.Folder, filenames []string) error {
-	_, _, err := folder.ListFolder(ctx)
+	err := storage.CheckReadAccess(ctx, folder)
 	if err != nil {
 		return fmt.Errorf("failed to list the storage: %v", err)
 	}
